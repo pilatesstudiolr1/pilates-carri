@@ -24,10 +24,11 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-[var(--radius-lg)]',
-        'bg-[var(--bg-secondary)] border border-[var(--border-default)]',
+        'rounded-2xl',
+        'bg-[var(--bg-secondary)] border border-[var(--border-default)] shadow-[0_2px_8px_rgba(0,0,0,0.03)]',
+        'transition-all duration-300',
         hover &&
-          'transition-all duration-[var(--transition-base)] hover:border-[var(--border-hover)] hover:shadow-[var(--shadow-md)] cursor-pointer',
+          'hover:-translate-y-0.5 hover:border-[var(--border-hover)] hover:shadow-md cursor-pointer',
         paddingStyles[padding],
         className
       )}
@@ -36,6 +37,7 @@ export function Card({
     </div>
   );
 }
+
 
 interface CardHeaderProps {
   title: string;

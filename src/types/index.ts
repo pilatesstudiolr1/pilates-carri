@@ -8,8 +8,10 @@ export interface NavItem {
   icon: string;
   roles: UserRole[];
   badge?: string | number;
+  section?: string;
   disabled?: boolean;
 }
+
 
 export interface BreadcrumbItem {
   label: string;

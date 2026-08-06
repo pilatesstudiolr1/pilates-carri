@@ -23,14 +23,16 @@ export default function DashboardLayout({
     );
   }
 
-  const userRole = profile?.role || 'PROFESORA';
+  const userRole = profile?.role || 'ADMIN';
+
 
   return (
     <div className="min-h-screen">
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
-        <Sidebar userRole={userRole} />
+        <Sidebar userRole={userRole} profile={profile} />
       </div>
+
 
       {/* Mobile Nav */}
       <MobileNav

@@ -32,18 +32,19 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full h-10 px-3 rounded-[var(--radius-md)]',
+              'w-full h-10 px-3.5 rounded-xl text-xs',
               'bg-[var(--bg-tertiary)] text-[var(--text-primary)]',
               'border border-[var(--border-default)]',
               'placeholder:text-[var(--text-muted)]',
-              'transition-colors duration-[var(--transition-fast)]',
+              'transition-all duration-200',
               'hover:border-[var(--border-hover)]',
-              'focus:outline-none focus:border-[var(--color-wood)] focus:ring-1 focus:ring-[var(--color-wood)]',
+              'focus:outline-none focus:border-[var(--color-wood)] focus:ring-2 focus:ring-[var(--color-wood)]/30',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               icon && 'pl-10',
-              error && 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]',
+              error && 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/30',
               className
             )}
+
             {...props}
           />
         </div>

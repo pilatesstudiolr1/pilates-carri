@@ -14,22 +14,23 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[var(--color-wood)] text-[var(--color-dark)] hover:bg-[var(--color-wood-light)] active:bg-[var(--color-wood-dark)] shadow-sm',
+    'bg-[var(--color-wood)] text-white hover:bg-[var(--color-wood-light)] active:bg-[var(--color-wood-dark)] shadow-xs font-semibold',
   secondary:
-    'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--color-olive)] border border-[var(--border-default)]',
+    'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--border-default)] border border-[var(--border-default)] font-semibold',
   danger:
-    'bg-[var(--color-danger)] text-white hover:bg-red-400 active:bg-red-500',
+    'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger)]/30 hover:bg-[var(--color-danger)] hover:text-white font-semibold',
   ghost:
-    'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]',
+    'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] font-semibold',
   outline:
-    'border border-[var(--border-default)] text-[var(--text-primary)] hover:border-[var(--color-wood)] hover:text-[var(--color-wood)]',
+    'border border-[var(--border-default)] text-[var(--text-primary)] hover:border-[var(--color-wood)] hover:text-[var(--color-wood)] bg-[var(--bg-secondary)] font-semibold',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
-  lg: 'h-12 px-6 text-base gap-2.5',
+  sm: 'h-8 px-3 text-xs gap-1.5 rounded-xl',
+  md: 'h-10 px-4 text-xs gap-2 rounded-xl',
+  lg: 'h-12 px-6 text-sm gap-2.5 rounded-xl',
 };
+
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (
@@ -49,8 +50,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-[var(--radius-md)] font-medium',
-          'transition-all duration-[var(--transition-fast)]',
+          'inline-flex items-center justify-center rounded-xl font-semibold',
+          'transition-all duration-200 active:scale-[0.98]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-wood)]',
           'disabled:opacity-50 disabled:pointer-events-none',
           'cursor-pointer select-none',
@@ -58,6 +59,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           sizeStyles[size],
           className
         )}
+
         disabled={disabled || loading}
         {...props}
       >

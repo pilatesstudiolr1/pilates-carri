@@ -10,18 +10,29 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Pilates Studio',
-    template: '%s | Pilates Studio',
+    default: 'Pilates Studio LR',
+    template: '%s | Pilates Studio LR',
   },
-  description: 'Sistema de gestion integral para estudios de Pilates',
+  description: 'Sistema de gestión integral para estudios de Pilates Reformer',
+  icons: {
+    icon: '/favicon.webp',
+    shortcut: '/favicon.webp',
+    apple: '/favicon.webp',
+  },
 };
+
+
+import { ToastProvider } from '@/components/providers/ToastProvider';
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="es" className={`${inter.variable} h-full`}>
       <body className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
-        {children}
+        <ToastProvider>
+          {children}
+        </ToastProvider>
       </body>
     </html>
   );
 }
+

@@ -34,8 +34,22 @@ export function useUser(): UseUserReturn {
           .eq('id', user.id)
           .single();
 
-        if (profileError) {
-          setError(profileError.message);
+        if (profileError || !data) {
+          setError(profileError?.message || 'Perfil no encontrado');
+          setProfile({
+            id: user.id,
+            email: user.email || 'admin@pilatesstudio.com',
+            full_name: user.user_metadata?.full_name || 'Administradora',
+            role: 'ADMIN',
+            avatar_url: null,
+            sede_id: null,
+            phone: null,
+            commission_rate: 0.40,
+            hourly_rate: 0,
+            is_active: true,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
         } else {
           setProfile(data as Profile);
         }
@@ -44,6 +58,7 @@ export function useUser(): UseUserReturn {
       } finally {
         setLoading(false);
       }
+
     }
 
     fetchProfile();

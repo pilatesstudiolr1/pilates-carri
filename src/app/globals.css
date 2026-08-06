@@ -2,65 +2,65 @@
 @import "tailwindcss";
 
 :root {
-  /* Paleta principal - Pilates Studio */
-  --color-wood: #DFB267;
-  --color-wood-light: #E8C88A;
-  --color-wood-dark: #C89B4E;
-  --color-dark: #1E1E1E;
-  --color-dark-soft: #2A2A2A;
-  --color-dark-muted: #363636;
-  --color-cream: #EBE7E0;
-  --color-cream-soft: #F5F2ED;
-  --color-warm: #F4E2BB;
-  --color-warm-soft: #F8EDDA;
-  --color-olive: #3D4A3E;
-  --color-olive-light: #4E5E4F;
-  --color-olive-dark: #2F3930;
+  /* Paleta recomendada: Terracota & Arena Serena (Boutique Wellness) */
+  --color-wood: #C87A5B;
+  --color-wood-light: #D98D6E;
+  --color-wood-dark: #B2674A;
+  --color-dark: #241E1C;
+  --color-dark-soft: #2E2725;
+  --color-dark-muted: #3B3330;
+  --color-cream: #EFECE6;
+  --color-cream-soft: #F9F7F3;
+  --color-warm: #F2E3D5;
+  --color-warm-soft: #FAF3EC;
+  --color-olive: #4E5E53;
+  --color-olive-light: #617366;
+  --color-olive-dark: #3B473F;
 
   /* Semanticos */
   --color-primary: var(--color-wood);
   --color-primary-hover: var(--color-wood-light);
   --color-primary-active: var(--color-wood-dark);
 
-  --color-success: #4ADE80;
-  --color-success-soft: rgba(74, 222, 128, 0.15);
-  --color-warning: #FBBF24;
-  --color-warning-soft: rgba(251, 191, 36, 0.15);
-  --color-danger: #F87171;
-  --color-danger-soft: rgba(248, 113, 113, 0.15);
-  --color-info: #60A5FA;
-  --color-info-soft: rgba(96, 165, 250, 0.15);
+  --color-success: #16A34A;
+  --color-success-soft: rgba(22, 163, 74, 0.1);
+  --color-warning: #D97706;
+  --color-warning-soft: rgba(217, 119, 6, 0.1);
+  --color-danger: #DC2626;
+  --color-danger-soft: rgba(220, 38, 38, 0.1);
+  --color-info: #2563EB;
+  --color-info-soft: rgba(37, 99, 235, 0.1);
 
-  /* Fondos */
-  --bg-primary: var(--color-dark);
-  --bg-secondary: var(--color-dark-soft);
-  --bg-tertiary: var(--color-dark-muted);
-  --bg-elevated: #1A1A1A;
-  --bg-overlay: rgba(0, 0, 0, 0.6);
+  /* Tema Por Defecto: Alabastro & Arena (Light) */
+  --bg-primary: #F9F7F3;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #EFECE6;
+  --bg-elevated: #FFFFFF;
+  --bg-overlay: rgba(24, 20, 18, 0.45);
 
   /* Texto */
-  --text-primary: var(--color-cream);
-  --text-secondary: #A8A29E;
-  --text-muted: #78716C;
+  --text-primary: #241E1C;
+  --text-secondary: #635B57;
+  --text-muted: #877E78;
   --text-accent: var(--color-wood);
 
   /* Bordes */
-  --border-default: rgba(235, 231, 224, 0.1);
-  --border-hover: rgba(235, 231, 224, 0.2);
+  --border-default: #E4DFD7;
+  --border-hover: #D6CECE;
   --border-focus: var(--color-wood);
 
   /* Sombras */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(223, 178, 103, 0.15);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.07);
+  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.09);
+  --shadow-glow: 0 0 20px rgba(200, 122, 91, 0.2);
 
   /* Radios */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 
   /* Transiciones */
@@ -73,6 +73,32 @@
   --sidebar-collapsed-width: 72px;
   --header-height: 64px;
 }
+
+/* Tema Oscuro (Midnight Terracotta) */
+[data-theme="dark"], .dark {
+  --bg-primary: #1A1615;
+  --bg-secondary: #241E1D;
+  --bg-tertiary: #2F2726;
+  --bg-elevated: #282120;
+  --bg-overlay: rgba(0, 0, 0, 0.65);
+
+  --text-primary: #F7F4F0;
+  --text-secondary: #A89F99;
+  --text-muted: #7A716B;
+
+  --border-default: rgba(247, 244, 240, 0.12);
+  --border-hover: rgba(247, 244, 240, 0.2);
+
+  --color-success: #4ADE80;
+  --color-success-soft: rgba(74, 222, 128, 0.15);
+  --color-warning: #FBBF24;
+  --color-warning-soft: rgba(251, 191, 36, 0.15);
+  --color-danger: #F87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.15);
+}
+
+
+
 
 @theme inline {
   --color-background: var(--bg-primary);
@@ -135,16 +161,42 @@ body {
   border-radius: var(--radius-sm);
 }
 
+/* Fix browser autofill background and text color on hover/focus */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
+  -webkit-text-fill-color: #1E1E1E !important;
+  caret-color: #1E1E1E !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+input, textarea {
+  caret-color: #1E1E1E;
+}
+
+input::selection, textarea::selection {
+  background: rgba(223, 178, 103, 0.4);
+  color: #1E1E1E;
+}
+
 /* Selection */
 ::selection {
   background: rgba(223, 178, 103, 0.3);
   color: var(--color-cream);
 }
 
+
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes fadeInUp {
@@ -152,6 +204,7 @@ body {
     opacity: 0;
     transform: translateY(8px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -163,6 +216,7 @@ body {
     opacity: 0;
     transform: translateX(-12px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -174,6 +228,7 @@ body {
     opacity: 0;
     transform: translateX(12px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -185,6 +240,7 @@ body {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -192,18 +248,35 @@ body {
 }
 
 @keyframes pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.7;
+  }
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .animate-fade-in {
@@ -231,12 +304,10 @@ body {
 }
 
 .animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--bg-secondary) 25%,
-    var(--bg-tertiary) 50%,
-    var(--bg-secondary) 75%
-  );
+  background: linear-gradient(90deg,
+      var(--bg-secondary) 25%,
+      var(--bg-tertiary) 50%,
+      var(--bg-secondary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
