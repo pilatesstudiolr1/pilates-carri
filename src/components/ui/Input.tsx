@@ -13,18 +13,18 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
     return (
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 w-full">
         {label && (
           <label
             htmlFor={inputId}
-            className="text-sm font-medium text-[var(--text-secondary)]"
+            className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)]"
           >
             {label}
           </label>
         )}
-        <div className="relative">
+        <div className="relative w-full">
           {icon && (
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
               {icon}
             </span>
           )}
@@ -32,7 +32,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full h-10 px-3.5 rounded-xl text-xs',
+              'w-full h-11 px-4 rounded-xl text-sm',
               'bg-[var(--bg-tertiary)] text-[var(--text-primary)]',
               'border border-[var(--border-default)]',
               'placeholder:text-[var(--text-muted)]',
@@ -40,16 +40,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               'hover:border-[var(--border-hover)]',
               'focus:outline-none focus:border-[var(--color-wood)] focus:ring-2 focus:ring-[var(--color-wood)]/30',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              icon && 'pl-10',
+              icon && 'pl-11',
               error && 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/30',
               className
             )}
-
             {...props}
           />
         </div>
         {error && (
-          <p className="text-xs text-[var(--color-danger)]">{error}</p>
+          <p className="text-xs text-[var(--color-danger)] font-medium">{error}</p>
         )}
         {hint && !error && (
           <p className="text-xs text-[var(--text-muted)]">{hint}</p>

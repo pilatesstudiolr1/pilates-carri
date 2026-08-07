@@ -8,7 +8,14 @@ import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { ProfesorFormModal } from '@/components/profesoras/ProfesorFormModal';
 import { Profile, ProfileUpdate, UserRole } from '@/types/database';
-import { getProfiles, updateProfileData, toggleProfileActive } from '@/lib/services/profesoras';
+import {
+  getProfiles,
+  updateProfileData,
+  createOrUpdateProfileByEmail,
+  toggleProfileActive,
+  getLiquidacionProfesoras,
+  LiquidacionProfesoraItem,
+} from '@/lib/services/profesoras';
 import {
   GraduationCap,
   Search,
@@ -16,15 +23,17 @@ import {
   Edit2,
   Phone,
   Mail,
-  ShieldCheck,
   Percent,
   UserCheck,
   UserX,
-  Plus,
+  TrendingUp,
+  UserPlus,
+  CalendarDays,
 } from 'lucide-react';
 
 export default function ProfesorasPage() {
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [liquidacion, setLiquidacion] = useState<LiquidacionProfesoraItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
@@ -39,17 +48,25 @@ export default function ProfesorasPage() {
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
-    const { data, error } = await getProfiles({
-      role: roleFilter,
-      isActive: activeFilter,
-      search,
-    });
+    const [profilesRes, liquidacionRes] = await Promise.all([
+      getProfiles({
+        role: roleFilter,
+        isActive: activeFilter,
+        search,
+      }),
+      getLiquidacionProfesoras(),
+    ]);
 
-    if (error) {
-      setErrorMsg(error);
+    if (profilesRes.error) {
+      setErrorMsg(profilesRes.error);
     } else {
-      setProfiles(data);
+      setProfiles(profilesRes.data);
     }
+
+    if (!liquidacionRes.error) {
+      setLiquidacion(liquidacionRes.data);
+    }
+
     setLoading(false);
   }, [roleFilter, activeFilter, search]);
 
@@ -60,13 +77,46 @@ export default function ProfesorasPage() {
     return () => clearTimeout(timer);
   }, [fetchProfiles]);
 
-  const handleUpdate = async (id: string, updateData: ProfileUpdate): Promise<boolean> => {
+  const handleCreateOrUpdateUser = async (data: {
+    id?: string;
+    email: string;
+    full_name: string;
+    role: UserRole;
+    phone?: string | null;
+    dni?: string | null;
+    commission_rate?: number;
+    is_active?: boolean;
+  }): Promise<boolean> => {
     setSubmitting(true);
-    const { error } = await updateProfileData(id, updateData);
+    let resError: string | null = null;
+
+    if (data.id) {
+      const { error } = await updateProfileData(data.id, {
+        full_name: data.full_name,
+        role: data.role,
+        phone: data.phone,
+        dni: data.dni,
+        commission_rate: data.commission_rate,
+        is_active: data.is_active,
+      });
+      resError = error;
+    } else {
+      const { error } = await createOrUpdateProfileByEmail({
+        email: data.email,
+        full_name: data.full_name,
+        role: data.role,
+        phone: data.phone,
+        dni: data.dni,
+        commission_rate: data.commission_rate,
+        is_active: data.is_active,
+      });
+      resError = error;
+    }
+
     setSubmitting(false);
 
-    if (error) {
-      alert(`Error al actualizar el usuario: ${error}`);
+    if (resError) {
+      alert(`Error al guardar el perfil de usuario: ${resError}`);
       return false;
     }
 
@@ -99,10 +149,80 @@ export default function ProfesorasPage() {
             <GraduationCap className="h-6 w-6 text-[var(--color-wood)]" /> Gestión de Profesoras y Usuarios
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Administra los roles, comisiones, datos de contacto y acceso del personal ({profiles.length} usuarios)
+            Administra roles (Admin / Profesor), vinculación de mails registradas en Supabase y comisiones ({profiles.length} usuarios)
           </p>
         </div>
+
+        <Button
+          onClick={() => {
+            setSelectedProfile(null);
+            setIsModalOpen(true);
+          }}
+          icon={<UserPlus className="h-4 w-4" />}
+        >
+          Asignar / Crear Usuario
+        </Button>
       </div>
+
+      {/* Sección Liquidación Diaria por Porcentaje */}
+      <Card className="p-5 flex flex-col gap-4 border border-[var(--border-default)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3">
+          <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-[var(--color-wood)]" /> Liquidación Diaria por Porcentaje
+          </h2>
+          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+            <CalendarDays className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Calculado en tiempo real
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-6 gap-2">
+            <Spinner size="sm" />
+            <span className="text-xs text-[var(--text-muted)]">Calculando comisiones diarias...</span>
+          </div>
+        ) : liquidacion.length === 0 ? (
+          <p className="text-xs text-[var(--text-muted)] py-3 text-center">
+            No se han registrado cobros asociados a profesoras en lo que va del mes.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
+                  <th className="py-2.5 px-3 font-semibold">Profesora</th>
+                  <th className="py-2.5 px-3 font-semibold">% Comisión</th>
+                  <th className="py-2.5 px-3 font-semibold">Cobros Hoy</th>
+                  <th className="py-2.5 px-3 font-semibold">Recaudado Hoy</th>
+                  <th className="py-2.5 px-3 font-semibold text-[var(--color-wood)]">A Pagar Hoy</th>
+                  <th className="py-2.5 px-3 font-semibold">Recaudado Mes</th>
+                  <th className="py-2.5 px-3 font-semibold text-[var(--color-wood)] text-right">A Pagar Acumulado Mes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
+                {liquidacion.map((item) => (
+                  <tr key={item.profesora_id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                    <td className="py-3 px-3 font-bold">{item.profesora_nombre}</td>
+                    <td className="py-3 px-3">
+                      <span className="px-2 py-0.5 rounded bg-[var(--color-wood)]/20 text-[var(--color-wood)] font-bold">
+                        {(item.commission_rate * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 font-medium">{item.pagos_hoy} cobros</td>
+                    <td className="py-3 px-3 text-[var(--text-muted)]">${item.monto_hoy.toLocaleString()}</td>
+                    <td className="py-3 px-3 font-extrabold text-[var(--color-wood)]">
+                      ${item.comision_hoy.toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-[var(--text-muted)]">${item.monto_mes.toLocaleString()}</td>
+                    <td className="py-3 px-3 font-extrabold text-[var(--color-wood)] text-right">
+                      ${item.comision_mes.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       {/* Filtros y Búsqueda */}
       <Card className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -137,7 +257,7 @@ export default function ProfesorasPage() {
                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            Administradas
+            Administradores
           </button>
           <button
             onClick={() => setRoleFilter('PROFESORA')}
@@ -147,7 +267,7 @@ export default function ProfesorasPage() {
                 : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
             }`}
           >
-            Profesoras
+            Profesores
           </button>
 
           <span className="text-xs text-[var(--text-muted)] ml-2 mr-1">Estado:</span>
@@ -219,9 +339,9 @@ export default function ProfesorasPage() {
                       </h3>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {profile.role === 'ADMIN' ? (
-                          <Badge variant="warning">Administradora</Badge>
+                          <Badge variant="warning">Administrador</Badge>
                         ) : (
-                          <Badge variant="default">Profesora</Badge>
+                          <Badge variant="default">Profesor</Badge>
                         )}
                       </div>
                     </div>
@@ -260,7 +380,7 @@ export default function ProfesorasPage() {
                   }}
                   icon={<Edit2 className="h-3.5 w-3.5" />}
                 >
-                  Editar Perfil
+                  Editar Perfil y Rol
                 </Button>
 
                 {profile.is_active ? (
@@ -286,11 +406,11 @@ export default function ProfesorasPage() {
         </div>
       )}
 
-      {/* Modal de edición de perfil */}
+      {/* Modal de edición/alta de perfil por email */}
       <ProfesorFormModal
         open={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleUpdate}
+        onSubmit={handleCreateOrUpdateUser}
         profileToEdit={selectedProfile}
         loading={submitting}
       />

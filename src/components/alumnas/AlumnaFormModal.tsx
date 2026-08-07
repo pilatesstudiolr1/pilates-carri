@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
-import { User, Phone, Mail, MapPin, FileText, AlertCircle, Heart, CheckCircle2 } from 'lucide-react';
+import { User, Phone, Mail, FileText, AlertCircle, Heart, CheckCircle2, Cake } from 'lucide-react';
 
 interface AlumnaFormModalProps {
   isOpen: boolean;
@@ -13,6 +13,18 @@ interface AlumnaFormModalProps {
   onSubmit: (data: AlumnaInsert) => Promise<boolean>;
   alumnaToEdit?: Alumna | null;
   loading?: boolean;
+}
+
+function calcularEdad(fechaNacimiento: string): number | null {
+  if (!fechaNacimiento) return null;
+  const hoy = new Date();
+  const nac = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const mes = hoy.getMonth() - nac.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) {
+    edad--;
+  }
+  return edad >= 0 ? edad : null;
 }
 
 export function AlumnaFormModal({
@@ -27,7 +39,7 @@ export function AlumnaFormModal({
   const [dni, setDni] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [address, setAddress] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [emergencyContactName, setEmergencyContactName] = useState('');
   const [emergencyContactPhone, setEmergencyContactPhone] = useState('');
   const [injuries, setInjuries] = useState('');
@@ -39,6 +51,8 @@ export function AlumnaFormModal({
   const [entryDate, setEntryDate] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const edadCalculada = dateOfBirth ? calcularEdad(dateOfBirth) : null;
+
   useEffect(() => {
     if (alumnaToEdit) {
       setFirstName(alumnaToEdit.first_name || '');
@@ -46,7 +60,7 @@ export function AlumnaFormModal({
       setDni(alumnaToEdit.dni || '');
       setPhone(alumnaToEdit.phone || '');
       setEmail(alumnaToEdit.email || '');
-      setAddress(alumnaToEdit.address || '');
+      setDateOfBirth(alumnaToEdit.date_of_birth || '');
       setEmergencyContactName(alumnaToEdit.emergency_contact_name || '');
       setEmergencyContactPhone(alumnaToEdit.emergency_contact_phone || '');
       setInjuries(alumnaToEdit.injuries || '');
@@ -67,7 +81,7 @@ export function AlumnaFormModal({
     setDni('');
     setPhone('');
     setEmail('');
-    setAddress('');
+    setDateOfBirth('');
     setEmergencyContactName('');
     setEmergencyContactPhone('');
     setInjuries('');
@@ -85,7 +99,7 @@ export function AlumnaFormModal({
     setErrorMsg('');
 
     if (!firstName.trim() || !lastName.trim() || !dni.trim() || !phone.trim()) {
-      setErrorMsg('Por favor completa los campos obligatorios (Nombre, Apellido, DNI y Teléfono)');
+      setErrorMsg('Por favor completa los campos obligatorios (Nombre, Apellido, DNI y Telefono)');
       return;
     }
 
@@ -95,8 +109,9 @@ export function AlumnaFormModal({
       dni: dni.trim(),
       phone: phone.trim(),
       email: email.trim() || null,
-      address: address.trim() || null,
+      address: alumnaToEdit?.address || null,
       photo_url: alumnaToEdit?.photo_url || null,
+      date_of_birth: dateOfBirth || null,
       emergency_contact_name: emergencyContactName.trim() || null,
       emergency_contact_phone: emergencyContactPhone.trim() || null,
       injuries: injuries.trim() || null,
@@ -104,11 +119,28 @@ export function AlumnaFormModal({
       medication: medication.trim() || null,
       consent_signed: consentSigned,
       observations: observations.trim() || null,
+      // Campos de ficha medica ampliada
+      medical_clearance: alumnaToEdit?.medical_clearance || false,
+      diseases: alumnaToEdit?.diseases || null,
+      surgeries: alumnaToEdit?.surgeries || null,
+      health_observations: alumnaToEdit?.health_observations || null,
+      // Plan y facturacion
+      plan: alumnaToEdit?.plan || null,
+      plan_amount: alumnaToEdit?.plan_amount || 0,
+      billing_start_date: alumnaToEdit?.billing_start_date || null,
+      billing_due_date: alumnaToEdit?.billing_due_date || null,
+      enrollment_paid: alumnaToEdit?.enrollment_paid || false,
+      enrollment_amount: alumnaToEdit?.enrollment_amount || 0,
+      monthly_paid: alumnaToEdit?.monthly_paid || false,
+      preferred_payment_method: alumnaToEdit?.preferred_payment_method || null,
+      // Estado y fechas
       status,
       entry_date: entryDate || new Date().toISOString().split('T')[0],
       exit_date: alumnaToEdit?.exit_date || null,
       exit_reason: alumnaToEdit?.exit_reason || null,
+      // Relaciones
       sede_id: alumnaToEdit?.sede_id || null,
+      profesora_id: alumnaToEdit?.profesora_id || null,
       created_by: null,
     };
 
@@ -124,7 +156,7 @@ export function AlumnaFormModal({
       isOpen={isOpen}
       onClose={onClose}
       title={alumnaToEdit ? 'Editar Ficha de Alumna' : 'Registrar Nueva Alumna'}
-      description="Completa los datos de la alumna y su ficha médica"
+      description="Completa los datos de la alumna y su ficha medica"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -142,14 +174,14 @@ export function AlumnaFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Nombre *"
-              placeholder="Ej. María"
+              placeholder="Ej. Maria"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
               required
             />
             <Input
               label="Apellido *"
-              placeholder="Ej. González"
+              placeholder="Ej. Gonzalez"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
               required
@@ -162,7 +194,7 @@ export function AlumnaFormModal({
               required
             />
             <Input
-              label="Teléfono *"
+              label="Telefono *"
               placeholder="+54 380 4123456"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -170,20 +202,34 @@ export function AlumnaFormModal({
               required
             />
             <Input
-              label="Correo electrónico"
+              label="Correo electronico"
               type="email"
               placeholder="maria@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               icon={<Mail className="h-4 w-4" />}
             />
-            <Input
-              label="Dirección"
-              placeholder="Calle 123, La Rioja"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              icon={<MapPin className="h-4 w-4" />}
-            />
+
+            {/* Fecha de nacimiento con calculo de edad automatico */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+                  <Cake className="h-4 w-4 text-[var(--color-wood)]" /> Fecha de Nacimiento
+                </label>
+                {edadCalculada !== null && (
+                  <span className="text-xs font-bold text-[var(--color-wood)] bg-[var(--color-wood)]/10 px-2 py-0.5 rounded-full">
+                    {edadCalculada} anos
+                  </span>
+                )}
+              </div>
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(e) => setDateOfBirth(e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-sm"
+              />
+            </div>
           </div>
         </div>
 
@@ -200,7 +246,7 @@ export function AlumnaFormModal({
               onChange={(e) => setEmergencyContactName(e.target.value)}
             />
             <Input
-              label="Teléfono de emergencia"
+              label="Telefono de emergencia"
               placeholder="+54 380 4999999"
               value={emergencyContactPhone}
               onChange={(e) => setEmergencyContactPhone(e.target.value)}
@@ -212,7 +258,7 @@ export function AlumnaFormModal({
         {/* Seccion 3: Ficha Medica y Salud */}
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-wood)] mb-3 flex items-center gap-2">
-            <Heart className="h-4 w-4" /> Ficha Médica y Salud
+            <Heart className="h-4 w-4" /> Ficha Medica y Salud
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <Input
@@ -222,7 +268,7 @@ export function AlumnaFormModal({
               onChange={(e) => setInjuries(e.target.value)}
             />
             <Input
-              label="Medicación habitual"
+              label="Medicacion habitual"
               placeholder="Medicamentos que consume..."
               value={medication}
               onChange={(e) => setMedication(e.target.value)}
@@ -237,7 +283,7 @@ export function AlumnaFormModal({
                 onChange={(e) => setIsPregnant(e.target.checked)}
                 className="w-4 h-4 accent-[var(--color-wood)] rounded cursor-pointer"
               />
-              <span>Embarazo (En gestación)</span>
+              <span>Embarazo (En gestacion)</span>
             </label>
 
             <label className="flex items-center gap-2 text-sm text-[var(--text-primary)] cursor-pointer select-none">
@@ -295,13 +341,12 @@ export function AlumnaFormModal({
           </div>
         </div>
 
-
         {/* Acciones */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-default)]">
           <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} icon={<CheckCircle2 className="h-4 w-4" />}>
             {alumnaToEdit ? 'Guardar Cambios' : 'Registrar Alumna'}
           </Button>
         </div>

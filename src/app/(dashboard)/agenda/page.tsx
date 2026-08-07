@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { GoogleCalendarGrid } from '@/components/agenda/GoogleCalendarGrid';
+import { ReformerMatrixView } from '@/components/agenda/ReformerMatrixView';
 import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { Clase, Profile } from '@/types/database';
-import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase } from '@/lib/services/agenda';
+import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
 import { getProfiles } from '@/lib/services/profesoras';
-import { Calendar, Plus, Filter, UserCheck, LayoutGrid, CalendarDays } from 'lucide-react';
+import { Calendar, Plus, UserCheck, LayoutGrid, CalendarDays, BedDouble } from 'lucide-react';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -23,7 +24,7 @@ const DIAS = [
 ];
 
 export default function AgendaPage() {
-  const [viewMode, setViewMode] = useState<'WEEK' | 'DAY'>('WEEK');
+  const [viewMode, setViewMode] = useState<'WEEK' | 'DAY' | 'REFORMER'>('REFORMER');
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [profesoraFilter, setProfesoraFilter] = useState<string>('ALL');
 
@@ -38,8 +39,9 @@ export default function AgendaPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
 
   const [selectedClase, setSelectedClase] = useState<Clase | null>(null);
-  const [presetDay, setPresetDay] = useState<number | undefined>(undefined);
-  const [presetTime, setPresetTime] = useState<string | undefined>(undefined);
+  const [presetDay, setPresetDay] = useState<number>(1);
+  const [presetTime, setPresetTime] = useState<string>('08:00');
+  const [presetCamilla, setPresetCamilla] = useState<number>(1);
   const [submitting, setSubmitting] = useState(false);
 
   const fetchAgenda = useCallback(async () => {
@@ -84,9 +86,9 @@ export default function AgendaPage() {
     return true;
   };
 
-  const handleAssignAlumna = async (claseId: string, alumnaId: string): Promise<boolean> => {
+  const handleAssignAlumna = async (claseId: string, alumnaId: string, camilla?: number): Promise<boolean> => {
     setSubmitting(true);
-    const { error } = await addAlumnaToClase(claseId, alumnaId);
+    const { error } = await addAlumnaToClase(claseId, alumnaId, camilla || presetCamilla);
     setSubmitting(false);
 
     if (error) {
@@ -111,10 +113,45 @@ export default function AgendaPage() {
     }
   };
 
-  const handleSelectEmptySlot = (dayOfWeek: number, startTime: string) => {
-    setPresetDay(dayOfWeek);
-    setPresetTime(startTime);
-    setIsClaseModalOpen(true);
+  const handleDeleteClase = async (claseId: string) => {
+    const { error } = await deleteClase(claseId);
+    if (error) {
+      alert(`Error al eliminar el turno: ${error}`);
+    } else {
+      fetchAgenda();
+      setIsDetailModalOpen(false);
+    }
+  };
+
+  const handleSelectEmptySlot = async (dayOfWeek: number, startTime: string, camilla = 1) => {
+    let targetClase = clases.find((c) => c.day_of_week === dayOfWeek && c.start_time.startsWith(startTime));
+
+    if (!targetClase) {
+      const endHourNum = parseInt(startTime.split(':')[0], 10) + 1;
+      const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
+
+      const { data: newClase } = await createClase({
+        name: `Turno ${startTime}`,
+        profesora_id: null,
+        day_of_week: dayOfWeek,
+        start_time: `${startTime}:00`,
+        end_time: `${endTime}:00`,
+        max_capacity: 6,
+      });
+
+      if (newClase) {
+        targetClase = newClase;
+        fetchAgenda();
+      }
+    }
+
+    if (targetClase) {
+      setSelectedClase(targetClase);
+      setPresetDay(dayOfWeek);
+      setPresetTime(startTime);
+      setPresetCamilla(camilla);
+      setIsAssignModalOpen(true);
+    }
   };
 
   const handleSelectClaseBlock = (clase: Clase) => {
@@ -122,23 +159,25 @@ export default function AgendaPage() {
     setIsDetailModalOpen(true);
   };
 
+  const currentDayLabel = DIAS.find((d) => d.value === presetDay)?.label || 'Lunes';
+
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-[var(--color-wood)]" /> Agenda de Clases y Turnos
+            <Calendar className="h-6 w-6 text-[var(--color-wood)]" /> Agenda y Asistencia por Turnos
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Calendario interactivo con grilla horaria. Haz clic en un casillero vacío para crear un turno o sobre una clase para gestionarla.
+            Organización semanal por horario y Reformer. Alterna entre la vista por Reformer, vista semanal y vista diaria.
           </p>
         </div>
 
         <Button
           onClick={() => {
-            setPresetDay(undefined);
-            setPresetTime(undefined);
+            setPresetDay(1);
+            setPresetTime('08:00');
             setIsClaseModalOpen(true);
           }}
           icon={<Plus className="h-4 w-4" />}
@@ -149,12 +188,23 @@ export default function AgendaPage() {
 
       {/* Barra de Controles y Vistas */}
       <Card className="p-3 flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Vistas Semanal vs Diaria */}
+        {/* Vistas: Reformer vs Semanal vs Diaria */}
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-md border border-[var(--border-default)]">
+          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
+            <button
+              onClick={() => setViewMode('REFORMER')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'REFORMER'
+                  ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <BedDouble className="h-3.5 w-3.5" /> Vista por Reformer
+            </button>
+
             <button
               onClick={() => setViewMode('WEEK')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'WEEK'
                   ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -162,9 +212,10 @@ export default function AgendaPage() {
             >
               <LayoutGrid className="h-3.5 w-3.5" /> Vista Semanal
             </button>
+
             <button
               onClick={() => setViewMode('DAY')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 viewMode === 'DAY'
                   ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -174,14 +225,14 @@ export default function AgendaPage() {
             </button>
           </div>
 
-          {/* Días selector if Day mode */}
+          {/* Selector de Dia en modo Vista Diaria */}
           {viewMode === 'DAY' && (
             <div className="flex items-center gap-1 overflow-x-auto">
               {DIAS.map((d) => (
                 <button
                   key={d.value}
                   onClick={() => setSelectedDay(d.value)}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                     selectedDay === d.value
                       ? 'bg-[var(--color-wood)]/20 text-[var(--color-wood)] font-bold'
                       : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -196,13 +247,13 @@ export default function AgendaPage() {
 
         {/* Filtro por Profesora */}
         <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1 shrink-0">
-            <UserCheck className="h-3.5 w-3.5" /> Profesora:
+          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1 shrink-0 font-medium">
+            <UserCheck className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Profesora:
           </span>
           <select
             value={profesoraFilter}
             onChange={(e) => setProfesoraFilter(e.target.value)}
-            className="h-8 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
+            className="h-9 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-medium cursor-pointer"
           >
             <option value="ALL">Todas las profesoras</option>
             {profesoras.map((p) => (
@@ -214,32 +265,34 @@ export default function AgendaPage() {
         </div>
       </Card>
 
-      {/* Leyenda de Capacidad */}
-      <div className="flex items-center gap-4 px-1 text-xs text-[var(--text-muted)]">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[var(--color-warning-soft)] border border-[var(--color-warning)]" /> Disponibilidad alta (&lt; 4 alumnas)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[var(--color-success-soft)] border border-[var(--color-success)]" /> Cupo óptimo (4-5 alumnas)
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-[var(--color-wood)]/20 border border-[var(--color-wood)]" /> Turno Lleno (6 alumnas)
-        </span>
-      </div>
-
       {/* Error state */}
       {errorMsg && (
-        <div className="p-4 rounded-md bg-[var(--color-danger-soft)] text-sm text-[var(--color-danger)]">
+        <div className="p-4 rounded-xl bg-[var(--color-danger-soft)] text-sm text-[var(--color-danger)]">
           {errorMsg}
         </div>
       )}
 
-      {/* Grilla Google Calendar */}
+      {/* Contenido de la vista elegida */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
           <Spinner size="lg" />
-          <p className="text-xs text-[var(--text-muted)]">Cargando grilla interactiva...</p>
+          <p className="text-xs text-[var(--text-muted)]">Cargando agenda de clases...</p>
         </div>
+      ) : viewMode === 'REFORMER' ? (
+        <ReformerMatrixView
+          clases={clases}
+          selectedDay={selectedDay}
+          onSelectDay={setSelectedDay}
+          onSelectClase={handleSelectClaseBlock}
+          onSelectEmptySlot={handleSelectEmptySlot}
+          onOpenAssignModal={(c, camilla = 1) => {
+            setSelectedClase(c);
+            setPresetDay(c.day_of_week);
+            setPresetTime(c.start_time.slice(0, 5));
+            setPresetCamilla(camilla);
+            setIsAssignModalOpen(true);
+          }}
+        />
       ) : (
         <GoogleCalendarGrid
           clases={clases}
@@ -270,6 +323,7 @@ export default function AgendaPage() {
           setIsAssignModalOpen(true);
         }}
         onRemoveAlumna={handleRemoveAlumna}
+        onDeleteClase={handleDeleteClase}
       />
 
       <AsignarAlumnaModal
@@ -277,6 +331,9 @@ export default function AgendaPage() {
         onClose={() => setIsAssignModalOpen(false)}
         onAssign={handleAssignAlumna}
         clase={selectedClase}
+        dayName={currentDayLabel}
+        presetTime={presetTime}
+        presetCamilla={presetCamilla}
         loading={submitting}
       />
     </div>

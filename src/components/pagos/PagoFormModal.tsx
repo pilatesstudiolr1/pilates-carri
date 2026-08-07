@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alumna, MetodoPago } from '@/types/database';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { METODOS_PAGO } from '@/lib/constants';
-import { DollarSign, Calendar, CreditCard, Percent, FileText, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Calendar, CreditCard, Percent, FileText, CheckCircle2, Search, X, User } from 'lucide-react';
 
 interface PagoFormModalProps {
   open: boolean;
@@ -30,12 +30,12 @@ export function PagoFormModal({
   loading = false,
 }: PagoFormModalProps) {
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
-  const [alumnaId, setAlumnaId] = useState('');
+  const [alumnaSearch, setAlumnaSearch] = useState('');
+  const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago>('efectivo');
 
-
-  // Automatic next month due date
   const nextMonthDate = new Date();
   nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
   const defaultDueDate = nextMonthDate.toISOString().slice(0, 10);
@@ -44,39 +44,70 @@ export function PagoFormModal({
   const [commissionRate, setCommissionRate] = useState('40');
   const [notes, setNotes] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
       setErrorMsg('');
+      setAlumnaSearch('');
+      setSelectedAlumna(null);
+      setAmount('');
+      setNotes('');
       fetchAlumnas();
     }
   }, [open]);
 
   const fetchAlumnas = async () => {
-    const { data } = await getAlumnas({ status: 'ACTIVE' });
+    const { data } = await getAlumnas({ status: 'ACTIVE', limit: 200 });
     setAlumnas(data);
-    if (data.length > 0 && !alumnaId) {
-      setAlumnaId(data[0].id);
+  };
+
+  // Filtro local en tiempo real
+  const alumnasFiltradas = alumnaSearch.trim().length >= 1
+    ? alumnas.filter((a) => {
+        const q = alumnaSearch.toLowerCase();
+        return (
+          a.first_name.toLowerCase().includes(q) ||
+          a.last_name.toLowerCase().includes(q) ||
+          a.dni.includes(q) ||
+          `${a.last_name} ${a.first_name}`.toLowerCase().includes(q)
+        );
+      }).slice(0, 8)
+    : [];
+
+  const handleSelectAlumna = (alumna: Alumna) => {
+    setSelectedAlumna(alumna);
+    setAlumnaSearch(`${alumna.last_name}, ${alumna.first_name}`);
+    setShowDropdown(false);
+    // Pre-rellenar monto si tiene plan
+    if (alumna.plan_amount && alumna.plan_amount > 0) {
+      setAmount(String(alumna.plan_amount));
     }
+  };
+
+  const handleClearAlumna = () => {
+    setSelectedAlumna(null);
+    setAlumnaSearch('');
+    setAmount('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!alumnaId) {
+    if (!selectedAlumna) {
       setErrorMsg('Debes seleccionar una alumna');
       return;
     }
 
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      setErrorMsg('El monto del cobro debe ser un número mayor a cero');
+      setErrorMsg('El monto del cobro debe ser un numero mayor a cero');
       return;
     }
 
     const success = await onSubmit({
-      alumna_id: alumnaId,
+      alumna_id: selectedAlumna.id,
       amount: numericAmount,
       payment_method: paymentMethod,
       due_date: dueDate,
@@ -92,7 +123,7 @@ export function PagoFormModal({
       open={open}
       onClose={onClose}
       title="Registrar Pago de Mensualidad"
-      description="Cobro automático con generación de fecha de vencimiento e ingreso a caja"
+      description="Cobro con calculo automatico de comision e ingreso a caja"
       size="md"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -102,21 +133,77 @@ export function PagoFormModal({
           </div>
         )}
 
-        <div>
-          <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5">
-            Seleccionar Alumna *
+        {/* Buscador de Alumna */}
+        <div ref={dropdownRef} className="relative">
+          <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
+            <User className="h-4 w-4 text-[var(--color-wood)]" /> Alumna *
           </label>
-          <select
-            value={alumnaId}
-            onChange={(e) => setAlumnaId(e.target.value)}
-            className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
-          >
-            {alumnas.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.last_name}, {a.first_name} (DNI: {a.dni})
-              </option>
-            ))}
-          </select>
+
+          {selectedAlumna ? (
+            <div className="flex items-center justify-between p-3 rounded-md bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/40 text-xs">
+              <div>
+                <p className="font-bold text-[var(--text-primary)]">
+                  {selectedAlumna.last_name}, {selectedAlumna.first_name}
+                </p>
+                <p className="text-[var(--text-muted)]">
+                  DNI: {selectedAlumna.dni}
+                  {selectedAlumna.plan && <span className="ml-2">&bull; Plan: {selectedAlumna.plan}</span>}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleClearAlumna}
+                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                <Search className="h-4 w-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Buscar por nombre, apellido o DNI..."
+                value={alumnaSearch}
+                onChange={(e) => {
+                  setAlumnaSearch(e.target.value);
+                  setShowDropdown(true);
+                }}
+                onFocus={() => setShowDropdown(true)}
+                className="w-full h-10 pl-9 pr-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-sm placeholder:text-[var(--text-muted)]"
+              />
+
+              {/* Dropdown de resultados */}
+              {showDropdown && alumnasFiltradas.length > 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-md shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                  {alumnasFiltradas.map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => handleSelectAlumna(a)}
+                      className="w-full px-3 py-2.5 text-left text-xs hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer border-b border-[var(--border-default)] last:border-b-0"
+                    >
+                      <p className="font-semibold text-[var(--text-primary)]">
+                        {a.last_name}, {a.first_name}
+                      </p>
+                      <p className="text-[var(--text-muted)]">
+                        DNI: {a.dni} &bull; Tel: {a.phone}
+                        {a.plan && <span className="ml-1">&bull; {a.plan}</span>}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showDropdown && alumnaSearch.trim().length >= 1 && alumnasFiltradas.length === 0 && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-md shadow-lg p-3 text-xs text-[var(--text-muted)] text-center">
+                  No se encontraron alumnas con ese criterio
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -133,7 +220,7 @@ export function PagoFormModal({
 
           <div>
             <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
-              <CreditCard className="h-4 w-4 text-[var(--color-wood)]" /> Método de Pago *
+              <CreditCard className="h-4 w-4 text-[var(--color-wood)]" /> Metodo de Pago *
             </label>
             <select
               value={paymentMethod}
@@ -151,7 +238,7 @@ export function PagoFormModal({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Próximo Vencimiento (Automático) *"
+            label="Proximo Vencimiento *"
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
@@ -160,14 +247,14 @@ export function PagoFormModal({
           />
 
           <Input
-            label="Comisión Profesora (%)"
+            label="Comision Profesora (%)"
             type="number"
             min="0"
             max="100"
             value={commissionRate}
             onChange={(e) => setCommissionRate(e.target.value)}
             icon={<Percent className="h-4 w-4 text-[var(--color-wood)]" />}
-            hint="Ej. 40% comisión por turno"
+            hint="Ej. 40% comision por turno"
           />
         </div>
 
@@ -179,12 +266,22 @@ export function PagoFormModal({
           icon={<FileText className="h-4 w-4" />}
         />
 
+        {/* Preview de comision */}
+        {selectedAlumna && amount && parseFloat(amount) > 0 && (
+          <div className="p-3 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs flex items-center justify-between">
+            <span className="text-[var(--text-muted)]">Comision calculada ({commissionRate}%)</span>
+            <span className="font-bold text-[var(--color-wood)]">
+              ${(parseFloat(amount) * (parseFloat(commissionRate) || 40) / 100).toLocaleString()}
+            </span>
+          </div>
+        )}
+
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-default)] mt-2">
           <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
             Cancelar
           </Button>
           <Button type="submit" loading={loading} icon={<CheckCircle2 className="h-4 w-4" />}>
-            Cobrar en 1 Clic
+            Cobrar
           </Button>
         </div>
       </form>

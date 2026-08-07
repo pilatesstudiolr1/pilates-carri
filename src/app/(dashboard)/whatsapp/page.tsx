@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { Alumna } from '@/types/database';
-import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign } from 'lucide-react';
+import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign, Search, X } from 'lucide-react';
 
 const PLANTILLAS_PREDEFINIDAS = [
   {
@@ -34,23 +34,42 @@ const PLANTILLAS_PREDEFINIDAS = [
 
 export default function WhatsAppPage() {
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
+  const [alumnaSearch, setAlumnaSearch] = useState('');
   const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
   const [selectedPlantilla, setSelectedPlantilla] = useState(PLANTILLAS_PREDEFINIDAS[0].id);
   const [mensajeEditable, setMensajeEditable] = useState(PLANTILLAS_PREDEFINIDAS[0].texto);
   const [vencimientoCustom, setVencimientoCustom] = useState('10 de este mes');
   const [montoCustom, setMontoCustom] = useState('35.000');
-  const [horarioCustom, setHorarioCustom] = useState('Lunes y Miércoles 09:00 hs');
+  const [horarioCustom, setHorarioCustom] = useState('Lunes y Miercoles 09:00 hs');
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
     async function load() {
       const { data } = await getAlumnas({ status: 'ACTIVE' });
       setAlumnas(data);
-      if (data.length > 0) setSelectedAlumnaId(data[0].id);
     }
     load();
   }, []);
 
   const alumnaSeleccionada = alumnas.find((a) => a.id === selectedAlumnaId);
+
+  // Filtrado local por nombre para el buscador
+  const alumnasFiltradas = alumnaSearch.trim().length >= 1
+    ? alumnas.filter((a) => {
+        const q = alumnaSearch.toLowerCase();
+        return (
+          a.first_name.toLowerCase().includes(q) ||
+          a.last_name.toLowerCase().includes(q) ||
+          `${a.last_name} ${a.first_name}`.toLowerCase().includes(q)
+        );
+      }).slice(0, 8)
+    : [];
+
+  const handleSelectAlumna = (alumna: Alumna) => {
+    setSelectedAlumnaId(alumna.id);
+    setAlumnaSearch(`${alumna.last_name}, ${alumna.first_name}`);
+    setShowDropdown(false);
+  };
 
   const handleSelectPlantilla = (id: string) => {
     setSelectedPlantilla(id);
@@ -123,21 +142,61 @@ export default function WhatsAppPage() {
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            {/* Buscador de Alumna */}
+            <div className="sm:col-span-2">
               <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5">
-                Seleccionar Alumna *
+                Buscar Alumna *
               </label>
-              <select
-                value={selectedAlumnaId}
-                onChange={(e) => setSelectedAlumnaId(e.target.value)}
-                className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
-              >
-                {alumnas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.last_name}, {a.first_name} ({a.phone})
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                  <Search className="h-4 w-4" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o apellido..."
+                  value={alumnaSearch}
+                  onChange={(e) => {
+                    setAlumnaSearch(e.target.value);
+                    setShowDropdown(true);
+                    if (!e.target.value) setSelectedAlumnaId('');
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  className="w-full h-10 pl-9 pr-9 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-sm placeholder:text-[var(--text-muted)]"
+                />
+                {alumnaSearch && (
+                  <button
+                    type="button"
+                    onClick={() => { setAlumnaSearch(''); setSelectedAlumnaId(''); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+
+                {/* Dropdown */}
+                {showDropdown && alumnasFiltradas.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-md shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                    {alumnasFiltradas.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleSelectAlumna(a)}
+                        className={`w-full px-3 py-2 text-left text-xs hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer border-b border-[var(--border-default)] last:border-b-0 ${
+                          selectedAlumnaId === a.id ? 'bg-[var(--color-wood)]/10' : ''
+                        }`}
+                      >
+                        <p className="font-semibold text-[var(--text-primary)]">{a.last_name}, {a.first_name}</p>
+                        <p className="text-[var(--text-muted)]">{a.phone}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {alumnaSeleccionada && (
+                <p className="text-xs text-[var(--color-wood)] mt-1 font-semibold">
+                  Tel: {alumnaSeleccionada.phone}
+                </p>
+              )}
             </div>
 
             <Input

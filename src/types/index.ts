@@ -1,6 +1,34 @@
 import type { UserRole } from './database';
 
-export type { Profile, Sede, UserRole, EstadoAlumna, MetodoPago, EstadoPago } from './database';
+export type {
+  Profile,
+  ProfileUpdate,
+  Sede,
+  UserRole,
+  AlumnaStatus,
+  MetodoPago,
+  EstadoPago,
+  EstadoAsistencia,
+  TipoPago,
+  EstadoCuota,
+  EstadoRecuperacion,
+  EstadoClaseAlumna,
+  CondicionInventario,
+  EstadoListaEspera,
+  Alumna,
+  AlumnaInsert,
+  AlumnaUpdate,
+  Clase,
+  ClaseAlumna,
+  Asistencia,
+  Pago,
+  CajaSesion,
+  CajaMovimiento,
+  Recuperacion,
+  Cuota,
+  ListaEspera,
+  Inventario,
+} from './database';
 
 export interface NavItem {
   label: string;

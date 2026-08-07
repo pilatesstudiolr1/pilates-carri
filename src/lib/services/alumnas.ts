@@ -6,12 +6,17 @@ export async function getAlumnas(options?: {
   status?: AlumnaStatus | 'ALL';
   limit?: number;
   offset?: number;
+  sedeId?: string;
 }): Promise<{ data: Alumna[]; count: number; error: string | null }> {
   try {
     const supabase = createClient();
     let query = supabase
       .from('alumnas')
       .select('*', { count: 'exact' });
+
+    if (options?.sedeId && options.sedeId !== 'ALL') {
+      query = query.eq('sede_id', options.sedeId);
+    }
 
     if (options?.status && options.status !== 'ALL') {
       query = query.eq('status', options.status);

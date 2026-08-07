@@ -4,13 +4,39 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alumna } from '@/types/database';
-import { User, Phone, Mail, MapPin, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle } from 'lucide-react';
+import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle } from 'lucide-react';
 
 interface AlumnaDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   alumna: Alumna | null;
   onEdit?: (alumna: Alumna) => void;
+}
+
+function calcularEdad(fechaNacimiento: string | null): number | null {
+  if (!fechaNacimiento) return null;
+  const hoy = new Date();
+  const nac = new Date(fechaNacimiento);
+  let edad = hoy.getFullYear() - nac.getFullYear();
+  const mes = hoy.getMonth() - nac.getMonth();
+  if (mes < 0 || (mes === 0 && hoy.getDate() < nac.getDate())) edad--;
+  return edad >= 0 ? edad : null;
+}
+
+function getVencimientoEstado(fechaVencimiento: string | null): {
+  label: string;
+  color: string;
+  bg: string;
+} {
+  if (!fechaVencimiento) return { label: 'Sin vencimiento', color: 'var(--text-muted)', bg: 'var(--bg-tertiary)' };
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const venc = new Date(fechaVencimiento);
+  const diffDias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDias < 0) return { label: `Vencida hace ${Math.abs(diffDias)} dias`, color: '#ef4444', bg: '#fecaca' };
+  if (diffDias <= 5) return { label: `Vence en ${diffDias} dias`, color: '#f59e0b', bg: '#fef3c7' };
+  return { label: `Vence: ${fechaVencimiento}`, color: '#22c55e', bg: '#bbf7d0' };
 }
 
 export function AlumnaDetailModal({
@@ -20,6 +46,9 @@ export function AlumnaDetailModal({
   onEdit,
 }: AlumnaDetailModalProps) {
   if (!alumna) return null;
+
+  const edad = calcularEdad(alumna.date_of_birth);
+  const vencimientoEstado = getVencimientoEstado(alumna.billing_due_date);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -42,7 +71,7 @@ export function AlumnaDetailModal({
       size="lg"
     >
       <div className="flex flex-col gap-5">
-        {/* Cabecera y Estado Ficha Médica */}
+        {/* Cabecera y Estado */}
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[var(--color-wood)]/20 border border-[var(--color-wood)]/40 flex items-center justify-center text-[var(--color-wood)] font-bold text-sm">
@@ -54,29 +83,68 @@ export function AlumnaDetailModal({
               </h2>
               <p className="text-xs text-[var(--text-muted)]">
                 DNI: {alumna.dni} &bull; Alta: {alumna.entry_date}
+                {edad !== null && <span className="ml-2 font-semibold text-[var(--color-wood)]">&bull; {edad} anos</span>}
               </p>
             </div>
           </div>
-          <div>{getStatusBadge(alumna.status)}</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Vencimiento */}
+            <span
+              className="text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
+              style={{ color: vencimientoEstado.color, background: vencimientoEstado.bg + '33' }}
+            >
+              <AlertTriangle className="h-3 w-3" />
+              {vencimientoEstado.label}
+            </span>
+            {getStatusBadge(alumna.status)}
+          </div>
         </div>
 
-        {/* Ficha Médica Clínico / Antecedentes */}
+        {/* Datos Personales Rapidos */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {alumna.date_of_birth && (
+            <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center gap-2 text-xs">
+              <Cake className="h-4 w-4 text-[var(--color-wood)] shrink-0" />
+              <div>
+                <p className="text-[var(--text-muted)] text-[10px] uppercase font-semibold">Nacimiento</p>
+                <p className="text-[var(--text-primary)] font-medium">{alumna.date_of_birth}</p>
+              </div>
+            </div>
+          )}
+          {alumna.plan && (
+            <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center gap-2 text-xs">
+              <Calendar className="h-4 w-4 text-[var(--color-wood)] shrink-0" />
+              <div>
+                <p className="text-[var(--text-muted)] text-[10px] uppercase font-semibold">Plan</p>
+                <p className="text-[var(--text-primary)] font-medium">{alumna.plan}</p>
+              </div>
+            </div>
+          )}
+          {alumna.billing_due_date && (
+            <div className="p-3 rounded-lg border text-xs" style={{ borderColor: vencimientoEstado.color + '44', background: vencimientoEstado.bg + '22' }}>
+              <p className="text-[10px] uppercase font-semibold mb-0.5" style={{ color: vencimientoEstado.color }}>Vencimiento Cuota</p>
+              <p className="font-bold" style={{ color: vencimientoEstado.color }}>{alumna.billing_due_date}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Ficha Medica */}
         <div className="p-4 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] space-y-3">
           <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-wood)] flex items-center gap-2 pb-2 border-b border-[var(--border-default)]">
-            <Heart className="h-4 w-4 text-[var(--color-wood)]" /> Ficha Médica & Antecedentes Clínicos
+            <Heart className="h-4 w-4 text-[var(--color-wood)]" /> Ficha Medica y Antecedentes
           </h3>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
-              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase block mb-1">Lesiones / Patologías</span>
+              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase block mb-1">Lesiones / Patologias</span>
               <p className="text-[var(--text-primary)] font-medium">
-                {alumna.injuries || 'Ninguna patología registrada'}
+                {alumna.injuries || 'Ninguna patologia registrada'}
               </p>
             </div>
             <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
-              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase block mb-1">Medicación Habitual</span>
+              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase block mb-1">Medicacion Habitual</span>
               <p className="text-[var(--text-primary)] font-medium">
-                {alumna.medication || 'Sin medicación informada'}
+                {alumna.medication || 'Sin medicacion informada'}
               </p>
             </div>
           </div>
@@ -88,7 +156,7 @@ export function AlumnaDetailModal({
               ) : (
                 <XCircle className="h-4 w-4 text-[var(--text-muted)]" />
               )}
-              <span className="font-medium text-[var(--text-primary)]">Embarazo: <strong>{alumna.is_pregnant ? 'Sí' : 'No'}</strong></span>
+              <span className="font-medium text-[var(--text-primary)]">Embarazo: <strong>{alumna.is_pregnant ? 'Si' : 'No'}</strong></span>
             </div>
 
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
@@ -97,12 +165,12 @@ export function AlumnaDetailModal({
               ) : (
                 <XCircle className="h-4 w-4 text-[var(--color-danger)]" />
               )}
-              <span className="font-medium text-[var(--text-primary)]">Consentimiento Informado: <strong>{alumna.consent_signed ? 'Firmado' : 'Pendiente'}</strong></span>
+              <span className="font-medium text-[var(--text-primary)]">Consentimiento: <strong>{alumna.consent_signed ? 'Firmado' : 'Pendiente'}</strong></span>
             </div>
           </div>
         </div>
 
-        {/* Informacion de Contacto y Emergencia */}
+        {/* Contacto */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="p-4 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-wood)] flex items-center gap-2 pb-2 border-b border-[var(--border-default)]">
@@ -111,7 +179,6 @@ export function AlumnaDetailModal({
             <div className="space-y-1 text-xs text-[var(--text-secondary)]">
               <p className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Tel: <strong className="text-[var(--text-primary)]">{alumna.phone}</strong></p>
               <p className="flex items-center gap-1.5 truncate"><Mail className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Mail: <strong className="text-[var(--text-primary)] truncate">{alumna.email || 'No registrado'}</strong></p>
-              <p className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Dir: <strong className="text-[var(--text-primary)]">{alumna.address || 'No registrada'}</strong></p>
             </div>
           </div>
 
@@ -122,7 +189,7 @@ export function AlumnaDetailModal({
             <div className="text-xs space-y-1">
               <p className="text-[var(--text-primary)] font-bold">{alumna.emergency_contact_name || 'Sin contacto asignado'}</p>
               {alumna.emergency_contact_phone && (
-                <p className="text-[var(--text-muted)]">Teléfono: {alumna.emergency_contact_phone}</p>
+                <p className="text-[var(--text-muted)]">Telefono: {alumna.emergency_contact_phone}</p>
               )}
             </div>
           </div>
@@ -138,7 +205,7 @@ export function AlumnaDetailModal({
           </div>
         )}
 
-        {/* Pie de modal y acciones */}
+        {/* Footer */}
         <div className="flex items-center justify-between pt-3 border-t border-[var(--border-default)]">
           <Button variant="ghost" onClick={onClose}>
             Cerrar
@@ -155,7 +222,6 @@ export function AlumnaDetailModal({
           )}
         </div>
       </div>
-
     </Modal>
   );
 }

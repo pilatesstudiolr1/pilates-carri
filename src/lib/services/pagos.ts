@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/client';
-import { Pago, MetodoPago, StatusPago } from '@/types/database';
+import { Pago, MetodoPago, EstadoPago } from '@/types/database';
 
 export async function getPagos(options?: {
-  status?: StatusPago | 'ALL';
+  status?: EstadoPago | 'ALL';
   alumnaId?: string;
+  sedeId?: string;
 }): Promise<{ data: Pago[]; error: string | null }> {
   try {
     const supabase = createClient();
@@ -11,6 +12,10 @@ export async function getPagos(options?: {
       .from('pagos')
       .select('*, alumna:alumnas(*)')
       .order('payment_date', { ascending: false });
+
+    if (options?.sedeId && options.sedeId !== 'ALL') {
+      query = query.eq('sede_id', options.sedeId);
+    }
 
     if (options?.status && options.status !== 'ALL') {
       query = query.eq('status', options.status);
@@ -37,6 +42,8 @@ export async function registrarPago(pagoData: {
   amount: number;
   payment_method: MetodoPago;
   due_date: string;
+  concept?: string;
+  billing_month?: string;
   commission_rate?: number;
   notes?: string;
 }): Promise<{ data: Pago | null; error: string | null }> {
@@ -62,7 +69,15 @@ export async function registrarPago(pagoData: {
 
     if (error) return { data: null, error: error.message };
 
-    // Also register an automatic INGRESO in Caja
+    // Actualizar fecha de vencimiento de la alumna si es Mensualidad
+    if (pagoData.due_date) {
+      await supabase
+        .from('alumnas')
+        .update({ billing_due_date: pagoData.due_date })
+        .eq('id', pagoData.alumna_id);
+    }
+
+    // Registrar ingreso automatico en Caja Movimientos
     await supabase.from('caja_movimientos').insert({
       tipo: 'INGRESO',
       concepto: `Cobro cuota mensualidad - Alumna`,
@@ -75,6 +90,23 @@ export async function registrarPago(pagoData: {
     return {
       data: null,
       error: err instanceof Error ? err.message : 'Error al registrar el pago',
+    };
+  }
+}
+
+export async function deletePago(id: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from('pagos')
+      .delete()
+      .eq('id', id);
+
+    if (error) return { error: error.message };
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al eliminar el pago',
     };
   }
 }
