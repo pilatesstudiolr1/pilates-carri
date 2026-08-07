@@ -100,7 +100,7 @@ export function AsignarTurnoFijoModal({
         {/* Info de la alumna */}
         <div className="p-3 rounded-md bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/30 flex items-center gap-3 text-xs">
           <div className="w-8 h-8 rounded-full bg-[var(--color-wood)]/20 flex items-center justify-center text-[var(--color-wood)] font-bold text-sm shrink-0">
-            {alumna.first_name[0]}{alumna.last_name[0]}
+            {alumna.first_name[0]}{(alumna.last_name || '')[0] || ''}
           </div>
           <div>
             <p className="font-bold text-[var(--text-primary)]">{alumna.first_name} {alumna.last_name}</p>

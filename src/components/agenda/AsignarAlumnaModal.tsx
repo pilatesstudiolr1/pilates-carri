@@ -94,7 +94,7 @@ export function AsignarAlumnaModal({
       const { data: newAlumna, error: createErr } = await createAlumna({
         first_name: manualFirstName.trim(),
         last_name: manualLastName.trim() || 'Sin apellido',
-        phone: manualPhone.trim() || null,
+        phone: manualPhone.trim() || 'Sin teléfono',
         status: 'ACTIVE',
       });
 

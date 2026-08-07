@@ -66,18 +66,21 @@ export function PagoFormModal({
   const alumnasFiltradas = alumnaSearch.trim().length >= 1
     ? alumnas.filter((a) => {
         const q = alumnaSearch.toLowerCase();
+        const firstName = (a.first_name || '').toLowerCase();
+        const lastName = (a.last_name || '').toLowerCase();
+        const dni = (a.dni || '').toLowerCase();
         return (
-          a.first_name.toLowerCase().includes(q) ||
-          a.last_name.toLowerCase().includes(q) ||
-          a.dni.includes(q) ||
-          `${a.last_name} ${a.first_name}`.toLowerCase().includes(q)
+          firstName.includes(q) ||
+          lastName.includes(q) ||
+          dni.includes(q) ||
+          `${lastName} ${firstName}`.includes(q)
         );
       }).slice(0, 8)
     : [];
 
   const handleSelectAlumna = (alumna: Alumna) => {
     setSelectedAlumna(alumna);
-    setAlumnaSearch(`${alumna.last_name}, ${alumna.first_name}`);
+    setAlumnaSearch(`${alumna.last_name || ''}, ${alumna.first_name}`);
     setShowDropdown(false);
     // Pre-rellenar monto si tiene plan
     if (alumna.plan_amount && alumna.plan_amount > 0) {

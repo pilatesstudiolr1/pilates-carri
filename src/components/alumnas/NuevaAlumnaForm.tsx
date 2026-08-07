@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { Profile } from '@/types/database';
+import { Profile, AlumnaStatus } from '@/types/database';
 import { createAlumna } from '@/lib/services/alumnas';
 import { getProfiles } from '@/lib/services/profesoras';
 import { getPlanes, PlanItem } from '@/lib/services/planes';
@@ -72,7 +72,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     nextMonth.setMonth(nextMonth.getMonth() + 1);
     return nextMonth.toISOString().split('T')[0];
   });
-  const [status, setStatus] = useState<'ACTIVE' | 'INACTIVE' | 'WAITLIST'>('ACTIVE');
+  const [status, setStatus] = useState<AlumnaStatus>('ACTIVE');
 
   // Turnos fijos semanales
   const [turnosFijos, setTurnosFijos] = useState<TurnoFijoItem[]>([
@@ -181,8 +181,8 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       email: email.trim() || null,
       address: address.trim() || null,
       date_of_birth: dateOfBirth || null,
-      emergency_contact: emergencyContact.trim() || null,
-      emergency_phone: emergencyPhone.trim() || null,
+      emergency_contact_name: emergencyContact.trim() || null,
+      emergency_contact_phone: emergencyPhone.trim() || null,
       profesora_id: selectedProfesoraId || null,
       plan: selectedPlanName || null,
       plan_amount: parseFloat(importe) || 0,
@@ -192,7 +192,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       diseases: diseases.trim() || null,
       surgeries: surgeries.trim() || null,
       health_observations: healthObservations.trim() || null,
-      notes: generalNotes.trim() || null,
+      observations: generalNotes.trim() || null,
     });
 
     if (alumnaErr || !newAlumna) {
@@ -421,8 +421,8 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                 className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
               >
                 <option value="ACTIVE">Activa</option>
+                <option value="SUSPENDED">Suspendida</option>
                 <option value="INACTIVE">Inactiva</option>
-                <option value="WAITLIST">Lista de espera</option>
               </select>
             </div>
           </div>

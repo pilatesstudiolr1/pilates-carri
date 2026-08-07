@@ -75,7 +75,7 @@ export function AlumnaDetailModal({
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)]">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[var(--color-wood)]/20 border border-[var(--color-wood)]/40 flex items-center justify-center text-[var(--color-wood)] font-bold text-sm">
-              {alumna.first_name[0]}{alumna.last_name[0]}
+              {alumna.first_name[0]}{(alumna.last_name || '')[0] || ''}
             </div>
             <div>
               <h2 className="text-base font-bold text-[var(--text-primary)]">

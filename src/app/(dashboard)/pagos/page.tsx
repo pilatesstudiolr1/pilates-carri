@@ -47,7 +47,7 @@ export default function PagosPage() {
   const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
   const [concepto, setConcepto] = useState('Mensualidad');
   const [monto, setMonto] = useState('');
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>('TRANSFERENCIA');
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>('transferencia');
   const [fechaPago, setFechaPago] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -179,19 +179,19 @@ export default function PagosPage() {
 
   // Totales de recaudación por medio de pago
   const totalTransferencias = pagos
-    .filter((p) => p.payment_method === 'TRANSFERENCIA' && p.status === 'PAID')
+    .filter((p) => p.payment_method === 'transferencia' && p.status === 'PAID')
     .reduce((acc, p) => acc + p.amount, 0);
 
   const totalEfectivo = pagos
-    .filter((p) => p.payment_method === 'EFECTIVO' && p.status === 'PAID')
+    .filter((p) => p.payment_method === 'efectivo' && p.status === 'PAID')
     .reduce((acc, p) => acc + p.amount, 0);
 
   const totalMercadoPago = pagos
-    .filter((p) => p.payment_method === 'MERCADO_PAGO' && p.status === 'PAID')
+    .filter((p) => p.payment_method === 'mercado_pago' && p.status === 'PAID')
     .reduce((acc, p) => acc + p.amount, 0);
 
   const totalTarjeta = pagos
-    .filter((p) => p.payment_method === 'DEBITO' || p.payment_method === 'CREDITO')
+    .filter((p) => p.payment_method === 'tarjeta')
     .reduce((acc, p) => acc + p.amount, 0);
 
   const totalRegistrado = pagos
@@ -309,11 +309,11 @@ export default function PagosPage() {
                 onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
                 className="w-full h-9 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-medium capitalize"
               >
-                <option value="TRANSFERENCIA">Transferencia</option>
-                <option value="EFECTIVO">Efectivo</option>
-                <option value="MERCADO_PAGO">Mercado Pago</option>
-                <option value="DEBITO">Débito / Tarjeta</option>
-                <option value="OTRO">Otro</option>
+                <option value="transferencia">Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="mercado_pago">Mercado Pago</option>
+                <option value="tarjeta">Débito / Tarjeta</option>
+                <option value="otro">Otro</option>
               </select>
             </div>
 
@@ -455,7 +455,7 @@ export default function PagosPage() {
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-extrabold text-xs shrink-0">
-                    {alum.first_name[0]}{alum.last_name[0]}
+                    {alum.first_name[0]}{(alum.last_name || '')[0] || ''}
                   </div>
                   <div>
                     <h3 className="text-xs font-bold text-[var(--text-primary)] capitalize">

@@ -75,7 +75,8 @@
 }
 
 /* Tema Oscuro (Midnight Terracotta) */
-[data-theme="dark"], .dark {
+[data-theme="dark"],
+.dark {
   --bg-primary: #1A1615;
   --bg-secondary: #241E1D;
   --bg-tertiary: #2F2726;
@@ -172,11 +173,13 @@ input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s;
 }
 
-input, textarea {
+input,
+textarea {
   caret-color: #1E1E1E;
 }
 
-input::selection, textarea::selection {
+input::selection,
+textarea::selection {
   background: rgba(223, 178, 103, 0.4);
   color: #1E1E1E;
 }

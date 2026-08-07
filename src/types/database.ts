@@ -57,8 +57,8 @@ export type ProfileUpdate = Partial<Omit<Profile, 'id' | 'created_at' | 'updated
 export interface Alumna {
   id: string;
   first_name: string;
-  last_name: string;
-  dni: string;
+  last_name: string | null;
+  dni: string | null;
   phone: string;
   email: string | null;
   address: string | null;
@@ -111,7 +111,10 @@ export interface Alumna {
   profesora?: Profile | null;
 }
 
-export type AlumnaInsert = Omit<Alumna, 'id' | 'created_at' | 'updated_at' | 'profesora'>;
+export type AlumnaInsert = Partial<Omit<Alumna, 'id' | 'created_at' | 'updated_at' | 'profesora'>> & {
+  first_name: string;
+  phone: string;
+};
 export type AlumnaUpdate = Partial<AlumnaInsert>;
 
 export interface Clase {

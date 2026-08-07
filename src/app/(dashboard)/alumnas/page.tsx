@@ -307,7 +307,7 @@ export default function AlumnasPage() {
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-full bg-[var(--color-wood)]/15 border border-[var(--color-wood)]/30 flex items-center justify-center text-[var(--color-wood)] font-bold text-xs shrink-0">
-                              {alumna.first_name[0]}{alumna.last_name[0]}
+                              {alumna.first_name[0]}{(alumna.last_name || '')[0] || ''}
                             </div>
                             <div>
                               <p className="font-bold text-[var(--text-primary)]">
