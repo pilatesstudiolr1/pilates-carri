@@ -32,14 +32,14 @@ export function useUser(): UseUserReturn {
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError || !data) {
           setError(profileError?.message || 'Perfil no encontrado');
           setProfile({
             id: user.id,
             email: user.email || 'admin@gmail.com',
-            full_name: user.user_metadata?.full_name || 'Administrador',
+            full_name: user.user_metadata?.full_name || 'Juliana',
             role: 'ADMIN',
             avatar_url: null,
             sede_id: null,

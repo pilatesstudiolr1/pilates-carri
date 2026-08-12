@@ -13,7 +13,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
     return (
-      <div className="flex flex-col gap-1.5 w-full">
+      <div className="flex flex-col gap-1.5 w-full min-w-0">
         {label && (
           <label
             htmlFor={inputId}
@@ -32,18 +32,19 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             className={cn(
-              'w-full h-11 px-4 rounded-xl text-sm',
-              'bg-[var(--bg-tertiary)] text-[var(--text-primary)]',
-              'border border-[var(--border-default)]',
-              'placeholder:text-[var(--text-muted)]',
+              'w-full h-10 px-3.5 rounded-md text-xs sm:text-sm font-sans',
+              'bg-white text-[var(--obsidian)]',
+              'border border-[var(--border)] shadow-2xs',
+              'placeholder:text-[var(--subtle)]',
               'transition-all duration-200',
-              'hover:border-[var(--border-hover)]',
-              'focus:outline-none focus:border-[var(--color-wood)] focus:ring-2 focus:ring-[var(--color-wood)]/30',
+              'hover:border-[#D4D4D4]',
+              'focus:outline-none focus:border-[var(--obsidian)] focus:ring-2 focus:ring-[var(--obsidian)]/15',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               icon && 'pl-11',
-              error && 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/30',
+              error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',
               className
             )}
+
             {...props}
           />
         </div>

@@ -37,8 +37,9 @@ interface ReformerMatrixViewProps {
   selectedDay: number;
   onSelectDay: (day: number) => void;
   onSelectClase: (clase: Clase) => void;
-  onSelectEmptySlot: (dayOfWeek: number, startTime: string, camilla?: number) => void;
+  onSelectEmptySlot?: (dayOfWeek: number, startTime: string, camilla?: number) => void;
   onOpenAssignModal?: (clase: Clase, camilla?: number) => void;
+  onSelectOccupiedSlot?: (dayOfWeek: number, startTime: string, camilla: number, alumnaItem: any, clase: Clase | null) => void;
 }
 
 export function ReformerMatrixView({
@@ -48,7 +49,10 @@ export function ReformerMatrixView({
   onSelectClase,
   onSelectEmptySlot,
   onOpenAssignModal,
+  onSelectOccupiedSlot,
 }: ReformerMatrixViewProps) {
+
+
   const [fechaAsistencia, setFechaAsistencia] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -204,9 +208,16 @@ export function ReformerMatrixView({
                         <td key={refNum} className="p-1.5">
                           <button
                             type="button"
-                            onClick={() => row.clase && onSelectClase(row.clase)}
+                            onClick={() => {
+                              if (onSelectOccupiedSlot) {
+                                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                              } else if (row.clase) {
+                                onSelectClase(row.clase);
+                              }
+                            }}
                             className="w-full p-2 rounded-xl bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)]/20 border border-[var(--border-default)] hover:border-[var(--color-wood)]/50 text-left transition-all cursor-pointer flex flex-col justify-between min-h-[54px]"
                           >
+
                             <span className="font-bold text-[var(--text-primary)] capitalize text-[11px] truncate block">
                               {alumnaNombre.toLowerCase()}
                             </span>
@@ -233,9 +244,10 @@ export function ReformerMatrixView({
                           onClick={() => {
                             if (row.clase && onOpenAssignModal) {
                               onOpenAssignModal(row.clase, refNum);
-                            } else {
+                            } else if (onSelectEmptySlot) {
                               onSelectEmptySlot(selectedDay, row.hora, refNum);
                             }
+
                           }}
                           className="w-full p-2 rounded-xl bg-[var(--bg-tertiary)]/40 hover:bg-[var(--color-wood)]/10 border border-dashed border-[var(--border-default)] hover:border-[var(--color-wood)] text-[var(--text-muted)] hover:text-[var(--color-wood)] transition-all cursor-pointer flex items-center justify-center gap-1 min-h-[54px]"
                         >

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { Alumna } from '@/types/database';
 import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign, Search, X } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const PLANTILLAS_PREDEFINIDAS = [
   {
@@ -33,6 +34,7 @@ const PLANTILLAS_PREDEFINIDAS = [
 ];
 
 export default function WhatsAppPage() {
+  const { alert: alertDialog } = useConfirm();
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
   const [alumnaSearch, setAlumnaSearch] = useState('');
   const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
@@ -88,9 +90,13 @@ export default function WhatsAppPage() {
       .replace(/{horario}/g, horarioCustom);
   };
 
-  const handleEnviarWhatsApp = () => {
+  const handleEnviarWhatsApp = async () => {
     if (!alumnaSeleccionada) {
-      alert('Selecciona una alumna');
+      await alertDialog({
+        title: 'Selección requerida',
+        message: 'Por favor selecciona una alumna para enviar el mensaje.',
+        variant: 'warning',
+      });
       return;
     }
 

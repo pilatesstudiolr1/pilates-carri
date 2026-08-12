@@ -26,10 +26,11 @@ const variantStyles: Record<ButtonVariant, string> = {
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5 rounded-xl',
-  md: 'h-10 px-4 text-xs gap-2 rounded-xl',
-  lg: 'h-12 px-6 text-sm gap-2.5 rounded-xl',
+  sm: 'h-8 px-3 text-xs gap-1.5 rounded-md',
+  md: 'h-10 px-4 text-xs sm:text-sm gap-2 rounded-md',
+  lg: 'h-11 px-6 text-sm gap-2.5 rounded-md',
 };
+
 
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -50,7 +51,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-xl font-semibold',
+          'inline-flex items-center justify-center rounded-md font-semibold',
           'transition-all duration-200 active:scale-[0.98]',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-wood)]',
           'disabled:opacity-50 disabled:pointer-events-none',

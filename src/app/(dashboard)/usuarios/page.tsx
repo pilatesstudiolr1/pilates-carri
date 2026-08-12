@@ -4,17 +4,17 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spinner } from '@/components/ui/Spinner';
 
-export default function FinanzasRedirectPage() {
+export default function UsuariosRedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/reportes?tab=finanzas');
+    router.replace('/profesoras');
   }, [router]);
 
   return (
     <div className="flex flex-col items-center justify-center py-20 gap-3">
       <Spinner size="lg" />
-      <p className="text-xs text-[var(--text-muted)]">Redirigiendo a Reportes &amp; Finanzas...</p>
+      <p className="text-xs text-[var(--text-muted)]">Redirigiendo a Profesores y Usuarios...</p>
     </div>
   );
 }

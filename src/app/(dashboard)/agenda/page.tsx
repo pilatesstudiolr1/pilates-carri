@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -9,10 +10,15 @@ import { ReformerMatrixView } from '@/components/agenda/ReformerMatrixView';
 import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
+import { TurnoModal } from '@/components/agenda/TurnoModal';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Clase, Profile } from '@/types/database';
 import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
+import { getBarreClases, BarreClase } from '@/lib/services/barre';
 import { getProfiles } from '@/lib/services/profesoras';
-import { Calendar, Plus, UserCheck, LayoutGrid, CalendarDays, BedDouble } from 'lucide-react';
+import { Calendar, Plus, LayoutGrid, CalendarDays, BedDouble, Filter, Layers } from 'lucide-react';
+
+import { useSede } from '@/hooks/useSede';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -23,20 +29,31 @@ const DIAS = [
   { value: 6, label: 'Sábado' },
 ];
 
+export type ModalityAgenda = 'REFORMER' | 'BARRE' | 'ALL';
+
 export default function AgendaPage() {
-  const [viewMode, setViewMode] = useState<'WEEK' | 'DAY' | 'REFORMER'>('REFORMER');
+  const { confirm, alert: alertDialog } = useConfirm();
+  const { selectedSedeId } = useSede();
+  const [modality, setModality] = useState<ModalityAgenda>('REFORMER');
+  const [viewMode, setViewMode] = useState<'WEEK' | 'REFORMER'>('REFORMER');
+
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [profesoraFilter, setProfesoraFilter] = useState<string>('ALL');
 
   const [clases, setClases] = useState<Clase[]>([]);
+  const [barreClases, setBarreClases] = useState<BarreClase[]>([]);
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
 
   // Modales
   const [isClaseModalOpen, setIsClaseModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+
+  // Modal Unificado de Turno y Asistencia (CASE A & CASE B)
+  const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
+  const [turnoModalDayName, setTurnoModalDayName] = useState('Lunes');
+  const [selectedAlumnaAsignada, setSelectedAlumnaAsignada] = useState<any | null>(null);
 
   const [selectedClase, setSelectedClase] = useState<Clase | null>(null);
   const [presetDay, setPresetDay] = useState<number>(1);
@@ -46,20 +63,22 @@ export default function AgendaPage() {
 
   const fetchAgenda = useCallback(async () => {
     setLoading(true);
-    setErrorMsg('');
-    const { data: clasesData, error: clasesErr } = await getClases({
-      profesoraId: profesoraFilter !== 'ALL' ? profesoraFilter : undefined,
-    });
-    const { data: profsData } = await getProfiles({ role: 'ALL' });
+    const [clasesRes, barreRes, profsRes] = await Promise.all([
+      getClases({
+        profesoraId: profesoraFilter !== 'ALL' ? profesoraFilter : undefined,
+        sedeId: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
+      }),
+      getBarreClases(),
 
-    if (clasesErr) {
-      setErrorMsg(clasesErr);
-    } else {
-      setClases(clasesData);
-    }
-    setProfesoras(profsData);
+      getProfiles({ role: 'ALL' }),
+    ]);
+
+    setClases(clasesRes.data || []);
+    setBarreClases(barreRes.data || []);
+    setProfesoras(profsRes.data || []);
     setLoading(false);
-  }, [profesoraFilter]);
+  }, [profesoraFilter, selectedSedeId]);
+
 
   useEffect(() => {
     fetchAgenda();
@@ -78,33 +97,50 @@ export default function AgendaPage() {
     setSubmitting(false);
 
     if (error) {
-      alert(`Error al crear la clase: ${error}`);
+      await alertDialog({ title: 'Error', message: error, variant: 'danger' });
       return false;
     }
 
+    setIsClaseModalOpen(false);
     fetchAgenda();
     return true;
   };
 
-  const handleAssignAlumna = async (claseId: string, alumnaId: string, camilla?: number): Promise<boolean> => {
+  const handleAddAlumna = async (claseId: string, alumnaId: string, camilla?: number): Promise<boolean> => {
     setSubmitting(true);
-    const { error } = await addAlumnaToClase(claseId, alumnaId, camilla || presetCamilla);
+    const { error } = await addAlumnaToClase(claseId, alumnaId, camilla || null);
     setSubmitting(false);
 
     if (error) {
-      alert(error);
+      await alertDialog({
+        title: 'Error al agregar alumna',
+        message: error,
+        variant: 'danger',
+      });
       return false;
     }
 
     fetchAgenda();
+    setIsAssignModalOpen(false);
     return true;
   };
 
-  const handleRemoveAlumna = async (claseId: string, alumnaId: string, nombreAlumna: string) => {
-    if (!confirm(`¿Remover a ${nombreAlumna} de este turno?`)) return;
+  const handleRemoveAlumna = async (claseId: string, alumnaId: string) => {
+    const isOk = await confirm({
+      title: 'Quitar Alumna del Turno',
+      message: '¿Desea desafectar a esta alumna del turno asignado?',
+      confirmText: 'Sí, quitar',
+      variant: 'warning',
+    });
+    if (!isOk) return;
+
     const { error } = await removeAlumnaFromClase(claseId, alumnaId);
     if (error) {
-      alert(error);
+      await alertDialog({
+        title: 'Error de desasignación',
+        message: error,
+        variant: 'danger',
+      });
     } else {
       fetchAgenda();
       if (selectedClase) {
@@ -114,43 +150,129 @@ export default function AgendaPage() {
   };
 
   const handleDeleteClase = async (claseId: string) => {
+    const isOk = await confirm({
+      title: 'Eliminar Turno',
+      message: '¿Está seguro de que desea eliminar este turno? Esta acción no se puede deshacer.',
+      confirmText: 'Eliminar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
+
     const { error } = await deleteClase(claseId);
     if (error) {
-      alert(`Error al eliminar el turno: ${error}`);
+      await alertDialog({
+        title: 'Error de eliminación',
+        message: `Error al eliminar el turno: ${error}`,
+        variant: 'danger',
+      });
     } else {
       fetchAgenda();
       setIsDetailModalOpen(false);
     }
   };
 
-  const handleSelectEmptySlot = async (dayOfWeek: number, startTime: string, camilla = 1) => {
-    let targetClase = clases.find((c) => c.day_of_week === dayOfWeek && c.start_time.startsWith(startTime));
+  const handleAbrirTurnoModal = (
+    dayOfWeek: number,
+    startTime: string,
+    camilla = 1,
+    alumnaItem: any = null
+  ) => {
+    const cleanTime = startTime.slice(0, 5);
+    const dayObj = DIAS.find((d) => d.value === dayOfWeek);
+    setTurnoModalDayName(dayObj?.label || 'Lunes');
 
-    if (!targetClase) {
-      const endHourNum = parseInt(startTime.split(':')[0], 10) + 1;
-      const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
+    const targetClase = clases.find(
+      (c) =>
+        c.day_of_week === dayOfWeek &&
+        (c.start_time.startsWith(cleanTime) || c.start_time.slice(0, 5) === cleanTime)
+    );
 
-      const { data: newClase } = await createClase({
-        name: `Turno ${startTime}`,
-        profesora_id: null,
-        day_of_week: dayOfWeek,
-        start_time: `${startTime}:00`,
-        end_time: `${endTime}:00`,
-        max_capacity: 6,
-      });
+    setSelectedClase(targetClase || null);
+    setPresetDay(dayOfWeek);
+    setPresetTime(cleanTime);
+    setPresetCamilla(camilla);
+    setSelectedAlumnaAsignada(alumnaItem);
+    setIsTurnoModalOpen(true);
+  };
 
-      if (newClase) {
-        targetClase = newClase;
-        fetchAgenda();
+  const handleSaveTurnoFromModal = async (data: {
+    claseId?: string;
+    alumnaId: string;
+    camilla: number;
+    dayOfWeek: number;
+    startTime: string;
+    observaciones?: string;
+    asistenciaStatus?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED';
+  }): Promise<boolean> => {
+    try {
+      let targetClaseId = data.claseId;
+
+      if (!targetClaseId) {
+        const endHourNum = parseInt(data.startTime.split(':')[0], 10) + 1;
+        const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
+
+        const { data: newClase, error: createErr } = await createClase({
+          name: `Turno ${data.startTime} hs`,
+          profesora_id: null,
+          day_of_week: data.dayOfWeek,
+          start_time: `${data.startTime}:00`,
+          end_time: `${endTime}:00`,
+          max_capacity: 6,
+        });
+
+        if (createErr || !newClase) {
+          await alertDialog({
+            title: 'Error al crear el turno',
+            message: createErr || 'No se pudo crear la clase',
+            variant: 'danger',
+          });
+          return false;
+        }
+
+        targetClaseId = newClase.id;
       }
-    }
 
-    if (targetClase) {
-      setSelectedClase(targetClase);
-      setPresetDay(dayOfWeek);
-      setPresetTime(startTime);
-      setPresetCamilla(camilla);
-      setIsAssignModalOpen(true);
+      // Asignar alumna al turno en la camilla correspondiente
+      const assignRes = await addAlumnaToClase(targetClaseId, data.alumnaId, data.camilla);
+      if (assignRes.error) {
+        // Si ya pertenece a la clase, omitir error estricto
+      }
+
+      // Si se marcó asistencia específica
+      if (data.asistenciaStatus && data.asistenciaStatus !== 'UNMARKED') {
+        const supabase = (await import('@/lib/supabase/client')).createClient();
+        const fechaHoy = new Date().toISOString().split('T')[0];
+
+        // Obtener el ID de clase_alumnas
+        const { data: caData } = await supabase
+          .from('clase_alumnas')
+          .select('id')
+          .eq('clase_id', targetClaseId)
+          .eq('alumna_id', data.alumnaId)
+          .maybeSingle();
+
+        if (caData?.id) {
+          await supabase.from('asistencias').upsert(
+            {
+              clase_alumna_id: caData.id,
+              date: fechaHoy,
+              status: data.asistenciaStatus,
+              notes: data.observaciones || null,
+            },
+            { onConflict: 'clase_alumna_id,date' }
+          );
+        }
+      }
+
+      await fetchAgenda();
+      return true;
+    } catch (err: any) {
+      await alertDialog({
+        title: 'Error de guardado',
+        message: err.message || 'Error al guardar el turno',
+        variant: 'danger',
+      });
+      return false;
     }
   };
 
@@ -159,18 +281,17 @@ export default function AgendaPage() {
     setIsDetailModalOpen(true);
   };
 
-  const currentDayLabel = DIAS.find((d) => d.value === presetDay)?.label || 'Lunes';
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
+    <div className="flex flex-col gap-6 animate-fade-in pb-12 max-w-7xl mx-auto">
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-[var(--color-wood)]" /> Agenda y Asistencia por Turnos
+            <Calendar className="h-6 w-6 text-[var(--color-wood)]" /> Agenda y Asistencia de Clases
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Organización semanal por horario y Reformer. Alterna entre la vista por Reformer, vista semanal y vista diaria.
+            Organización semanal por horario, Reformer y Barre con separación por modalidad.
           </p>
         </div>
 
@@ -186,156 +307,245 @@ export default function AgendaPage() {
         </Button>
       </div>
 
-      {/* Barra de Controles y Vistas */}
-      <Card className="p-3 flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Vistas: Reformer vs Semanal vs Diaria */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
-          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
-            <button
-              onClick={() => setViewMode('REFORMER')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === 'REFORMER'
-                  ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <BedDouble className="h-3.5 w-3.5" /> Vista por Reformer
-            </button>
+      {/* Selector de Modalidad (Reformer vs Barre vs Todas) */}
+      <Card className="p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto">
+          <span className="px-2 text-[var(--text-muted)] flex items-center gap-1">
+            <Filter className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Modalidad:
+          </span>
+          <button
+            onClick={() => setModality('REFORMER')}
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              modality === 'REFORMER'
+                ? 'bg-[var(--color-wood)] text-white shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Layers className="h-3.5 w-3.5" /> Reformer ({clases.length})
+          </button>
 
-            <button
-              onClick={() => setViewMode('WEEK')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === 'WEEK'
-                  ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" /> Vista Semanal
-            </button>
+          <button
+            onClick={() => setModality('BARRE')}
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              modality === 'BARRE'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <Image src="/media/berre.webp" alt="Barre" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
+            Barre ({barreClases.length})
+          </button>
 
-            <button
-              onClick={() => setViewMode('DAY')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === 'DAY'
-                  ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <CalendarDays className="h-3.5 w-3.5" /> Vista Diaria
-            </button>
-          </div>
-
-          {/* Selector de Dia en modo Vista Diaria */}
-          {viewMode === 'DAY' && (
-            <div className="flex items-center gap-1 overflow-x-auto">
-              {DIAS.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setSelectedDay(d.value)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                    selectedDay === d.value
-                      ? 'bg-[var(--color-wood)]/20 text-[var(--color-wood)] font-bold'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <button
+            onClick={() => setModality('ALL')}
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+              modality === 'ALL'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Todas ({clases.length + barreClases.length})
+          </button>
         </div>
 
         {/* Filtro por Profesora */}
-        <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1 shrink-0 font-medium">
-            <UserCheck className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Profesora:
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <span className="text-xs font-semibold text-[var(--text-secondary)] whitespace-nowrap">
+            Profesora:
           </span>
           <select
             value={profesoraFilter}
             onChange={(e) => setProfesoraFilter(e.target.value)}
-            className="h-9 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-medium cursor-pointer"
+            className="h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
           >
-            <option value="ALL">Todas las profesoras</option>
+            <option value="ALL">Todas las Profesoras</option>
             {profesoras.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.full_name}
+                {p.full_name || 'Profesora'}
               </option>
             ))}
           </select>
         </div>
       </Card>
 
-      {/* Error state */}
-      {errorMsg && (
-        <div className="p-4 rounded-xl bg-[var(--color-danger-soft)] text-sm text-[var(--color-danger)]">
-          {errorMsg}
-        </div>
-      )}
-
-      {/* Contenido de la vista elegida */}
+      {/* Vistas según Modalidad */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <div className="flex flex-col items-center justify-center py-20 gap-3 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-default)]">
           <Spinner size="lg" />
-          <p className="text-xs text-[var(--text-muted)]">Cargando agenda de clases...</p>
+          <p className="text-xs text-[var(--text-muted)] font-medium">Cargando grilla horaria de clases...</p>
         </div>
-      ) : viewMode === 'REFORMER' ? (
-        <ReformerMatrixView
-          clases={clases}
-          selectedDay={selectedDay}
-          onSelectDay={setSelectedDay}
-          onSelectClase={handleSelectClaseBlock}
-          onSelectEmptySlot={handleSelectEmptySlot}
-          onOpenAssignModal={(c, camilla = 1) => {
-            setSelectedClase(c);
-            setPresetDay(c.day_of_week);
-            setPresetTime(c.start_time.slice(0, 5));
-            setPresetCamilla(camilla);
-            setIsAssignModalOpen(true);
-          }}
-        />
+      ) : modality === 'BARRE' ? (
+        /* Vista Exclusiva de Clases de Barre */
+        <Card className="p-6 border border-[var(--border-default)] shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3">
+            <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <Image src="/media/berre.webp" alt="Barre" width={22} height={22} className="h-5 w-5 object-contain" />
+              Agenda de Clases de Barre en Baranda ({barreClases.length} turnos)
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {barreClases.map((bc) => (
+              <div key={bc.id} className="p-4 rounded-xl bg-[var(--bg-tertiary)]/70 border border-[var(--border-default)] space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-extrabold text-amber-600 dark:text-amber-400 uppercase bg-amber-500/10 px-2 py-0.5 rounded">
+                    Día {bc.day_of_week} &bull; {bc.start_time.slice(0, 5)} hs
+                  </span>
+                  <span className="font-bold text-[var(--text-muted)]">
+                    {bc.alumnas_count || 0} / {bc.max_capacity} inscriptas
+                  </span>
+                </div>
+                <h4 className="font-bold text-sm text-[var(--text-primary)]">{bc.name}</h4>
+                <p className="text-xs text-[var(--text-secondary)]">Profesora: {bc.profesora_name}</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Sede: {bc.sede_name}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
       ) : (
-        <GoogleCalendarGrid
-          clases={clases}
-          viewMode={viewMode}
-          selectedDay={selectedDay}
-          onSelectClase={handleSelectClaseBlock}
-          onSelectEmptySlot={handleSelectEmptySlot}
-        />
+        /* Vista de Reformer / General */
+        <div className="flex flex-col gap-4">
+          {/* Sub-barras de vista (Reformer / Semanal) */}
+          <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] w-fit">
+            <button
+              onClick={() => setViewMode('REFORMER')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'REFORMER'
+                  ? 'bg-[var(--color-wood)] text-white shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <BedDouble className="h-3.5 w-3.5" /> Vista por Reformer (Camillas)
+            </button>
+            <button
+              onClick={() => setViewMode('WEEK')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                viewMode === 'WEEK'
+                  ? 'bg-[var(--color-wood)] text-white shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" /> Vista Semanal
+            </button>
+          </div>
+
+          {viewMode === 'REFORMER' ? (
+            <ReformerMatrixView
+              clases={clases}
+              selectedDay={selectedDay}
+              onSelectDay={setSelectedDay}
+              onSelectEmptySlot={(day: number, time: string, camilla?: number) => handleAbrirTurnoModal(day, time, camilla || 1, null)}
+
+              onSelectOccupiedSlot={(day, time, camilla, item) => handleAbrirTurnoModal(day, time, camilla, item)}
+              onSelectClase={handleSelectClaseBlock}
+            />
+          ) : (
+            <GoogleCalendarGrid
+              clases={clases}
+              viewMode="WEEK"
+              selectedDay={selectedDay}
+              onSelectClase={handleSelectClaseBlock}
+              onSelectEmptySlot={(day, time) => handleAbrirTurnoModal(day, time, 1, null)}
+            />
+          )}
+
+          {/* Si está en modo 'ALL', adjuntar también las clases de Barre abajo */}
+          {modality === 'ALL' && (
+            <Card className="p-6 border border-[var(--border-default)] shadow-xs space-y-4 mt-6">
+              <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2 border-b border-[var(--border-default)] pb-3">
+                <Image src="/media/berre.webp" alt="Barre" width={22} height={22} className="h-5 w-5 object-contain" />
+                Clases de Barre Integradas ({barreClases.length})
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {barreClases.map((bc) => (
+                  <div key={bc.id} className="p-4 rounded-xl bg-[var(--bg-tertiary)]/70 border border-[var(--border-default)] space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-extrabold text-amber-600 dark:text-amber-400 uppercase bg-amber-500/10 px-2 py-0.5 rounded">
+                        Día {bc.day_of_week} &bull; {bc.start_time.slice(0, 5)} hs
+                      </span>
+                      <span className="font-bold text-[var(--text-muted)]">
+                        {bc.alumnas_count || 0} / {bc.max_capacity} inscriptas
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-sm text-[var(--text-primary)]">{bc.name}</h4>
+                    <p className="text-xs text-[var(--text-secondary)]">Profesora: {bc.profesora_name}</p>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+        </div>
       )}
 
-      {/* Modales */}
-      <ClaseFormModal
-        open={isClaseModalOpen}
-        onClose={() => setIsClaseModalOpen(false)}
-        onSubmit={handleCreateClase}
-        profesoras={profesoras}
-        initialDayOfWeek={presetDay}
-        initialStartTime={presetTime}
-        loading={submitting}
-      />
-
-      <ClaseDetailModal
-        open={isDetailModalOpen}
-        onClose={() => setIsDetailModalOpen(false)}
-        clase={selectedClase}
-        onOpenAssignModal={(c) => {
-          setSelectedClase(c);
-          setIsAssignModalOpen(true);
+      {/* MODAL UNIFICADO: Agregar Turno / Turno y Asistencia */}
+      <TurnoModal
+        open={isTurnoModalOpen}
+        onClose={() => {
+          setIsTurnoModalOpen(false);
+          setSelectedAlumnaAsignada(null);
         }}
-        onRemoveAlumna={handleRemoveAlumna}
-        onDeleteClase={handleDeleteClase}
-      />
-
-      <AsignarAlumnaModal
-        open={isAssignModalOpen}
-        onClose={() => setIsAssignModalOpen(false)}
-        onAssign={handleAssignAlumna}
         clase={selectedClase}
-        dayName={currentDayLabel}
+        dayName={turnoModalDayName}
         presetTime={presetTime}
         presetCamilla={presetCamilla}
-        loading={submitting}
+        alumnaAsignada={selectedAlumnaAsignada}
+        onSave={handleSaveTurnoFromModal}
+        onDeleteTurno={async (claseId, alumnaId) => {
+          if (alumnaId) {
+            await handleRemoveAlumna(claseId, alumnaId);
+          } else {
+            await handleDeleteClase(claseId);
+          }
+          return true;
+        }}
       />
+
+      {/* Modales Clásicos */}
+      {isClaseModalOpen && (
+        <ClaseFormModal
+          open={isClaseModalOpen}
+          onClose={() => setIsClaseModalOpen(false)}
+          onSubmit={handleCreateClase}
+          profesoras={profesoras}
+          initialDayOfWeek={presetDay}
+          initialStartTime={presetTime}
+          loading={submitting}
+        />
+      )}
+
+      {isDetailModalOpen && selectedClase && (
+        <ClaseDetailModal
+          open={isDetailModalOpen}
+          clase={selectedClase}
+          onClose={() => {
+            setIsDetailModalOpen(false);
+            setSelectedClase(null);
+          }}
+          onOpenAssignModal={(c) => {
+            setSelectedClase(c);
+            setIsDetailModalOpen(false);
+            setIsAssignModalOpen(true);
+          }}
+          onRemoveAlumna={(claseId, alumnaId) => handleRemoveAlumna(claseId, alumnaId)}
+          onDeleteClase={(claseId) => handleDeleteClase(claseId)}
+        />
+      )}
+
+      {isAssignModalOpen && selectedClase && (
+        <AsignarAlumnaModal
+          open={isAssignModalOpen}
+          clase={selectedClase}
+          onClose={() => {
+            setIsAssignModalOpen(false);
+            setSelectedClase(null);
+          }}
+          onAssign={handleAddAlumna}
+          presetTime={presetTime}
+          presetCamilla={presetCamilla}
+          loading={submitting}
+        />
+      )}
     </div>
   );
 }
+

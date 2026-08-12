@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
@@ -11,8 +12,10 @@ import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
 import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
-import { getAlumnas, createAlumna, updateAlumna, updateAlumnaStatus } from '@/lib/services/alumnas';
+import { getAlumnas, updateAlumna, updateAlumnaStatus } from '@/lib/services/alumnas';
+import { getBarreAlumnas, BarreAlumna } from '@/lib/services/barre';
 import { addAlumnaToClase } from '@/lib/services/agenda';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import {
   Users,
   UserPlus,
@@ -20,13 +23,12 @@ import {
   Filter,
   Eye,
   Edit2,
-  UserCheck,
-  UserX,
-  Phone,
-  Calendar,
   AlertTriangle,
   List,
+  Layers,
 } from 'lucide-react';
+
+export type ModalityFilterAlumnas = 'ALL' | 'REFORMER' | 'BARRE';
 
 function getVencimientoCell(fechaVencimiento: string | null) {
   if (!fechaVencimiento) {
@@ -61,8 +63,12 @@ function getVencimientoCell(fechaVencimiento: string | null) {
 }
 
 export default function AlumnasPage() {
+  const { confirm, alert: alertDialog } = useConfirm();
   const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>('LIST');
+  const [modalityFilter, setModalityFilter] = useState<ModalityFilterAlumnas>('ALL');
+
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
+  const [alumnasBarre, setAlumnasBarre] = useState<BarreAlumna[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -74,380 +80,379 @@ export default function AlumnasPage() {
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
 
   const fetchAlumnas = useCallback(async () => {
     setLoading(true);
-    setErrorMsg('');
-    const { data, count, error } = await getAlumnas({
-      search,
-      status: statusFilter,
-      limit: 100,
-    });
 
-    if (error) {
-      setErrorMsg(error);
-    } else {
-      setAlumnas(data);
-      setTotalCount(count);
-    }
+    const [refRes, barreRes] = await Promise.all([
+      getAlumnas({
+        search: search || undefined,
+        status: statusFilter,
+      }),
+      getBarreAlumnas(),
+    ]);
+
+    setAlumnas(refRes.data || []);
+    setTotalCount(refRes.count || 0);
+
+    setAlumnasBarre(barreRes.data || []);
     setLoading(false);
   }, [search, statusFilter]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchAlumnas();
-    }, 300);
-    return () => clearTimeout(timer);
+    fetchAlumnas();
   }, [fetchAlumnas]);
 
-  const handleCreateOrUpdate = async (data: AlumnaInsert): Promise<boolean> => {
-    setSubmitting(true);
-    if (selectedAlumna) {
-      const { error } = await updateAlumna(selectedAlumna.id, data);
-      if (error) {
-        alert(`Error al actualizar: ${error}`);
-        setSubmitting(false);
-        return false;
-      }
-    } else {
-      const { error } = await createAlumna(data);
-      if (error) {
-        alert(`Error al registrar: ${error}`);
-        setSubmitting(false);
-        return false;
-      }
-    }
-    setSubmitting(false);
-    fetchAlumnas();
-    return true;
-  };
-
-  const handleStatusChange = async (alumna: Alumna, newStatus: AlumnaStatus) => {
-    const confirmMsg = newStatus === 'INACTIVE'
-      ? `¿Dar de baja a ${alumna.first_name} ${alumna.last_name}?`
-      : `¿Cambiar estado de ${alumna.first_name} a ${newStatus}?`;
-
-    if (!confirm(confirmMsg)) return;
-
-    const { error } = await updateAlumnaStatus(alumna.id, newStatus);
-    if (error) {
-      alert(`Error al cambiar estado: ${error}`);
-    } else {
-      fetchAlumnas();
-    }
-  };
-
-  const handleAsignarTurno = async (claseId: string, alumnaId: string, camilla?: number | null): Promise<boolean> => {
+  const handleAssignTurnoFijo = async (claseId: string, alumnaId: string, camilla?: number | null): Promise<boolean> => {
     setSubmitting(true);
     const { error } = await addAlumnaToClase(claseId, alumnaId, camilla);
     setSubmitting(false);
 
     if (error) {
-      alert(error);
+      await alertDialog({
+        title: 'Error de asignación',
+        message: `No se pudo inscribir a la alumna: ${error}`,
+        variant: 'danger',
+      });
       return false;
     }
 
+    await alertDialog({
+      title: 'Inscripción Exitosa',
+      message: `La alumna ha sido inscripta correctamente en el turno fijo.`,
+      variant: 'success',
+    });
+    setIsTurnoModalOpen(false);
+    setSelectedAlumna(null);
     return true;
   };
 
-  const getStatusBadge = (status: AlumnaStatus) => {
-    switch (status) {
-      case 'ACTIVE':
-        return <Badge variant="success">Activa</Badge>;
-      case 'SUSPENDED':
-        return <Badge variant="warning">Suspendida</Badge>;
-      case 'INACTIVE':
-        return <Badge variant="danger">Inactiva</Badge>;
-      default:
-        return <Badge variant="default">{status}</Badge>;
+  const handleUpdateAlumna = async (id: string, data: Partial<AlumnaInsert>) => {
+    setSubmitting(true);
+    const { error } = await updateAlumna(id, data);
+    setSubmitting(false);
+
+    if (error) {
+      await alertDialog({ title: 'Error al guardar', message: error, variant: 'danger' });
+      return;
     }
+
+    setIsFormOpen(false);
+    setSelectedAlumna(null);
+    fetchAlumnas();
   };
 
+  // Filtrado final de lista según modalidad seleccionada (Reformer | Barre | All)
+  const displayReformerList = modalityFilter === 'ALL' || modalityFilter === 'REFORMER';
+  const displayBarreList = modalityFilter === 'ALL' || modalityFilter === 'BARRE';
+
   return (
-    <div className="flex flex-col gap-6 animate-fade-in">
-      {/* Encabezado y Pestañas */}
+    <div className="flex flex-col gap-6 animate-fade-in pb-12 max-w-7xl mx-auto">
+      {/* Encabezado y Acciones */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
             <Users className="h-6 w-6 text-[var(--color-wood)]" /> Gestión de Alumnas
           </h1>
           <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Gestión de fichas, planes, vencimientos, profesoras y datos de las alumnas ({totalCount} registradas)
+            Registro de fichas de alumnas, estado de cuotas y asignación de turnos divididos por modalidad.
           </p>
         </div>
 
-        {/* Pestañas de Navegación del Módulo */}
-        <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
-          <button
-            onClick={() => setActiveTab('LIST')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'LIST'
-                ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <List className="h-4 w-4" /> Listado de alumnas
-          </button>
-
-          <button
-            onClick={() => setActiveTab('NEW')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold flex items-center gap-2 transition-all cursor-pointer ${
-              activeTab === 'NEW'
-                ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            <UserPlus className="h-4 w-4" /> Nueva alumna
-          </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
+            <button
+              onClick={() => setActiveTab('LIST')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'LIST'
+                  ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <List className="h-4 w-4" /> Alumnas Registradas
+            </button>
+            <button
+              onClick={() => setActiveTab('NEW')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'NEW'
+                  ? 'bg-[var(--color-wood)] text-white shadow-xs'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <UserPlus className="h-4 w-4" /> Nueva Alumna
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* PESTAÑA 2: NUEVA ALUMNA */}
       {activeTab === 'NEW' ? (
-        <NuevaAlumnaForm
-          onSuccess={() => {
-            fetchAlumnas();
-            setActiveTab('LIST');
-          }}
-        />
+        /* Pestaña: Registro de Nueva Alumna (Espacioso max-w-6xl para evitar superposición) */
+        <div className="w-full max-w-6xl mx-auto">
+          <NuevaAlumnaForm
+            onSuccess={() => {
+              setActiveTab('LIST');
+              fetchAlumnas();
+            }}
+          />
+        </div>
       ) : (
-        /* PESTAÑA 1: LISTADO DE ALUMNAS */
-        <div className="flex flex-col gap-6">
-          {/* Filtros y Buscador */}
-          <Card className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="w-full md:w-80">
-              <Input
-                placeholder="Buscar por nombre, DNI o teléfono..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                icon={<Search className="h-4 w-4" />}
-              />
+        /* Pestaña: Listado de Alumnas con Filtros por Modalidad y Estado */
+        <div className="flex flex-col gap-4">
+          {/* Barra de Filtros (Modalidad + Buscador + Estado) */}
+          <Card className="p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Filter Pill 1: Modalidad (Reformer vs Barre vs Todas) */}
+            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto">
+              <span className="px-2 text-[var(--text-muted)] flex items-center gap-1">
+                <Filter className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Modalidad:
+              </span>
+              <button
+                onClick={() => setModalityFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                  modalityFilter === 'ALL'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Todas ({totalCount + alumnasBarre.length})
+              </button>
+
+              <button
+                onClick={() => setModalityFilter('REFORMER')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  modalityFilter === 'REFORMER'
+                    ? 'bg-[var(--color-wood)] text-white shadow-xs'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" /> Reformer ({totalCount})
+              </button>
+
+              <button
+                onClick={() => setModalityFilter('BARRE')}
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  modalityFilter === 'BARRE'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <Image src="/media/berre.webp" alt="Barre" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
+                Barre ({alumnasBarre.length})
+              </button>
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
-              <span className="text-xs text-[var(--text-muted)] flex items-center gap-1 shrink-0 mr-1">
-                <Filter className="h-3.5 w-3.5" /> Estado:
-              </span>
-              {(['ALL', 'ACTIVE', 'SUSPENDED', 'INACTIVE'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer shrink-0 ${
-                    statusFilter === s
-                      ? 'bg-[var(--color-wood)] text-[var(--color-dark)]'
-                      : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {s === 'ALL' ? 'Todas' : s === 'ACTIVE' ? 'Activas' : s === 'SUSPENDED' ? 'Suspendidas' : 'Inactivas'}
-                </button>
-              ))}
+            {/* Buscador & Estado */}
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                <Input
+                  placeholder="Buscar por nombre, DNI o tel..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 text-xs"
+                />
+              </div>
+
+              <select
+                value={statusFilter}
+                onChange={(e: any) => setStatusFilter(e.target.value)}
+                className="h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">Todos los Estados</option>
+                <option value="ACTIVE">Activas</option>
+                <option value="INACTIVE">Inactivas</option>
+                <option value="SUSPENDED">Suspendidas</option>
+              </select>
             </div>
           </Card>
 
-          {/* Mensaje de error */}
-          {errorMsg && (
-            <div className="p-4 rounded-xl bg-[var(--color-danger-soft)] border border-[var(--color-danger)]/30 text-sm text-[var(--color-danger)]">
-              {errorMsg}
-            </div>
-          )}
-
-          {/* Tabla de Alumnas */}
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Spinner size="lg" />
-              <p className="text-xs text-[var(--text-muted)]">Cargando lista de alumnas...</p>
+              <p className="text-xs text-[var(--text-muted)]">Cargando alumnas por modalidad...</p>
             </div>
-          ) : alumnas.length === 0 ? (
-            <Card className="p-12 text-center flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-muted)]">
-                <Users className="h-6 w-6" />
-              </div>
-              <h3 className="text-base font-semibold text-[var(--text-primary)]">
-                No se encontraron alumnas
-              </h3>
-              <p className="text-xs text-[var(--text-muted)] max-w-sm">
-                {search
-                  ? 'No hay registros que coincidan con la búsqueda.'
-                  : 'Comienza registrando la primera alumna en el sistema.'}
-              </p>
-              {!search && (
-                <Button
-                  onClick={() => setActiveTab('NEW')}
-                  size="sm"
-                  className="mt-2"
-                >
-                  Registrar Alumna
-                </Button>
-              )}
-            </Card>
           ) : (
-            <Card className="overflow-hidden p-0 border border-[var(--border-default)]">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-xs uppercase tracking-wider text-[var(--text-muted)]">
-                      <th className="py-3.5 px-4 font-semibold">Alumna</th>
-                      <th className="py-3.5 px-4 font-semibold">DNI</th>
-                      <th className="py-3.5 px-4 font-semibold">Contacto</th>
-                      <th className="py-3.5 px-4 font-semibold">Plan</th>
-                      <th className="py-3.5 px-4 font-semibold">Importe</th>
-                      <th className="py-3.5 px-4 font-semibold">Vencimiento</th>
-                      <th className="py-3.5 px-4 font-semibold">Estado</th>
-                      <th className="py-3.5 px-4 font-semibold text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--border-default)]">
-                    {alumnas.map((alumna) => (
-                      <tr
-                        key={alumna.id}
-                        className="hover:bg-[var(--bg-tertiary)]/50 transition-colors"
-                      >
-                        {/* Alumna Name */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-[var(--color-wood)]/15 border border-[var(--color-wood)]/30 flex items-center justify-center text-[var(--color-wood)] font-bold text-xs shrink-0">
-                              {alumna.first_name[0]}{(alumna.last_name || '')[0] || ''}
-                            </div>
-                            <div>
-                              <p className="font-bold text-[var(--text-primary)]">
-                                {alumna.first_name} {alumna.last_name}
-                              </p>
-                              <p className="text-[11px] text-[var(--text-muted)]">
-                                Ingreso: {alumna.entry_date}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
+            <div className="space-y-6">
+              {/* Sección 1: Alumnas Reformer */}
+              {displayReformerList && (
+                <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
+                    <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <Layers className="h-5 w-5 text-[var(--color-wood)]" /> Alumnas de Pilates Reformer ({alumnas.length})
+                    </h3>
+                  </div>
 
-                        {/* DNI */}
-                        <td className="py-3.5 px-4 text-[var(--text-secondary)] font-mono text-xs">
-                          {alumna.dni || 'Sin DNI'}
-                        </td>
+                  {alumnas.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] py-8 text-center">
+                      No se encontraron alumnas de Reformer con el filtro seleccionado.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
+                            <th className="py-3 px-4 font-semibold">Alumna</th>
+                            <th className="py-3 px-4 font-semibold">DNI / Teléfono</th>
+                            <th className="py-3 px-4 font-semibold">Plan Actual</th>
+                            <th className="py-3 px-4 font-semibold">Vencimiento</th>
+                            <th className="py-3 px-4 font-semibold">Estado</th>
+                            <th className="py-3 px-4 font-semibold">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
+                          {alumnas.map((a) => (
+                            <tr key={a.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                              <td className="py-3.5 px-4 font-bold capitalize">
+                                {a.first_name} {a.last_name || ''}
+                              </td>
+                              <td className="py-3.5 px-4 font-mono text-[var(--text-secondary)]">
+                                {a.phone} {a.dni ? `· DNI ${a.dni}` : ''}
+                              </td>
+                              <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">
+                                {a.plan || 'Sin plan asignado'}
+                              </td>
+                              <td className="py-3.5 px-4">{getVencimientoCell(a.billing_due_date)}</td>
+                              <td className="py-3.5 px-4">
+                                {a.status === 'ACTIVE' ? (
+                                  <Badge variant="success">Activa</Badge>
+                                ) : a.status === 'INACTIVE' ? (
+                                  <Badge variant="muted">Inactiva</Badge>
+                                ) : (
+                                  <Badge variant="warning">Suspendida</Badge>
+                                )}
+                              </td>
+                              <td className="py-3.5 px-4">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setSelectedAlumna(a);
+                                      setIsDetailOpen(true);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)]/20 text-[var(--text-secondary)] hover:text-[var(--color-wood)] transition-colors cursor-pointer"
+                                    title="Ver Ficha Completa"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setSelectedAlumna(a);
+                                      setIsFormOpen(true);
+                                    }}
+                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-blue-500/20 text-[var(--text-secondary)] hover:text-blue-500 transition-colors cursor-pointer"
+                                    title="Editar Alumna"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card>
+              )}
 
-                        {/* Contact */}
-                        <td className="py-3.5 px-4">
-                          <div className="flex flex-col text-xs">
-                            <span className="text-[var(--text-primary)] flex items-center gap-1 font-medium">
-                              <Phone className="h-3 w-3 text-[var(--color-wood)]" /> {alumna.phone}
-                            </span>
-                            {alumna.emergency_contact_phone && (
-                              <span className="text-[11px] text-[var(--text-muted)]">
-                                Emergencia: {alumna.emergency_contact_phone}
-                              </span>
-                            )}
-                          </div>
-                        </td>
+              {/* Sección 2: Alumnas Barre */}
+              {displayBarreList && (
+                <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+                  <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
+                    <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <Image src="/media/berre.webp" alt="Barre" width={20} height={20} className="h-5 w-5 object-contain" />
+                      Alumnas de Studio Barre ({alumnasBarre.length})
+                    </h3>
+                  </div>
 
-                        {/* Plan */}
-                        <td className="py-3.5 px-4 text-xs font-semibold text-[var(--text-primary)]">
-                          {alumna.plan || 'Sin plan'}
-                        </td>
-
-                        {/* Importe */}
-                        <td className="py-3.5 px-4 text-xs font-mono font-bold text-[var(--color-wood)]">
-                          ${(alumna.plan_amount || 0).toLocaleString()}
-                        </td>
-
-                        {/* Vencimiento */}
-                        <td className="py-3.5 px-4">
-                          {getVencimientoCell(alumna.billing_due_date)}
-                        </td>
-
-                        {/* Status */}
-                        <td className="py-3.5 px-4">{getStatusBadge(alumna.status)}</td>
-
-                        {/* Actions */}
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => {
-                                setSelectedAlumna(alumna);
-                                setIsDetailOpen(true);
-                              }}
-                              title="Ver Ficha Completa"
-                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSelectedAlumna(alumna);
-                                setIsFormOpen(true);
-                              }}
-                              title="Editar Alumna"
-                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-wood)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              onClick={() => {
-                                setSelectedAlumna(alumna);
-                                setIsTurnoModalOpen(true);
-                              }}
-                              title="Asignar Turno Fijo"
-                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-wood)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
-                            >
-                              <Calendar className="h-4 w-4" />
-                            </button>
-
-                            {alumna.status === 'ACTIVE' ? (
-                              <button
-                                onClick={() => handleStatusChange(alumna, 'INACTIVE')}
-                                title="Dar de baja"
-                                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
-                              >
-                                <UserX className="h-4 w-4" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleStatusChange(alumna, 'ACTIVE')}
-                                title="Reactivar Alumna"
-                                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--color-success)] hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer"
-                              >
-                                <UserCheck className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                  {alumnasBarre.length === 0 ? (
+                    <p className="text-xs text-[var(--text-muted)] py-8 text-center">
+                      No hay alumnas registradas en Studio Barre.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
+                            <th className="py-3 px-4 font-semibold">Alumna Barre</th>
+                            <th className="py-3 px-4 font-semibold">Plan Barre</th>
+                            <th className="py-3 px-4 font-semibold">Mensualidad</th>
+                            <th className="py-3 px-4 font-semibold">Vencimiento</th>
+                            <th className="py-3 px-4 font-semibold">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
+                          {alumnasBarre.map((b) => (
+                            <tr key={b.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
+                              <td className="py-3.5 px-4 font-bold capitalize">{b.alumna_name}</td>
+                              <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">{b.plan_name}</td>
+                              <td className="py-3.5 px-4 font-mono font-bold text-amber-600 dark:text-amber-400">
+                                ${b.monthly_fee.toLocaleString()} ARS
+                              </td>
+                              <td className="py-3.5 px-4 font-mono">{b.due_date}</td>
+                              <td className="py-3.5 px-4">
+                                {b.status === 'ACTIVE' ? (
+                                  <Badge variant="success">Activa</Badge>
+                                ) : (
+                                  <Badge variant="muted">Inactiva</Badge>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card>
+              )}
+            </div>
           )}
         </div>
       )}
 
       {/* Modales */}
-      <AlumnaFormModal
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSubmit={handleCreateOrUpdate}
-        alumnaToEdit={selectedAlumna}
-        loading={submitting}
-      />
+      {isFormOpen && selectedAlumna && (
+        <AlumnaFormModal
+          isOpen={isFormOpen}
+          alumnaToEdit={selectedAlumna}
+          onClose={() => {
+            setIsFormOpen(false);
+            setSelectedAlumna(null);
+          }}
+          onSubmit={async (data) => {
+            await handleUpdateAlumna(selectedAlumna.id, data);
+            return true;
+          }}
+          loading={submitting}
+        />
+      )}
 
-      <AlumnaDetailModal
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        alumna={selectedAlumna}
-        onEdit={(alumna) => {
-          setSelectedAlumna(alumna);
-          setIsFormOpen(true);
-        }}
-      />
+      {isDetailOpen && selectedAlumna && (
+        <AlumnaDetailModal
+          isOpen={isDetailOpen}
+          alumna={selectedAlumna}
+          onClose={() => {
+            setIsDetailOpen(false);
+            setSelectedAlumna(null);
+          }}
+          onEdit={(a) => {
+            setSelectedAlumna(a);
+            setIsDetailOpen(false);
+            setIsFormOpen(true);
+          }}
+        />
+      )}
 
-      <AsignarTurnoFijoModal
-        isOpen={isTurnoModalOpen}
-        onClose={() => setIsTurnoModalOpen(false)}
-        alumna={selectedAlumna}
-        onAssign={handleAsignarTurno}
-        loading={submitting}
-      />
+      {isTurnoModalOpen && selectedAlumna && (
+        <AsignarTurnoFijoModal
+          isOpen={isTurnoModalOpen}
+          alumna={selectedAlumna}
+          onClose={() => {
+            setIsTurnoModalOpen(false);
+            setSelectedAlumna(null);
+          }}
+          onAssign={handleAssignTurnoFijo}
+          loading={submitting}
+        />
+      )}
     </div>
   );
 }

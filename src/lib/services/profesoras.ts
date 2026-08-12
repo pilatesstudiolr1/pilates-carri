@@ -67,64 +67,46 @@ export async function updateProfileData(
 }
 
 export async function createOrUpdateProfileByEmail(profileData: {
+  id?: string;
   email: string;
-  full_name: string;
-  role: UserRole;
+  full_name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  role?: UserRole;
   phone?: string | null;
   dni?: string | null;
+  turno?: string | null;
+  hire_date?: string | null;
+  observations?: string | null;
+  username?: string | null;
+  password_text?: string | null;
+  work_days?: string[];
+  work_hours?: string[];
+  sede_id?: string | null;
   commission_rate?: number;
   is_active?: boolean;
 }): Promise<{ data: Profile | null; error: string | null }> {
   try {
-    const supabase = createClient();
-    const cleanEmail = profileData.email.trim().toLowerCase();
+    const isUpdate = !!profileData.id;
+    const response = await fetch('/api/admin/users', {
+      method: isUpdate ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(profileData),
+    });
 
-    // Verificar si ya existe perfil registrado con ese email
-    const { data: existing } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', cleanEmail)
-      .maybeSingle();
+    const resData = await response.json();
 
-    if (existing) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({
-          full_name: profileData.full_name,
-          role: profileData.role,
-          phone: profileData.phone || null,
-          dni: profileData.dni || null,
-          commission_rate: profileData.commission_rate ?? 0.40,
-          is_active: profileData.is_active ?? true,
-        })
-        .eq('id', existing.id)
-        .select()
-        .single();
-
-      if (error) return { data: null, error: error.message };
-      return { data: data as Profile, error: null };
-    } else {
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert({
-          email: cleanEmail,
-          full_name: profileData.full_name,
-          role: profileData.role,
-          phone: profileData.phone || null,
-          dni: profileData.dni || null,
-          commission_rate: profileData.commission_rate ?? 0.40,
-          is_active: profileData.is_active ?? true,
-        })
-        .select()
-        .single();
-
-      if (error) return { data: null, error: error.message };
-      return { data: data as Profile, error: null };
+    if (!response.ok || resData.error) {
+      return { data: null, error: resData.error || 'Error al procesar el usuario' };
     }
+
+    return { data: resData.data as Profile, error: null };
   } catch (err) {
     return {
       data: null,
-      error: err instanceof Error ? err.message : 'Error al registrar/asignar perfil por email',
+      error: err instanceof Error ? err.message : 'Error al registrar/asignar perfil',
     };
   }
 }
@@ -145,6 +127,26 @@ export async function toggleProfileActive(
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : 'Error al cambiar estado de usuario',
+    };
+  }
+}
+
+export async function deleteProfile(id: string): Promise<{ error: string | null }> {
+  try {
+    const response = await fetch(`/api/admin/users?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+
+    const resData = await response.json();
+
+    if (!response.ok || resData.error) {
+      return { error: resData.error || 'Error al eliminar usuario' };
+    }
+
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al eliminar profesora',
     };
   }
 }
@@ -174,24 +176,47 @@ export async function getLiquidacionProfesoras(): Promise<{
     const hoy = new Date().toISOString().split('T')[0];
     const mesActual = hoy.slice(0, 7);
 
-    const { data, error } = await supabase
-      .from('pagos')
-      .select('amount, commission_amount, payment_date, alumna:alumnas(profesora:profiles(id, full_name, commission_rate))')
-      .eq('status', 'PAID')
-      .gte('payment_date', `${mesActual}-01`);
+    const [pagosRes, alumnasRes, profilesRes] = await Promise.all([
+      supabase
+        .from('pagos')
+        .select('amount, payment_date, profesora_id, alumna_id')
+        .gte('payment_date', `${mesActual}-01`),
+      supabase
+        .from('alumnas')
+        .select('id, profesora_id'),
+      supabase
+        .from('profiles')
+        .select('id, full_name, commission_rate'),
+    ]);
 
-    if (error) return { data: [], error: error.message };
+    if (pagosRes.error) return { data: [], error: pagosRes.error.message };
+
+    const alumnasMap = new Map<string, string | null>();
+    if (alumnasRes.data) {
+      alumnasRes.data.forEach((a: any) => {
+        if (a.id) alumnasMap.set(a.id, a.profesora_id || null);
+      });
+    }
+
+    const profilesMap = new Map<string, { id: string; full_name: string; commission_rate: number }>();
+    if (profilesRes.data) {
+      profilesRes.data.forEach((p: any) => {
+        if (p.id) profilesMap.set(p.id, p);
+      });
+    }
 
     const map = new Map<string, LiquidacionProfesoraItem>();
 
-    for (const pago of data as any[]) {
-      const profesora = pago.alumna?.profesora;
+    for (const pago of (pagosRes.data as any[])) {
+      const pid = pago.profesora_id || (pago.alumna_id ? alumnasMap.get(pago.alumna_id) : null);
+      if (!pid) continue;
+
+      const profesora = profilesMap.get(pid);
       if (!profesora) continue;
 
-      const pid = profesora.id;
       const esHoy = pago.payment_date === hoy;
       const rate = profesora.commission_rate ?? 0.4;
-      const comision = pago.commission_amount || (pago.amount * rate);
+      const comision = (pago.amount || 0) * rate;
 
       if (!map.has(pid)) {
         map.set(pid, {
@@ -209,12 +234,12 @@ export async function getLiquidacionProfesoras(): Promise<{
 
       const item = map.get(pid)!;
       item.pagos_mes += 1;
-      item.monto_mes += pago.amount;
+      item.monto_mes += (pago.amount || 0);
       item.comision_mes += comision;
 
       if (esHoy) {
         item.pagos_hoy += 1;
-        item.monto_hoy += pago.amount;
+        item.monto_hoy += (pago.amount || 0);
         item.comision_hoy += comision;
       }
     }

@@ -11,9 +11,11 @@ import { CajaMovimiento, MetodoPago, Sede } from '@/types/database';
 import { getMovimientos, registrarMovimiento } from '@/lib/services/caja';
 import { getSedes } from '@/lib/services/sedes';
 import { METODOS_PAGO } from '@/lib/constants';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Wallet, Plus, TrendingUp, TrendingDown, DollarSign, CreditCard, ArrowUpRight, ArrowDownLeft, Filter, Building2 } from 'lucide-react';
 
 export default function CajaPage() {
+  const { alert: alertDialog } = useConfirm();
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selectedSedeId, setSelectedSedeId] = useState<string>('ALL');
   const [movimientos, setMovimientos] = useState<CajaMovimiento[]>([]);
@@ -63,7 +65,11 @@ export default function CajaPage() {
   const handleCreateMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!concepto.trim() || !monto || parseFloat(monto) <= 0) {
-      alert('Ingresa un concepto y un monto válido');
+      await alertDialog({
+        title: 'Monto o concepto inválido',
+        message: 'Por favor ingresa un concepto y un monto válido mayor a 0.',
+        variant: 'warning',
+      });
       return;
     }
 
@@ -78,11 +84,15 @@ export default function CajaPage() {
     setSubmitting(false);
 
     if (error) {
-      alert(`Error al registrar: ${error}`);
+      await alertDialog({
+        title: 'Error de Movimiento',
+        message: `Error al registrar movimiento: ${error}`,
+        variant: 'danger',
+      });
     } else {
-      setIsModalOpen(false);
       setConcepto('');
       setMonto('');
+      setIsModalOpen(false);
       fetchData();
     }
   };

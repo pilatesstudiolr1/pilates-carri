@@ -11,9 +11,11 @@ import { PlanFormModal } from '@/components/configuracion/PlanFormModal';
 import { Sede } from '@/types/database';
 import { getSedes, createSede, updateSede } from '@/lib/services/sedes';
 import { getPlanes, createPlan, updatePlan, togglePlanActive, deletePlan, PlanItem } from '@/lib/services/planes';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Settings, Building2, MapPin, Phone, BedDouble, Edit2, Plus, Percent, Shield, Save, Tag, Power, Trash2, Calendar } from 'lucide-react';
 
 export default function ConfiguracionPage() {
+  const { confirm, alert: alertDialog } = useConfirm();
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [planes, setPlanes] = useState<PlanItem[]>([]);
   const [loadingSedes, setLoadingSedes] = useState(true);
@@ -78,14 +80,22 @@ export default function ConfiguracionPage() {
     if (selectedSede) {
       const { error } = await updateSede(selectedSede.id, sedeData);
       if (error) {
-        alert(`Error al actualizar la sede: ${error}`);
+        await alertDialog({
+          title: 'Error de Sede',
+          message: `Error al actualizar la sede: ${error}`,
+          variant: 'danger',
+        });
         setSubmitting(false);
         return false;
       }
     } else {
       const { error } = await createSede(sedeData);
       if (error) {
-        alert(`Error al crear la sede: ${error}`);
+        await alertDialog({
+          title: 'Error de Sede',
+          message: `Error al crear la sede: ${error}`,
+          variant: 'danger',
+        });
         setSubmitting(false);
         return false;
       }
@@ -106,14 +116,22 @@ export default function ConfiguracionPage() {
     if (selectedPlan) {
       const { error } = await updatePlan(selectedPlan.id, planData);
       if (error) {
-        alert(`Error al actualizar el plan: ${error}`);
+        await alertDialog({
+          title: 'Error de Plan',
+          message: `Error al actualizar el plan: ${error}`,
+          variant: 'danger',
+        });
         setSubmitting(false);
         return false;
       }
     } else {
       const { error } = await createPlan(planData);
       if (error) {
-        alert(`Error al crear el plan: ${error}`);
+        await alertDialog({
+          title: 'Error de Plan',
+          message: `Error al crear el plan: ${error}`,
+          variant: 'danger',
+        });
         setSubmitting(false);
         return false;
       }
@@ -125,28 +143,47 @@ export default function ConfiguracionPage() {
 
   const handleTogglePlan = async (plan: PlanItem) => {
     const nextState = !plan.is_active;
+    const confirmTitle = nextState ? 'Reactivar plan' : 'Desactivar plan';
     const confirmMsg = nextState
-      ? `¿Reactivar el plan ${plan.name}?`
-      : `¿Desactivar el plan ${plan.name}? No aparecerá en la selección de nuevas alumnas.`;
+      ? `¿Desea reactivar el plan ${plan.name}?`
+      : `¿Desea desactivar el plan ${plan.name}? No aparecerá en la selección de nuevas alumnas.`;
 
-    if (!confirm(confirmMsg)) return;
+    const isOk = await confirm({
+      title: confirmTitle,
+      message: confirmMsg,
+      confirmText: nextState ? 'Reactivar' : 'Desactivar',
+      variant: 'warning',
+    });
+    if (!isOk) return;
 
     const { error } = await togglePlanActive(plan.id, nextState);
     if (error) {
-      alert(`Error al modificar estado del plan: ${error}`);
+      await alertDialog({
+        title: 'Error de Plan',
+        message: `Error al modificar estado del plan: ${error}`,
+        variant: 'danger',
+      });
     } else {
       fetchData();
     }
   };
 
   const handleDeletePlanConfirm = async (plan: PlanItem) => {
-    if (!confirm(`¿Estás seguro de eliminar el plan "${plan.name}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
+    const isOk = await confirm({
+      title: 'Eliminar plan de suscripción',
+      message: `¿Estás seguro de eliminar el plan "${plan.name}"? Esta acción no se puede deshacer.`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
 
     const { error } = await deletePlan(plan.id);
     if (error) {
-      alert(`Error al eliminar el plan: ${error}`);
+      await alertDialog({
+        title: 'Error de eliminación',
+        message: `Error al eliminar el plan: ${error}`,
+        variant: 'danger',
+      });
     } else {
       fetchData();
     }

@@ -67,7 +67,7 @@ export function Modal({
       {/* Modal Container */}
       <div
         className={cn(
-          'relative w-full rounded-2xl flex flex-col',
+          'relative w-full rounded-xl flex flex-col',
           'bg-[var(--bg-secondary)] border border-[var(--border-default)]',
           'shadow-2xl overflow-hidden',
           'animate-scale-in max-h-[90vh]',

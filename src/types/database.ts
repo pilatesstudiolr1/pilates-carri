@@ -38,11 +38,18 @@ export interface Profile {
   id: string;
   email: string;
   full_name: string;
+  first_name?: string | null;
+  last_name?: string | null;
   role: UserRole;
   avatar_url: string | null;
   sede_id: string | null;
   phone: string | null;
   dni: string | null;
+  turno?: string | null;
+  hire_date?: string | null;
+  observations?: string | null;
+  username?: string | null;
+  password_text?: string | null;
   commission_rate: number;
   hourly_rate: number;
   work_days: string[];

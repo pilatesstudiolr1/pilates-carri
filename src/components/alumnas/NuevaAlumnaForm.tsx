@@ -269,7 +269,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             <User className="h-4 w-4 text-[var(--color-wood)]" /> Datos personales
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <Input
               label="Nombre *"
               placeholder="Nombre"
@@ -299,7 +299,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <Input
               label="Correo electrónico"
               type="email"
@@ -337,7 +337,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             <Phone className="h-4 w-4 text-[var(--color-wood)]" /> Contacto de emergencia
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Input
               label="Nombre del contacto"
               placeholder="Nombre y apellido"
@@ -359,7 +359,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             <Shield className="h-4 w-4 text-[var(--color-wood)]" /> Plan y asistencia
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             <div>
               <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
                 Profesora responsable *
@@ -403,7 +403,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <Input
               label="Importe ($)"
               type="number"

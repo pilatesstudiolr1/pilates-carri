@@ -42,19 +42,18 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-3 py-0.5',
-        'text-xs font-semibold rounded-full tracking-wide',
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5',
+        'text-[11px] font-mono font-medium rounded-[2px] tracking-tight shadow-2xs',
         variantStyles[variant],
         className
       )}
     >
       {dot && (
         <span
-          className={cn('h-1.5 w-1.5 rounded-full', dotColors[variant])}
+          className={cn('h-1.5 w-1.5 rounded-full shrink-0', dotColors[variant])}
         />
       )}
       {children}
     </span>
   );
 }
-

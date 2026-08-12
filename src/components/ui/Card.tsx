@@ -24,15 +24,16 @@ export function Card({
   return (
     <div
       className={cn(
-        'rounded-2xl',
-        'bg-[var(--bg-secondary)] border border-[var(--border-default)] shadow-[0_2px_8px_rgba(0,0,0,0.03)]',
+        'rounded-lg',
+        'bg-[var(--surface)] border border-[var(--border)] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.03)]',
         'transition-all duration-300',
         hover &&
-        'hover:-translate-y-0.5 hover:border-[var(--border-hover)] hover:shadow-md cursor-pointer',
+          'hover:-translate-y-0.5 hover:border-[#D4D4D4] hover:shadow-[0_8px_16px_-4px_rgba(0,0,0,0.06)] cursor-pointer',
         paddingStyles[padding],
         className
       )}
     >
+
       {children}
     </div>
   );

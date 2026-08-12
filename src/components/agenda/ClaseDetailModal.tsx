@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Clase } from '@/types/database';
 import { Clock, UserCheck, MapPin, Plus, UserX, CheckCircle, XCircle, Trash2, BedDouble } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 interface ClaseDetailModalProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function ClaseDetailModal({
   onRemoveAlumna,
   onDeleteClase,
 }: ClaseDetailModalProps) {
+  const { confirm } = useConfirm();
   const [asistencias, setAsistencias] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState(false);
 
@@ -41,7 +43,14 @@ export function ClaseDetailModal({
 
   const handleDeleteClase = async () => {
     if (!onDeleteClase) return;
-    if (!confirm(`¿Eliminar el turno "${clase.name}"? Esta accion no se puede deshacer. Las alumnas asignadas quedaran desvinculadas.`)) return;
+    const isOk = await confirm({
+      title: 'Eliminar turno de la agenda',
+      message: `¿Desea eliminar el turno "${clase.name}"? Las alumnas asignadas quedarán desvinculadas.`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
+
     setDeleting(true);
     await onDeleteClase(clase.id);
     setDeleting(false);

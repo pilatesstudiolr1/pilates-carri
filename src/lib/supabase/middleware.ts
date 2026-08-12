@@ -47,8 +47,28 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isPublicPath) {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/portal';
     return NextResponse.redirect(url);
+  }
+
+  // Protección de rutas por Rol: PROFESORA solo puede ver /profesora y /portal
+  if (user && !isPublicPath) {
+    const pathname = request.nextUrl.pathname;
+    const isAllowedProfesoraPath = pathname === '/profesora' || pathname.startsWith('/profesora/') || pathname === '/portal' || pathname.startsWith('/portal/');
+
+    if (!isAllowedProfesoraPath) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (profile?.role === 'PROFESORA') {
+        const url = request.nextUrl.clone();
+        url.pathname = '/profesora';
+        return NextResponse.redirect(url);
+      }
+    }
   }
 
   return supabaseResponse;

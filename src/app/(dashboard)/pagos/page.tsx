@@ -10,6 +10,7 @@ import { Alumna, Pago, MetodoPago } from '@/types/database';
 import { getPagos, registrarPago, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { useUser } from '@/hooks/useUser';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 import {
   CreditCard,
   Plus,
@@ -32,6 +33,7 @@ import {
 } from 'lucide-react';
 
 export default function PagosPage() {
+  const { confirm, alert: alertDialog } = useConfirm();
   const { profile } = useUser();
   const isAdmin = profile?.role === 'ADMIN';
 
@@ -143,13 +145,21 @@ export default function PagosPage() {
   };
 
   const handleDeletePagoConfirm = async (pagoId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este registro de pago? Esta acción no se puede deshacer.')) {
-      return;
-    }
+    const isOk = await confirm({
+      title: 'Eliminar registro de pago',
+      message: '¿Estás seguro de eliminar este registro de pago? Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
 
     const { error } = await deletePago(pagoId);
     if (error) {
-      alert(`Error al eliminar: ${error}`);
+      await alertDialog({
+        title: 'Error de pago',
+        message: `Error al eliminar: ${error}`,
+        variant: 'danger',
+      });
     } else {
       fetchData();
     }
