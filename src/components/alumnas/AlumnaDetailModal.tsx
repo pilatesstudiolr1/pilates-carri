@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alumna } from '@/types/database';
-import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle } from 'lucide-react';
+import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock } from 'lucide-react';
 
 interface AlumnaDetailModalProps {
   isOpen: boolean;
@@ -101,7 +101,7 @@ export function AlumnaDetailModal({
         </div>
 
         {/* Datos Personales Rapidos */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {alumna.date_of_birth && (
             <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center gap-2 text-xs">
               <Cake className="h-4 w-4 text-[var(--color-wood)] shrink-0" />
@@ -117,6 +117,15 @@ export function AlumnaDetailModal({
               <div>
                 <p className="text-[var(--text-muted)] text-[10px] uppercase font-semibold">Plan</p>
                 <p className="text-[var(--text-primary)] font-medium">{alumna.plan}</p>
+              </div>
+            </div>
+          )}
+          {alumna.billing_start_date && (
+            <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center gap-2 text-xs">
+              <Clock className="h-4 w-4 text-[var(--color-wood)] shrink-0" />
+              <div>
+                <p className="text-[var(--text-muted)] text-[10px] uppercase font-semibold">Inicio Período</p>
+                <p className="text-[var(--text-primary)] font-medium">{alumna.billing_start_date}</p>
               </div>
             </div>
           )}

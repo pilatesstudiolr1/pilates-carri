@@ -331,7 +331,7 @@ export function TurnoModal({
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-[var(--text-secondary)] font-medium pt-1 border-t border-[var(--color-wood)]/20">
                 <div>
-                  <strong>Plan:</strong> {selectedAlumna.plan || '3 veces por semana - $55.000'}
+                  <strong>Plan:</strong> {selectedAlumna.plan || 'Sin plan'}
                 </div>
                 <div>
                   <strong>Teléfono:</strong> {selectedAlumna.phone || 'Sin teléfono'}
@@ -340,7 +340,7 @@ export function TurnoModal({
                   <strong>Estado:</strong> {selectedAlumna.status || 'Activa'}
                 </div>
                 <div>
-                  <strong>Vencimiento:</strong> {selectedAlumna.billing_due_date || '2026-08-17'}
+                  <strong>Vencimiento:</strong> {selectedAlumna.billing_due_date || 'Sin fecha'}
                 </div>
               </div>
             </div>

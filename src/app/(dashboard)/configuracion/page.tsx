@@ -22,6 +22,8 @@ export default function ConfiguracionPage() {
   const [loadingPlanes, setLoadingPlanes] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const CONFIG_PARAMS_KEY = 'studio_general_params';
+
   // Parámetros generales
   const [nombreEstudio, setNombreEstudio] = useState('Pilates Studio LR');
   const [comisionDefault, setComisionDefault] = useState('40');
@@ -37,6 +39,22 @@ export default function ConfiguracionPage() {
   const [selectedPlan, setSelectedPlan] = useState<PlanItem | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const raw = localStorage.getItem(CONFIG_PARAMS_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.nombreEstudio) setNombreEstudio(parsed.nombreEstudio);
+          if (parsed.comisionDefault) setComisionDefault(parsed.comisionDefault);
+          if (parsed.maxCupo) setMaxCupo(parsed.maxCupo);
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoadingSedes(true);
@@ -65,6 +83,13 @@ export default function ConfiguracionPage() {
 
   const handleSaveParams = (e: React.FormEvent) => {
     e.preventDefault();
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(CONFIG_PARAMS_KEY, JSON.stringify({
+        nombreEstudio,
+        comisionDefault,
+        maxCupo,
+      }));
+    }
     setSavedParams(true);
     setTimeout(() => setSavedParams(false), 3000);
   };

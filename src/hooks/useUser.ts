@@ -38,8 +38,8 @@ export function useUser(): UseUserReturn {
           setError(profileError?.message || 'Perfil no encontrado');
           setProfile({
             id: user.id,
-            email: user.email || 'admin@gmail.com',
-            full_name: user.user_metadata?.full_name || 'Juliana',
+            email: user.email || '',
+            full_name: user.user_metadata?.full_name || (user.email ? user.email.split('@')[0] : 'Usuario'),
             role: 'ADMIN',
             avatar_url: null,
             sede_id: null,

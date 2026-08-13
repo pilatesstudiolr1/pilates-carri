@@ -67,10 +67,13 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   const [selectedProfesoraId, setSelectedProfesoraId] = useState('');
   const [selectedPlanName, setSelectedPlanName] = useState('');
   const [importe, setImporte] = useState('0');
+  const [billingStartDate, setBillingStartDate] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [billingDueDate, setBillingDueDate] = useState<string>(() => {
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    return nextMonth.toISOString().split('T')[0];
+    const start = new Date();
+    start.setMonth(start.getMonth() + 1);
+    return start.toISOString().split('T')[0];
   });
   const [status, setStatus] = useState<AlumnaStatus>('ACTIVE');
 
@@ -97,7 +100,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     async function loadData() {
       const [profsRes, planesRes] = await Promise.all([
         getProfiles({ role: 'ALL' }),
-        getPlanes(),
+        getPlanes({ onlyActive: true }),
       ]);
       setProfesoras(profsRes.data);
       setPlanes(planesRes.data);
@@ -109,6 +112,17 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     }
     loadData();
   }, []);
+
+  const handleStartDateChange = (dateStr: string) => {
+    setBillingStartDate(dateStr);
+    if (dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        d.setMonth(d.getMonth() + 1);
+        setBillingDueDate(d.toISOString().split('T')[0]);
+      }
+    }
+  };
 
   // Calcular edad automaticamente
   useEffect(() => {
@@ -186,6 +200,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       profesora_id: selectedProfesoraId || null,
       plan: selectedPlanName || null,
       plan_amount: parseFloat(importe) || 0,
+      billing_start_date: billingStartDate || null,
       billing_due_date: billingDueDate || null,
       status,
       medical_clearance: hasMedicalClearance,
@@ -362,7 +377,35 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             <div>
               <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Profesora responsable *
+                Plan de clases *
+              </label>
+              <select
+                value={selectedPlanName}
+                onChange={(e) => handlePlanChange(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
+              >
+                {planes.length === 0 ? (
+                  <option value="">Sin planes activos (configure en Configuración)</option>
+                ) : (
+                  planes.map((pl) => (
+                    <option key={pl.id} value={pl.name}>
+                      {pl.name} - ${pl.price.toLocaleString()}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+
+            <Input
+              label="Importe del plan ($)"
+              type="number"
+              value={importe}
+              onChange={(e) => setImporte(e.target.value)}
+            />
+
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Profesora responsable
               </label>
               <select
                 value={selectedProfesoraId}
@@ -377,43 +420,28 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                 ))}
               </select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <Input
+              label="Fecha de inicio (Comienza clases)"
+              type="date"
+              value={billingStartDate}
+              onChange={(e) => handleStartDateChange(e.target.value)}
+              icon={<Calendar className="h-4 w-4" />}
+            />
 
             <Input
-              label="Fecha de vencimiento"
+              label="Fecha de vencimiento (Fin de período)"
               type="date"
               value={billingDueDate}
               onChange={(e) => setBillingDueDate(e.target.value)}
+              icon={<Calendar className="h-4 w-4" />}
             />
 
             <div>
               <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Plan *
-              </label>
-              <select
-                value={selectedPlanName}
-                onChange={(e) => handlePlanChange(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
-              >
-                {planes.map((pl) => (
-                  <option key={pl.id} value={pl.name}>
-                    {pl.name} - ${pl.price.toLocaleString()}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <Input
-              label="Importe ($)"
-              type="number"
-              value={importe}
-              onChange={(e) => setImporte(e.target.value)}
-            />
-
-            <div>
-              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Estado
+                Estado de la alumna
               </label>
               <select
                 value={status}
@@ -426,6 +454,18 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
               </select>
             </div>
           </div>
+
+          {billingStartDate && billingDueDate && (
+            <div className="px-3.5 py-2.5 rounded-xl bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/20 text-xs font-medium text-[var(--text-primary)] flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-[var(--color-wood)]" />
+                Vigencia del plan:
+              </span>
+              <span className="font-bold text-[var(--color-wood)]">
+                Del {billingStartDate.split('-').reverse().join('/')} al {billingDueDate.split('-').reverse().join('/')}
+              </span>
+            </div>
+          )}
 
           {/* Turnos Fijos Semanales */}
           <div className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-default)] flex flex-col gap-3 mt-2">

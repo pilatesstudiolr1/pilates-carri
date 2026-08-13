@@ -11,13 +11,6 @@ export interface PlanItem {
   updated_at?: string;
 }
 
-const DEFAULT_PLANES: PlanItem[] = [
-  { id: 'p-1', name: '1 vez por semana', weekly_classes: 1, price: 35000, description: '4 clases al mes', is_active: true },
-  { id: 'p-2', name: '2 veces por semana', weekly_classes: 2, price: 45000, description: '8 clases al mes', is_active: true },
-  { id: 'p-3', name: '3 veces por semana', weekly_classes: 3, price: 55000, description: '12 clases al mes', is_active: true },
-  { id: 'p-4', name: 'Pase Libre', weekly_classes: 5, price: 65000, description: 'Clases ilimitadas por mes', is_active: true },
-];
-
 const LOCAL_STORAGE_KEY_DELETED = 'studio_deleted_plan_ids';
 const LOCAL_STORAGE_KEY_CUSTOM = 'studio_custom_planes';
 
@@ -70,34 +63,54 @@ function saveCustomPlan(plan: PlanItem) {
   }
 }
 
-export async function getPlanes(): Promise<{ data: PlanItem[]; error: string | null }> {
+export async function getPlanes(options?: {
+  onlyActive?: boolean;
+}): Promise<{ data: PlanItem[]; error: string | null }> {
   const deletedIds = getDeletedPlanIds();
   const customPlanes = getCustomPlanes();
 
   try {
     const supabase = createClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from('planes')
       .select('*')
       .order('price', { ascending: true });
 
+    if (options?.onlyActive) {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, error } = await query;
+
     if (error) {
-      // Si la tabla no existe o hay error, combinar predeterminados + personalizados no borrados
-      const combined = [...DEFAULT_PLANES, ...customPlanes].filter((p) => !deletedIds.includes(p.id));
+      // Si hay error o la tabla no existe aún, usar únicamente planes personalizados de localStorage (sin hardcoded)
+      let combined = customPlanes.filter((p) => !deletedIds.includes(p.id));
+      if (options?.onlyActive) {
+        combined = combined.filter((p) => p.is_active !== false);
+      }
       return { data: combined, error: null };
     }
 
     if (data && data.length > 0) {
-      const filtered = (data as PlanItem[]).filter((p) => !deletedIds.includes(p.id));
+      let filtered = (data as PlanItem[]).filter((p) => !deletedIds.includes(p.id));
+      if (options?.onlyActive) {
+        filtered = filtered.filter((p) => p.is_active !== false);
+      }
       return { data: filtered, error: null };
     }
 
-    // Si data es array vacío (todos fueron eliminados en la BD o tabla vacía sin error)
-    const fallbackFiltered = [...DEFAULT_PLANES, ...customPlanes].filter((p) => !deletedIds.includes(p.id));
-    return { data: fallbackFiltered, error: null };
+    // Si data es array vacío en BD, combinar con customPlanes si los hubiere
+    let fallback = customPlanes.filter((p) => !deletedIds.includes(p.id));
+    if (options?.onlyActive) {
+      fallback = fallback.filter((p) => p.is_active !== false);
+    }
+    return { data: fallback, error: null };
   } catch {
-    const fallbackFiltered = [...DEFAULT_PLANES, ...customPlanes].filter((p) => !deletedIds.includes(p.id));
-    return { data: fallbackFiltered, error: null };
+    let fallback = customPlanes.filter((p) => !deletedIds.includes(p.id));
+    if (options?.onlyActive) {
+      fallback = fallback.filter((p) => p.is_active !== false);
+    }
+    return { data: fallback, error: null };
   }
 }
 
@@ -158,7 +171,7 @@ export async function updatePlan(
   try {
     if (id.startsWith('p-')) {
       const custom = getCustomPlanes();
-      const item = custom.find((p) => p.id === id) || DEFAULT_PLANES.find((p) => p.id === id);
+      const item = custom.find((p: PlanItem) => p.id === id);
       if (item) {
         saveCustomPlan({ ...item, ...updateData });
       }

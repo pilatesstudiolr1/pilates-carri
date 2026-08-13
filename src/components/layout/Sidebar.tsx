@@ -240,7 +240,7 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
         <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[var(--bg-tertiary)]/80 border border-[var(--border-default)]">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-bold text-[var(--text-primary)] truncate leading-tight">
-              {profile?.full_name || 'Juliana'}
+              {profile?.full_name || 'Usuario'}
             </p>
             <div className="flex items-center gap-1 mt-0.5">
               {userRole === 'ADMIN' ? (

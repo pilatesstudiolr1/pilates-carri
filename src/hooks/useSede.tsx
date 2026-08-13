@@ -36,30 +36,8 @@ export function SedeProvider({ children }: { children: React.ReactNode }) {
     setLoading(true);
     try {
       const res = await getSedes({ isActive: true });
-      if (res.data && res.data.length > 0) {
+      if (res.data) {
         setSedes(res.data);
-      } else {
-        const defaultSedes: Sede[] = [
-          {
-            id: 'sede-norte',
-            name: 'Sede Norte (Nicaragua 148)',
-            address: 'Nicaragua 148, La Rioja',
-            phone: '3804-000000',
-            max_camillas: 6,
-            is_active: true,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 'sede-centro',
-            name: 'Sede Centro',
-            address: 'Av. Rivadavia 250, La Rioja',
-            phone: '3804-111111',
-            max_camillas: 4,
-            is_active: true,
-            created_at: new Date().toISOString(),
-          },
-        ];
-        setSedes(defaultSedes);
       }
     } catch (err) {
       console.error('Error al cargar sedes:', err);

@@ -5,7 +5,8 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
-import { User, Phone, Mail, FileText, AlertCircle, Heart, CheckCircle2, Cake } from 'lucide-react';
+import { getPlanes, PlanItem } from '@/lib/services/planes';
+import { User, Phone, Mail, FileText, AlertCircle, Heart, CheckCircle2, Cake, Shield, Calendar, Clock } from 'lucide-react';
 
 interface AlumnaFormModalProps {
   isOpen: boolean;
@@ -49,9 +50,27 @@ export function AlumnaFormModal({
   const [observations, setObservations] = useState('');
   const [status, setStatus] = useState<AlumnaStatus>('ACTIVE');
   const [entryDate, setEntryDate] = useState('');
+
+  // Plan y Fechas de Vigencia
+  const [planes, setPlanes] = useState<PlanItem[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [planAmount, setPlanAmount] = useState('0');
+  const [billingStartDate, setBillingStartDate] = useState('');
+  const [billingDueDate, setBillingDueDate] = useState('');
+
   const [errorMsg, setErrorMsg] = useState('');
 
   const edadCalculada = dateOfBirth ? calcularEdad(dateOfBirth) : null;
+
+  useEffect(() => {
+    async function fetchPlanes() {
+      const res = await getPlanes({ onlyActive: true });
+      setPlanes(res.data);
+    }
+    if (isOpen) {
+      fetchPlanes();
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (alumnaToEdit) {
@@ -70,12 +89,21 @@ export function AlumnaFormModal({
       setObservations(alumnaToEdit.observations || '');
       setStatus(alumnaToEdit.status || 'ACTIVE');
       setEntryDate(alumnaToEdit.entry_date || new Date().toISOString().split('T')[0]);
+      setSelectedPlan(alumnaToEdit.plan || '');
+      setPlanAmount(alumnaToEdit.plan_amount ? alumnaToEdit.plan_amount.toString() : '0');
+      setBillingStartDate(alumnaToEdit.billing_start_date || new Date().toISOString().split('T')[0]);
+      setBillingDueDate(alumnaToEdit.billing_due_date || '');
     } else {
       resetForm();
     }
   }, [alumnaToEdit, isOpen]);
 
   const resetForm = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const nextMonth = new Date();
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const dueStr = nextMonth.toISOString().split('T')[0];
+
     setFirstName('');
     setLastName('');
     setDni('');
@@ -90,23 +118,46 @@ export function AlumnaFormModal({
     setConsentSigned(true);
     setObservations('');
     setStatus('ACTIVE');
-    setEntryDate(new Date().toISOString().split('T')[0]);
+    setEntryDate(today);
+    setSelectedPlan('');
+    setPlanAmount('0');
+    setBillingStartDate(today);
+    setBillingDueDate(dueStr);
     setErrorMsg('');
+  };
+
+  const handleStartDateChange = (dateStr: string) => {
+    setBillingStartDate(dateStr);
+    if (dateStr) {
+      const d = new Date(dateStr + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        d.setMonth(d.getMonth() + 1);
+        setBillingDueDate(d.toISOString().split('T')[0]);
+      }
+    }
+  };
+
+  const handlePlanChange = (planName: string) => {
+    setSelectedPlan(planName);
+    const found = planes.find((p) => p.name === planName);
+    if (found) {
+      setPlanAmount(found.price.toString());
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (!firstName.trim() || !lastName.trim() || !dni.trim() || !phone.trim()) {
-      setErrorMsg('Por favor completa los campos obligatorios (Nombre, Apellido, DNI y Telefono)');
+    if (!firstName.trim() || !phone.trim()) {
+      setErrorMsg('Por favor completa los campos obligatorios (Nombre y Teléfono)');
       return;
     }
 
     const payload: AlumnaInsert = {
       first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      dni: dni.trim(),
+      last_name: lastName.trim() || null,
+      dni: dni.trim() || null,
       phone: phone.trim(),
       email: email.trim() || null,
       address: alumnaToEdit?.address || null,
@@ -125,10 +176,10 @@ export function AlumnaFormModal({
       surgeries: alumnaToEdit?.surgeries || null,
       health_observations: alumnaToEdit?.health_observations || null,
       // Plan y facturacion
-      plan: alumnaToEdit?.plan || null,
-      plan_amount: alumnaToEdit?.plan_amount || 0,
-      billing_start_date: alumnaToEdit?.billing_start_date || null,
-      billing_due_date: alumnaToEdit?.billing_due_date || null,
+      plan: selectedPlan || null,
+      plan_amount: parseFloat(planAmount) || 0,
+      billing_start_date: billingStartDate || null,
+      billing_due_date: billingDueDate || null,
       enrollment_paid: alumnaToEdit?.enrollment_paid || false,
       enrollment_amount: alumnaToEdit?.enrollment_amount || 0,
       monthly_paid: alumnaToEdit?.monthly_paid || false,
@@ -298,7 +349,67 @@ export function AlumnaFormModal({
           </div>
         </div>
 
-        {/* Seccion 4: Estado y Observaciones */}
+        {/* Seccion 4: Plan y Vigencia de Cuota */}
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-wood)] mb-3 flex items-center gap-2">
+            <Shield className="h-4 w-4" /> Plan y Período de Vigencia
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Plan de clases
+              </label>
+              <select
+                value={selectedPlan}
+                onChange={(e) => handlePlanChange(e.target.value)}
+                className="w-full h-10 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
+              >
+                <option value="">Seleccionar plan</option>
+                {planes.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name} - ${p.price.toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <Input
+              label="Importe ($)"
+              type="number"
+              value={planAmount}
+              onChange={(e) => setPlanAmount(e.target.value)}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+            <Input
+              label="Fecha de inicio (Comienza clases)"
+              type="date"
+              value={billingStartDate}
+              onChange={(e) => handleStartDateChange(e.target.value)}
+            />
+
+            <Input
+              label="Fecha de vencimiento (Fin de período)"
+              type="date"
+              value={billingDueDate}
+              onChange={(e) => setBillingDueDate(e.target.value)}
+            />
+          </div>
+
+          {billingStartDate && billingDueDate && (
+            <div className="p-3 rounded-xl bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/20 text-xs font-medium text-[var(--text-primary)] flex items-center justify-between">
+              <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                <Clock className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Vigencia:
+              </span>
+              <span className="font-bold text-[var(--color-wood)]">
+                Del {billingStartDate.split('-').reverse().join('/')} al {billingDueDate.split('-').reverse().join('/')}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Seccion 5: Estado y Observaciones */}
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--color-wood)] mb-3 flex items-center gap-2">
             <FileText className="h-4 w-4" /> Observaciones y Estado
