@@ -253,9 +253,9 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   };
 
   return (
-    <Card className="p-6 md:p-8 flex flex-col gap-8 border border-[var(--border-default)] animate-fade-in text-[var(--text-primary)]">
+    <Card className="p-4 sm:p-6 md:p-8 flex flex-col gap-6 sm:gap-8 border border-[var(--border-default)] animate-fade-in text-[var(--text-primary)]">
       <div>
-        <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)]">
           Nueva alumna
         </h2>
         <p className="text-xs text-[var(--text-muted)] mt-1">

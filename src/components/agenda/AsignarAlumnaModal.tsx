@@ -318,8 +318,8 @@ export function AsignarAlumnaModal({
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 w-full sm:w-auto shrink-0">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 w-full sm:w-auto shrink-0">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
               Cancelar
             </Button>
             <Button
@@ -327,6 +327,7 @@ export function AsignarAlumnaModal({
               loading={loading}
               disabled={tab === 'EXISTING' && !selectedAlumnaId}
               icon={<CheckCircle2 className="h-4 w-4" />}
+              className="w-full sm:w-auto"
             >
               Agregar a la Agenda
             </Button>

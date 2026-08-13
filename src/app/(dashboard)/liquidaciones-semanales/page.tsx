@@ -372,8 +372,8 @@ export default function LiquidacionesSemanalesPage() {
                     No hay mensualidades abonadas para esta profesora en el filtro de modalidad seleccionado ({modalityFilter}).
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <table className="w-full text-left text-xs border-collapse min-w-[650px]">
                       <thead>
                         <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                           <th className="py-3 px-4 font-semibold">Alumna / Paciente</th>
@@ -405,7 +405,7 @@ export default function LiquidacionesSemanalesPage() {
         </>
       ) : (
         /* Pestaña: Historial de Liquidaciones */
-        <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+        <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] mb-4">
             Historial de Liquidaciones Guardadas
           </h3>
@@ -415,8 +415,8 @@ export default function LiquidacionesSemanalesPage() {
               No hay liquidaciones registradas en el historial.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse min-w-[650px]">
                 <thead>
                   <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                     <th className="py-3 px-4 font-semibold">Profesora</th>

@@ -306,10 +306,10 @@ export default function FinanzasPersonalesPage() {
   return (
     <div className="flex flex-col gap-6 animate-fade-in pb-16 text-[var(--text-primary)] max-w-6xl mx-auto">
       {/* Cabecera Estilo Mercado Pago */}
-      <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 text-white rounded-3xl p-6 sm:p-8 shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 text-white rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative z-10">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 relative z-10">
           <div>
             <div className="flex items-center gap-2">
               <span className="bg-white/20 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -319,12 +319,12 @@ export default function FinanzasPersonalesPage() {
             </div>
 
             <div className="mt-3 flex items-center gap-3">
-              <h2 className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold font-mono tracking-tight">
                 {showBalance ? `$${saldoTotalCuentas.toLocaleString()} ARS` : '••••••••••'}
               </h2>
               <button
                 onClick={() => setShowBalance(!showBalance)}
-                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer"
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all cursor-pointer shrink-0"
                 title={showBalance ? 'Ocultar saldo' : 'Mostrar saldo'}
               >
                 {showBalance ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -335,10 +335,10 @@ export default function FinanzasPersonalesPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             <Button
               onClick={() => setIsRetiroModalOpen(true)}
-              className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md border-0"
+              className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs shadow-md border-0 w-full sm:w-auto"
               icon={<ArrowDownLeft className="h-4 w-4" />}
             >
               Registrar Retiro del negocio
@@ -348,7 +348,7 @@ export default function FinanzasPersonalesPage() {
                 setTipoMovimiento('GASTO');
                 setIsMovimientoModalOpen(true);
               }}
-              className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs backdrop-blur-xs border-0"
+              className="bg-white/20 hover:bg-white/30 text-white font-bold text-xs backdrop-blur-xs border-0 w-full sm:w-auto"
               icon={<Plus className="h-4 w-4" />}
             >
               Registrar Movimiento
@@ -407,7 +407,7 @@ export default function FinanzasPersonalesPage() {
       </div>
 
       {/* Pestañas Principales de Finanzas Personales */}
-      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1.5 rounded-2xl border border-[var(--border-default)] w-fit overflow-x-auto">
+      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1.5 rounded-2xl border border-[var(--border-default)] w-full sm:w-fit overflow-x-auto custom-scrollbar">
         <button
           onClick={() => setActiveTab('RESUMEN')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
@@ -571,8 +571,8 @@ export default function FinanzasPersonalesPage() {
               </button>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse min-w-[580px]">
                 <thead>
                   <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                     <th className="py-3 px-4 font-semibold">Fecha</th>
@@ -815,8 +815,8 @@ export default function FinanzasPersonalesPage() {
             Historial de Movimientos Personales
           </h3>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[580px]">
               <thead>
                 <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                   <th className="py-3 px-4 font-semibold">Fecha</th>

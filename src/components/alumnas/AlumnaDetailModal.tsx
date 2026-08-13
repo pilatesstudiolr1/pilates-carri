@@ -215,8 +215,8 @@ export function AlumnaDetailModal({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-[var(--border-default)]">
-          <Button variant="ghost" onClick={onClose}>
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-[var(--border-default)]">
+          <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
             Cerrar
           </Button>
           {onEdit && (
@@ -225,6 +225,7 @@ export function AlumnaDetailModal({
                 onClose();
                 onEdit(alumna);
               }}
+              className="w-full sm:w-auto"
             >
               Editar Ficha
             </Button>

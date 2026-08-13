@@ -122,17 +122,17 @@ export default function ReportesPage() {
       {/* Cabecera Principal */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2.5">
-            <BarChart3 className="h-6 w-6 text-[var(--color-wood)]" /> Reportes &amp; Finanzas
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2.5">
+            <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Reportes &amp; Finanzas
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Resumen general de la sede seleccionada y estado de resultados financiero.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {/* Selector de Sede */}
-          <div className="relative min-w-[200px]">
+          <div className="relative w-full sm:min-w-[200px]">
             <select
               value={selectedSedeId}
               onChange={(e) => setSelectedSedeId(e.target.value)}
@@ -153,6 +153,7 @@ export default function ReportesPage() {
             onClick={loadData}
             loading={loading}
             icon={<RefreshCw className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
             Actualizar
           </Button>
@@ -160,7 +161,7 @@ export default function ReportesPage() {
       </div>
 
       {/* Pestañas de Unificación Amigables */}
-      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1 rounded-md border border-[var(--border-default)] w-fit">
+      <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1 rounded-md border border-[var(--border-default)] w-full sm:w-fit overflow-x-auto custom-scrollbar">
         <button
           onClick={() => setActiveTab('reportes')}
           className={`px-4 py-2 rounded text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${

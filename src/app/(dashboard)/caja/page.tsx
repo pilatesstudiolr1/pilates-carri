@@ -120,9 +120,9 @@ export default function CajaPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           {/* Selector de Sede */}
-          <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)] mr-2">
+          <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)]">
             <Filter className="h-4 w-4 text-[var(--color-wood)] ml-1 shrink-0" />
             <select
               value={selectedSedeId}
@@ -138,26 +138,30 @@ export default function CajaPage() {
             </select>
           </div>
 
-          <Button
-            onClick={() => {
-              setTipo('EGRESO');
-              setIsModalOpen(true);
-            }}
-            variant="outline"
-            icon={<TrendingDown className="h-4 w-4 text-[var(--color-danger)]" />}
-          >
-            Registrar Gasto
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              onClick={() => {
+                setTipo('EGRESO');
+                setIsModalOpen(true);
+              }}
+              variant="outline"
+              icon={<TrendingDown className="h-4 w-4 text-[var(--color-danger)]" />}
+              className="flex-1 sm:flex-initial"
+            >
+              Registrar Gasto
+            </Button>
 
-          <Button
-            onClick={() => {
-              setTipo('INGRESO');
-              setIsModalOpen(true);
-            }}
-            icon={<Plus className="h-4 w-4" />}
-          >
-            Registrar Ingreso
-          </Button>
+            <Button
+              onClick={() => {
+                setTipo('INGRESO');
+                setIsModalOpen(true);
+              }}
+              icon={<Plus className="h-4 w-4" />}
+              className="flex-1 sm:flex-initial"
+            >
+              Registrar Ingreso
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -220,8 +224,8 @@ export default function CajaPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden p-0 border border-[var(--border-default)]">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[580px]">
               <thead className="bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-bold uppercase tracking-wider border-b border-[var(--border-default)]">
                 <tr>
                   <th className="p-3.5">Tipo</th>

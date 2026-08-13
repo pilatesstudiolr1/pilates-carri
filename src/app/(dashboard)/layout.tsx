@@ -64,7 +64,7 @@ export default function DashboardLayout({
                 profile={profile}
                 onMenuClick={() => setMobileNavOpen(true)}
               />
-              <main className="p-6">
+              <main className="p-3 sm:p-4 md:p-6">
                 {children}
               </main>
             </div>

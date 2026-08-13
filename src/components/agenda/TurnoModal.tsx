@@ -442,15 +442,15 @@ export function TurnoModal({
         </div>
 
         {/* BOTONES DE ACCIÓN */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-[var(--border-default)]">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-[var(--border-default)]">
           {isOccupied && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               {manualPhone && (
                 <a
                   href={`https://wa.me/${manualPhone.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-2xs"
+                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-2xs flex-1 sm:flex-initial"
                 >
                   <MessageCircle className="h-4 w-4" />
                   <span>WhatsApp</span>
@@ -461,7 +461,7 @@ export function TurnoModal({
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer flex-1 sm:flex-initial"
                 >
                   <Trash2 className="h-4 w-4" />
                   <span>Eliminar turno</span>
@@ -470,11 +470,11 @@ export function TurnoModal({
             </div>
           )}
 
-          <div className="flex items-center gap-2 ml-auto">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving}>
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto sm:ml-auto">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={saving} className="w-full sm:w-auto">
               Cancelar
             </Button>
-            <Button type="submit" loading={saving} icon={<CheckCircle2 className="h-4 w-4" />}>
+            <Button type="submit" loading={saving} icon={<CheckCircle2 className="h-4 w-4" />} className="w-full sm:w-auto">
               {isOccupied ? 'Guardar cambios del turno' : 'Agregar a la agenda'}
             </Button>
           </div>

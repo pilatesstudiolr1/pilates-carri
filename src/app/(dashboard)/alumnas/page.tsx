@@ -151,19 +151,19 @@ export default function AlumnasPage() {
       {/* Encabezado y Acciones */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Users className="h-6 w-6 text-[var(--color-wood)]" /> Gestión de Alumnas
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+            <Users className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Gestión de Alumnas
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Registro de fichas de alumnas, estado de cuotas y asignación de turnos divididos por modalidad.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] w-full sm:w-auto">
             <button
               onClick={() => setActiveTab('LIST')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'LIST'
                   ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-xs'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -173,7 +173,7 @@ export default function AlumnasPage() {
             </button>
             <button
               onClick={() => setActiveTab('NEW')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'NEW'
                   ? 'bg-[var(--color-wood)] text-white shadow-xs'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -199,15 +199,15 @@ export default function AlumnasPage() {
         /* Pestaña: Listado de Alumnas con Filtros por Modalidad y Estado */
         <div className="flex flex-col gap-4">
           {/* Barra de Filtros (Modalidad + Buscador + Estado) */}
-          <Card className="p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
+          <Card className="p-3 sm:p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
             {/* Filter Pill 1: Modalidad (Reformer vs Barre vs Todas) */}
-            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto">
-              <span className="px-2 text-[var(--text-muted)] flex items-center gap-1">
+            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto overflow-x-auto custom-scrollbar">
+              <span className="px-2 text-[var(--text-muted)] flex items-center gap-1 shrink-0">
                 <Filter className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Modalidad:
               </span>
               <button
                 onClick={() => setModalityFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 ${
                   modalityFilter === 'ALL'
                     ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -218,7 +218,7 @@ export default function AlumnasPage() {
 
               <button
                 onClick={() => setModalityFilter('REFORMER')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                   modalityFilter === 'REFORMER'
                     ? 'bg-[var(--color-wood)] text-white shadow-xs'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -229,7 +229,7 @@ export default function AlumnasPage() {
 
               <button
                 onClick={() => setModalityFilter('BARRE')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                   modalityFilter === 'BARRE'
                     ? 'bg-amber-600 text-white shadow-xs'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -241,21 +241,21 @@ export default function AlumnasPage() {
             </div>
 
             {/* Buscador & Estado */}
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-64">
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                 <Input
                   placeholder="Buscar por nombre, DNI o tel..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 text-xs"
+                  className="pl-9 text-xs w-full"
                 />
               </div>
 
               <select
                 value={statusFilter}
                 onChange={(e: any) => setStatusFilter(e.target.value)}
-                className="h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
+                className="w-full sm:w-auto h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
               >
                 <option value="ALL">Todos los Estados</option>
                 <option value="ACTIVE">Activas</option>
@@ -274,9 +274,9 @@ export default function AlumnasPage() {
             <div className="space-y-6">
               {/* Sección 1: Alumnas Reformer */}
               {displayReformerList && (
-                <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+                <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
                   <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
-                    <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                       <Layers className="h-5 w-5 text-[var(--color-wood)]" /> Alumnas de Pilates Reformer ({alumnas.length})
                     </h3>
                   </div>
@@ -286,8 +286,8 @@ export default function AlumnasPage() {
                       No se encontraron alumnas de Reformer con el filtro seleccionado.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left text-xs border-collapse min-w-[650px]">
                         <thead>
                           <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                             <th className="py-3 px-4 font-semibold">Alumna</th>
@@ -355,9 +355,9 @@ export default function AlumnasPage() {
 
               {/* Sección 2: Alumnas Barre */}
               {displayBarreList && (
-                <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+                <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
                   <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
-                    <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
                       <Image src="/media/berre.webp" alt="Barre" width={20} height={20} className="h-5 w-5 object-contain" />
                       Alumnas de Studio Barre ({alumnasBarre.length})
                     </h3>
@@ -368,8 +368,8 @@ export default function AlumnasPage() {
                       No hay alumnas registradas en Studio Barre.
                     </p>
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs border-collapse">
+                    <div className="overflow-x-auto custom-scrollbar">
+                      <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                         <thead>
                           <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                             <th className="py-3 px-4 font-semibold">Alumna Barre</th>

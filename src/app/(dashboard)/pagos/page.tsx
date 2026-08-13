@@ -522,8 +522,8 @@ export default function PagosPage() {
             {search ? 'No se encontraron pagos con ese criterio de búsqueda.' : 'No hay historial de pagos registrado aún.'}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
                   <th className="py-3 px-3">Fecha</th>

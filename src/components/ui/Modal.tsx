@@ -57,7 +57,7 @@ export function Modal({
   if (!isModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6">
       {/* Overlay Backdrop Blur */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
@@ -70,16 +70,16 @@ export function Modal({
           'relative w-full rounded-xl flex flex-col',
           'bg-[var(--bg-secondary)] border border-[var(--border-default)]',
           'shadow-2xl overflow-hidden',
-          'animate-scale-in max-h-[90vh]',
+          'animate-scale-in max-h-[92vh] sm:max-h-[90vh]',
           sizeStyles[size]
         )}
       >
         {/* Header */}
         {(title || showClose) && (
-          <div className="flex items-start justify-between p-5 sm:p-6 border-b border-[var(--border-default)] bg-[var(--bg-tertiary)]/50 shrink-0">
-            <div className="pr-4">
+          <div className="flex items-start justify-between p-4 sm:p-5 md:p-6 border-b border-[var(--border-default)] bg-[var(--bg-tertiary)]/50 shrink-0">
+            <div className="pr-3 sm:pr-4">
               {title && (
-                <h2 className="text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">
+                <h2 className="text-base sm:text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">
                   {title}
                 </h2>
               )}
@@ -93,7 +93,7 @@ export function Modal({
               <button
                 onClick={onClose}
                 className={cn(
-                  'w-9 h-9 rounded-full shrink-0',
+                  'w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0',
                   'flex items-center justify-center',
                   'bg-[var(--bg-tertiary)] border border-[var(--border-default)]',
                   'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]',
@@ -101,14 +101,14 @@ export function Modal({
                 )}
                 aria-label="Cerrar modal"
               >
-                <X className="h-4.5 w-4.5" />
+                <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
               </button>
             )}
           </div>
         )}
 
         {/* Scrollable Body */}
-        <div className="p-5 sm:p-6 overflow-y-auto max-h-[calc(90vh-90px)] space-y-4">
+        <div className="p-4 sm:p-5 md:p-6 overflow-y-auto max-h-[calc(92vh-75px)] sm:max-h-[calc(90vh-90px)] space-y-4 custom-scrollbar">
           {children}
         </div>
       </div>

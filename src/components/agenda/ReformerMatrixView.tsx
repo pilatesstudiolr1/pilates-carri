@@ -102,13 +102,13 @@ export function ReformerMatrixView({
   return (
     <div className="flex flex-col gap-6 animate-fade-in text-[var(--text-primary)]">
       {/* 1. Selector de Dia y Fecha de Asistencia */}
-      <Card className="p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-[var(--border-default)]">
-        <div className="flex items-center gap-1.5 overflow-x-auto">
+      <Card className="p-3 sm:p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 border-[var(--border-default)]">
+        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 md:pb-0">
           {DIAS.map((d) => (
             <button
               key={d.value}
               onClick={() => onSelectDay(d.value)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
                 selectedDay === d.value
                   ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-sm'
                   : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
@@ -119,67 +119,67 @@ export function ReformerMatrixView({
           ))}
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-[var(--border-default)]">
           <span className="text-xs font-semibold text-[var(--text-muted)]">Fecha de asistencia:</span>
           <input
             type="date"
             value={fechaAsistencia}
             onChange={(e) => setFechaAsistencia(e.target.value)}
-            className="px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] cursor-pointer"
           />
         </div>
       </Card>
 
       {/* 2. Tarjetas Metricas del Dia (UBICADAS JUSTO ENCIMA DE LA MATRIZ) */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-[var(--text-muted)] font-semibold">Turnos ocupados</span>
-          <p className="text-2xl font-black text-[var(--text-primary)] my-1">{totalLugaresOcupados}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
+          <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Turnos ocupados</span>
+          <p className="text-xl sm:text-2xl font-black text-[var(--text-primary)] my-1">{totalLugaresOcupados}</p>
           <span className="text-[10px] text-[var(--text-muted)]">de {totalCapacidadDia || 72} lugares del día</span>
         </Card>
 
-        <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-[var(--text-muted)] font-semibold">Presentes hoy</span>
-          <p className="text-2xl font-black text-[var(--color-success)] my-1">0</p>
-          <span className="text-[10px] text-[var(--text-muted)]">{fechaAsistencia}</span>
+        <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
+          <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Presentes hoy</span>
+          <p className="text-xl sm:text-2xl font-black text-[var(--color-success)] my-1">0</p>
+          <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
 
-        <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-[var(--text-muted)] font-semibold">Ausentes</span>
-          <p className="text-2xl font-black text-red-400 my-1">0</p>
-          <span className="text-[10px] text-[var(--text-muted)]">{fechaAsistencia}</span>
+        <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
+          <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Ausentes</span>
+          <p className="text-xl sm:text-2xl font-black text-red-400 my-1">0</p>
+          <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
 
-        <Card className="p-4 flex flex-col justify-between">
-          <span className="text-xs text-[var(--text-muted)] font-semibold">Recuperaciones</span>
-          <p className="text-2xl font-black text-[var(--color-wood)] my-1">0</p>
-          <span className="text-[10px] text-[var(--text-muted)]">{fechaAsistencia}</span>
+        <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
+          <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Recuperaciones</span>
+          <p className="text-xl sm:text-2xl font-black text-[var(--color-wood)] my-1">0</p>
+          <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
       </div>
 
       {/* 3. Matriz por Reformer (Reformer 1 a Reformer 6) */}
-      <Card className="p-5 flex flex-col gap-4 border-[var(--border-default)] overflow-hidden">
+      <Card className="p-3.5 sm:p-5 flex flex-col gap-4 border-[var(--border-default)] overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-default)] pb-3">
           <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-[var(--color-wood)]" /> Matriz por Reformer &bull; {DIAS.find(d => d.value === selectedDay)?.label}
+            <h2 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-[var(--color-wood)]" /> Matriz por Reformer &bull; {DIAS.find(d => d.value === selectedDay)?.label}
             </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+            <p className="text-[11px] sm:text-xs text-[var(--text-muted)] mt-0.5">
               Toca un lugar vacio para asignar una alumna o marcar asistencia
             </p>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-default)]" /> Disponible</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[var(--color-wood)]" /> Sin marcar</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-[var(--color-success)]" /> Presente</span>
-            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> Ausente</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] sm:text-xs text-[var(--text-muted)]">
+            <span className="flex items-center gap-1"><span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-default)]" /> Disponible</span>
+            <span className="flex items-center gap-1"><span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-[var(--color-wood)]" /> Sin marcar</span>
+            <span className="flex items-center gap-1"><span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-[var(--color-success)]" /> Presente</span>
+            <span className="flex items-center gap-1"><span className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-red-500" /> Ausente</span>
           </div>
         </div>
 
         {/* Tabla Matriz Reformer */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-center text-xs border-collapse">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-center text-xs border-collapse min-w-[840px]">
             <thead>
               <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-bold uppercase tracking-wider">
                 <th className="py-3 px-3 w-20 text-left">Hora</th>

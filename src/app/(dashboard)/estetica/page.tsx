@@ -224,8 +224,8 @@ export default function EsteticaPage() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                 <thead>
                   <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                     <th className="py-3 px-4 font-semibold">Paciente</th>
@@ -279,13 +279,13 @@ export default function EsteticaPage() {
         </div>
       ) : activeTab === 'SESIONES' ? (
         /* Pestaña 2: Agenda de Sesiones de Estética */
-        <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+        <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
           <h3 className="text-base font-bold text-[var(--text-primary)] mb-4">
             Agenda y Turnos de Tratamientos
           </h3>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[700px]">
               <thead>
                 <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                   <th className="py-3 px-4 font-semibold">Fecha &amp; Hora</th>

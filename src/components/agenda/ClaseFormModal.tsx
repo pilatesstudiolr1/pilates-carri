@@ -183,11 +183,11 @@ export function ClaseFormModal({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-default)] mt-2">
-          <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-4 border-t border-[var(--border-default)] mt-2">
+          <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="w-full sm:w-auto">
             Cancelar
           </Button>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" loading={loading} className="w-full sm:w-auto">
             Crear Turno
           </Button>
         </div>

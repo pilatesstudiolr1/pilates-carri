@@ -252,17 +252,16 @@ export default function ReformerBarreDashboardPage() {
   return (
     <div className="flex flex-col gap-6 animate-fade-in pb-12 text-[var(--text-primary)] max-w-7xl mx-auto">
       {/* Header Corporativo con Switch de Modalidad */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-secondary)] border border-[var(--border-default)] p-6 rounded-2xl shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[var(--bg-secondary)] border border-[var(--border-default)] p-4 sm:p-6 rounded-2xl shadow-xs">
         <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
             Centro de control
           </h1>
         </div>
 
-
         {/* Switch de 3 Modos: Reformer | Barre | General */}
-        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
-          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)]">
+        <div className="flex items-center gap-2 sm:gap-3 self-start md:self-auto flex-wrap w-full md:w-auto">
+          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] w-full sm:w-auto overflow-x-auto custom-scrollbar">
             <button
               onClick={() => setModality('REFORMER')}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${

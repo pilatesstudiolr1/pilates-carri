@@ -332,19 +332,20 @@ export default function ProfesorasPage() {
       {/* Encabezado Principal */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2.5">
-            <ShieldCheck className="h-6 w-6 text-[var(--color-wood)]" /> Profesores y Usuarios
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2.5">
+            <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Profesores y Usuarios
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Gestión integral de personal, credenciales de acceso a Supabase, comisiones y disponibilidad de horarios.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => setShowLiquidacion(!showLiquidacion)}
             icon={<TrendingUp className="h-4 w-4 text-[var(--color-wood)]" />}
+            className="w-full sm:w-auto"
           >
             {showLiquidacion ? 'Ocultar Liquidaciones' : 'Ver Liquidaciones'}
           </Button>
@@ -354,6 +355,7 @@ export default function ProfesorasPage() {
             onClick={fetchProfiles}
             loading={loading}
             icon={<RefreshCw className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
             Actualizar
           </Button>
@@ -362,8 +364,8 @@ export default function ProfesorasPage() {
 
       {/* Sección Liquidación Diaria */}
       {showLiquidacion && (
-        <Card className="p-5 flex flex-col gap-4 border border-[var(--border-default)] animate-fade-in">
-          <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3">
+        <Card className="p-4 sm:p-5 flex flex-col gap-4 border border-[var(--border-default)] animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border-default)] pb-3">
             <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-[var(--color-wood)]" /> Liquidación Diaria por Porcentaje
             </h2>
@@ -382,8 +384,8 @@ export default function ProfesorasPage() {
               No se han registrado cobros asociados a profesoras en el mes.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse min-w-[720px]">
                 <thead>
                   <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                     <th className="py-2.5 px-3 font-semibold">Profesora</th>
@@ -825,8 +827,8 @@ export default function ProfesorasPage() {
             No se encontraron registros.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full text-left text-xs border-collapse min-w-[760px]">
               <thead>
                 <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                   <th className="py-3 px-4 font-semibold">Nombre</th>

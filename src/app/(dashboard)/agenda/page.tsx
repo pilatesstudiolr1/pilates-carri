@@ -287,10 +287,10 @@ export default function AgendaPage() {
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Calendar className="h-6 w-6 text-[var(--color-wood)]" /> Agenda y Asistencia de Clases
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+            <Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Agenda y Asistencia de Clases
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Organización semanal por horario, Reformer y Barre con separación por modalidad.
           </p>
         </div>
@@ -302,14 +302,15 @@ export default function AgendaPage() {
             setIsClaseModalOpen(true);
           }}
           icon={<Plus className="h-4 w-4" />}
+          className="w-full sm:w-auto"
         >
           Nuevo Turno
         </Button>
       </div>
 
       {/* Selector de Modalidad (Reformer vs Barre vs Todas) */}
-      <Card className="p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto">
+      <Card className="p-3 sm:p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto overflow-x-auto custom-scrollbar">
           <span className="px-2 text-[var(--text-muted)] flex items-center gap-1">
             <Filter className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Modalidad:
           </span>

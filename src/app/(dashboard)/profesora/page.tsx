@@ -177,11 +177,11 @@ export default function ProfesoraVistaPage() {
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12 animate-fade-in text-[var(--text-primary)]">
       {/* Header Saludo y Selector de Fecha */}
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl p-4 sm:p-6 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
+            <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-emerald-500 animate-pulse" />
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
               ¡Hola, {userName}!
             </h1>
           </div>
@@ -191,7 +191,7 @@ export default function ProfesoraVistaPage() {
         </div>
 
         {/* Controles de Fecha */}
-        <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)]">
+        <div className="flex items-center gap-1.5 sm:gap-2 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)] w-full sm:w-auto overflow-x-auto custom-scrollbar">
           <Button
             variant="ghost"
             size="sm"

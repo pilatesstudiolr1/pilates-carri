@@ -248,7 +248,7 @@ export default function WhatsAppPage() {
           <div className="flex justify-end pt-2">
             <Button
               onClick={handleEnviarWhatsApp}
-              className="bg-[#25D366] hover:bg-[#20bd5a] text-white"
+              className="w-full sm:w-auto bg-[#25D366] hover:bg-[#20bd5a] text-white"
               icon={<Send className="h-4 w-4" />}
             >
               Abrir en WhatsApp Web / App

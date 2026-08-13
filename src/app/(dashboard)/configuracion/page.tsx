@@ -219,15 +219,15 @@ export default function ConfiguracionPage() {
       {/* Encabezado */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Settings className="h-6 w-6 text-[var(--color-wood)]" /> Configuración General y Planes
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+            <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Configuración General y Planes
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Administración de sedes, catálogo de planes y reglas generales de negocio
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <Button
             variant="outline"
             onClick={() => {
@@ -235,6 +235,7 @@ export default function ConfiguracionPage() {
               setIsPlanModalOpen(true);
             }}
             icon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
             Nuevo Plan
           </Button>
@@ -244,6 +245,7 @@ export default function ConfiguracionPage() {
               setIsSedeModalOpen(true);
             }}
             icon={<Plus className="h-4 w-4" />}
+            className="w-full sm:w-auto"
           >
             Nueva Sede
           </Button>

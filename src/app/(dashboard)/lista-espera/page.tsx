@@ -52,15 +52,15 @@ export default function ListaEsperaPage() {
     <div className="flex flex-col gap-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-[var(--color-wood)]" /> Lista de Espera de Turnos
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+            <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Lista de Espera de Turnos
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
             Registro de solicitudes de alumnas en espera de vacantes en turnos concurridos
           </p>
         </div>
 
-        <Button onClick={() => setIsModalOpen(true)} icon={<Plus className="h-4 w-4" />}>
+        <Button onClick={() => setIsModalOpen(true)} icon={<Plus className="h-4 w-4" />} className="w-full sm:w-auto">
           Añadir a Lista de Espera
         </Button>
       </div>
@@ -149,9 +149,9 @@ export default function ListaEsperaPage() {
 
           <Input label="Notas u Observaciones" placeholder="Ej. Prefiere turno mañana antes de las 10hs" value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-default)]">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
-            <Button type="submit">Guardar en Espera</Button>
+          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-4 border-t border-[var(--border-default)]">
+            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button type="submit" className="w-full sm:w-auto">Guardar en Espera</Button>
           </div>
         </form>
       </Modal>
