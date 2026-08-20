@@ -95,12 +95,22 @@ export async function createClase(claseData: {
   start_time: string;
   end_time: string;
   max_capacity: number;
+  sede_id?: string | null;
 }): Promise<{ data: Clase | null; error: string | null }> {
   try {
     const supabase = createClient();
     const { data, error } = await supabase
       .from('clases')
-      .insert(claseData)
+      .insert({
+        name: claseData.name,
+        profesora_id: claseData.profesora_id,
+        day_of_week: claseData.day_of_week,
+        start_time: claseData.start_time,
+        end_time: claseData.end_time,
+        max_capacity: claseData.max_capacity,
+        sede_id: claseData.sede_id || null,
+        is_active: true,
+      })
       .select()
       .single();
 
@@ -123,6 +133,7 @@ export async function updateClase(
     start_time: string;
     end_time: string;
     max_capacity: number;
+    sede_id: string | null;
   }>
 ): Promise<{ error: string | null }> {
   try {

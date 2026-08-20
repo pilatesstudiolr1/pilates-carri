@@ -18,6 +18,22 @@ export const MAX_CAMILLAS_SEDE_CENTRO = 4;
 export const COMISION_PROFESORA_DEFAULT = 0.40; // 40%
 export const MONTO_INSCRIPCION_DEFAULT = 9500; // $9.500 ARS
 
+// Datos bancarios para transferencias
+export const DATOS_TRANSFERENCIA = {
+  alias: 'PILATES148',
+  cbu: '3840200500000025297333',
+  titular: 'Juliana Carrizo',
+  banco: 'Banco Santander',
+};
+
+// Respaldo de precios de planes
+export const PRECIOS_PLANES_DEFAULT = {
+  '2 veces': 45000,
+  '3 veces': 55000,
+  '4 veces': 65000,
+  '5 veces': 100000,
+};
+
 // ============================================
 // Dias Laborables
 // ============================================

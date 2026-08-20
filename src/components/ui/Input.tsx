@@ -33,12 +33,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             id={inputId}
             className={cn(
               'w-full h-10 px-3.5 rounded-md text-xs sm:text-sm font-sans',
-              'bg-white text-[var(--obsidian)]',
-              'border border-[var(--border)] shadow-2xs',
-              'placeholder:text-[var(--subtle)]',
+              'bg-[var(--bg-secondary)] text-[var(--text-primary)]',
+              'border border-[var(--border-default)] shadow-2xs',
+              'placeholder:text-[var(--text-muted)]',
               'transition-all duration-200',
-              'hover:border-[#D4D4D4]',
-              'focus:outline-none focus:border-[var(--obsidian)] focus:ring-2 focus:ring-[var(--obsidian)]/15',
+              'hover:border-[var(--border-hover)]',
+              'focus:outline-none focus:border-[var(--color-wood)] focus:ring-2 focus:ring-[var(--color-wood)]/20',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               icon && 'pl-11',
               error && 'border-red-500 focus:border-red-500 focus:ring-red-500/20',

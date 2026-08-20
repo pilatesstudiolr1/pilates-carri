@@ -93,7 +93,10 @@ export default function AgendaPage() {
     max_capacity: number;
   }): Promise<boolean> => {
     setSubmitting(true);
-    const { error } = await createClase(data);
+    const { error } = await createClase({
+      ...data,
+      sede_id: selectedSedeId !== 'ALL' ? selectedSedeId : null,
+    });
     setSubmitting(false);
 
     if (error) {

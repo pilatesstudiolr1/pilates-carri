@@ -9,27 +9,33 @@ import { Alumna } from '@/types/database';
 import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign, Search, X } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
+import { DATOS_TRANSFERENCIA } from '@/lib/constants';
+
 const PLANTILLAS_PREDEFINIDAS = [
   {
     id: 'vencimiento',
     titulo: 'Recordatorio de Vencimiento de Cuota',
-    texto: '¡Hola {nombre}! Te recordamos que la cuota de Pilates Reformer de este mes vence el {vencimiento}. Importe: ${monto}. ¡Muchas gracias!',
+    texto: 'Hola {nombre}. Te recordamos que la cuota de Pilates Reformer de este mes vence el {vencimiento}. Importe: ${monto}. Muchas gracias.',
+  },
+  {
+    id: 'transferencia',
+    titulo: 'Datos Bancarios para Transferencia',
+    texto: `Hola {nombre}. Te compartimos los datos bancarios para abonar tu cuota:\n\nTitular: ${DATOS_TRANSFERENCIA.titular}\nAlias: ${DATOS_TRANSFERENCIA.alias}\nCBU: ${DATOS_TRANSFERENCIA.cbu}\n\nPor favor envianos el comprobante una vez realizada la transferencia. Muchas gracias.`,
   },
   {
     id: 'bienvenida',
     titulo: 'Mensaje de Bienvenida al Estudio',
-    texto: '¡Hola {nombre}! Te damos la más cálida bienvenida a Pilates Studio LR. Tu turno asignado es: {horario}. ¡Nos vemos en tu clase!',
+    texto: 'Hola {nombre}. Te damos la bienvenida a Pilates Studio LR. Tu turno asignado es: {horario}. Te esperamos en tu clase.',
   },
   {
     id: 'cumpleanos',
     titulo: 'Feliz Cumpleaños',
-    texto: '¡Feliz cumpleaños {nombre}! Te deseamos un día hermoso de parte de todo el equipo de Pilates Studio LR. ¡Gracias por entrenar con nosotros!',
-
+    texto: 'Feliz cumpleaños {nombre}. Te deseamos un excelente día de parte de todo el equipo de Pilates Studio LR. Gracias por entrenar con nosotros.',
   },
   {
     id: 'recuperacion',
     titulo: 'Confirmación de Turno de Recuperación',
-    texto: '¡Hola {nombre}! Te confirmamos tu turno de recuperación para el día {horario}. Por favor avísanos si necesitas reprogramar. ¡Te esperamos!',
+    texto: 'Hola {nombre}. Te confirmamos tu turno de recuperación para el día {horario}. Por favor avísanos si necesitas reprogramar. Te esperamos.',
   },
 ];
 

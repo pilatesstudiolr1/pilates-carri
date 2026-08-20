@@ -3,6 +3,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { Sede } from '@/types/database';
 import { getSedes } from '@/lib/services/sedes';
+import { useUser } from '@/hooks/useUser';
 
 const LOCAL_SEDE_KEY = 'pilates_selected_sede_id';
 
@@ -12,6 +13,7 @@ interface SedeContextType {
   setSelectedSedeId: (id: string) => void;
   selectedSede: Sede | null;
   loading: boolean;
+  isTeacherLocked: boolean;
 }
 
 const SedeContext = createContext<SedeContextType>({
@@ -20,9 +22,11 @@ const SedeContext = createContext<SedeContextType>({
   setSelectedSedeId: () => {},
   selectedSede: null,
   loading: true,
+  isTeacherLocked: false,
 });
 
 export function SedeProvider({ children }: { children: React.ReactNode }) {
+  const { profile } = useUser();
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selectedSedeId, setSelectedSedeIdState] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -31,6 +35,20 @@ export function SedeProvider({ children }: { children: React.ReactNode }) {
     return 'ALL';
   });
   const [loading, setLoading] = useState<boolean>(true);
+
+  // Si el usuario es profesora y tiene una sede fija asignada, fijarla automáticamente
+  const isTeacher = profile?.role === 'PROFESORA';
+  const assignedSedeId = profile?.sede_id;
+  const isTeacherLocked = Boolean(isTeacher && assignedSedeId);
+
+  useEffect(() => {
+    if (isTeacher && assignedSedeId) {
+      setSelectedSedeIdState(assignedSedeId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(LOCAL_SEDE_KEY, assignedSedeId);
+      }
+    }
+  }, [isTeacher, assignedSedeId]);
 
   const fetchSedes = async () => {
     setLoading(true);
@@ -51,6 +69,10 @@ export function SedeProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setSelectedSedeId = (id: string) => {
+    if (isTeacherLocked && assignedSedeId) {
+      // Profesora fija en su sede asignada
+      return;
+    }
     setSelectedSedeIdState(id);
     localStorage.setItem(LOCAL_SEDE_KEY, id);
   };
@@ -68,6 +90,7 @@ export function SedeProvider({ children }: { children: React.ReactNode }) {
         setSelectedSedeId,
         selectedSede,
         loading,
+        isTeacherLocked,
       }}
     >
       {children}

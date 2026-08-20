@@ -21,7 +21,7 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
-  const { sedes, selectedSedeId, setSelectedSedeId } = useSede();
+  const { sedes, selectedSedeId, setSelectedSedeId, selectedSede, isTeacherLocked } = useSede();
 
   const currentPage = NAVIGATION_ITEMS.find((item) =>
     item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
@@ -61,21 +61,27 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
           <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs font-semibold shadow-2xs hover:border-[var(--color-wood)]/60 transition-all">
             <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[var(--color-wood)] shrink-0" />
             <span className="text-[var(--text-muted)] font-medium hidden md:inline">Sede:</span>
-            <select
-              value={selectedSedeId}
-              onChange={(e) => setSelectedSedeId(e.target.value)}
-              className="bg-transparent font-extrabold text-[var(--text-primary)] focus:outline-none cursor-pointer pr-1 max-w-[90px] sm:max-w-none truncate text-[11px] sm:text-xs"
-              title="Seleccionar Sede Operativa"
-            >
-              <option value="ALL" className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
-                Todas las Sedes
-              </option>
-              {sedes.map((s) => (
-                <option key={s.id} value={s.id} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
-                  {s.name}
+            {isTeacherLocked ? (
+              <span className="font-extrabold text-[var(--text-primary)] text-[11px] sm:text-xs">
+                {selectedSede?.name || 'Sede Asignada'}
+              </span>
+            ) : (
+              <select
+                value={selectedSedeId}
+                onChange={(e) => setSelectedSedeId(e.target.value)}
+                className="bg-transparent font-extrabold text-[var(--text-primary)] focus:outline-none cursor-pointer pr-1 max-w-[90px] sm:max-w-none truncate text-[11px] sm:text-xs"
+                title="Seleccionar Sede Operativa"
+              >
+                <option value="ALL" className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                  Todas las Sedes
                 </option>
-              ))}
-            </select>
+                {sedes.map((s) => (
+                  <option key={s.id} value={s.id} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Theme Toggle Button */}

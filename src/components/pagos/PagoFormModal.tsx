@@ -18,8 +18,13 @@ interface PagoFormModalProps {
     payment_method: MetodoPago;
     due_date: string;
     commission_rate: number;
+    concept?: string;
+    period?: string;
+    profesora_id?: string;
     notes?: string;
   }) => Promise<boolean>;
+  initialAlumna?: Alumna | null;
+  defaultProfesoraId?: string;
   loading?: boolean;
 }
 
@@ -27,6 +32,8 @@ export function PagoFormModal({
   open,
   onClose,
   onSubmit,
+  initialAlumna,
+  defaultProfesoraId,
   loading = false,
 }: PagoFormModalProps) {
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
@@ -35,6 +42,10 @@ export function PagoFormModal({
   const [showDropdown, setShowDropdown] = useState(false);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago>('efectivo');
+
+  // Concepto y duracion del pago
+  const [duracionTipo, setDuracionTipo] = useState<'1_MES' | '2_MESES' | '3_MESES' | 'CLASE_SUELTA' | 'INSCRIPCION' | 'OTRO'>('1_MES');
+  const [concept, setConcept] = useState('Cuota mensualidad');
 
   const nextMonthDate = new Date();
   nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
@@ -50,12 +61,65 @@ export function PagoFormModal({
     if (open) {
       setErrorMsg('');
       setAlumnaSearch('');
-      setSelectedAlumna(null);
-      setAmount('');
       setNotes('');
+      setDuracionTipo('1_MES');
+      setConcept('Cuota mensualidad');
+
+      if (initialAlumna) {
+        setSelectedAlumna(initialAlumna);
+        setAlumnaSearch(`${initialAlumna.last_name || ''}, ${initialAlumna.first_name}`);
+        if (initialAlumna.plan_amount && initialAlumna.plan_amount > 0) {
+          setAmount(String(initialAlumna.plan_amount));
+        } else {
+          setAmount('');
+        }
+      } else {
+        setSelectedAlumna(null);
+        setAmount('');
+      }
+
+      const next = new Date();
+      next.setMonth(next.getMonth() + 1);
+      setDueDate(next.toISOString().slice(0, 10));
+
       fetchAlumnas();
     }
-  }, [open]);
+  }, [open, initialAlumna]);
+
+  const handleDuracionChange = (tipo: '1_MES' | '2_MESES' | '3_MESES' | 'CLASE_SUELTA' | 'INSCRIPCION' | 'OTRO') => {
+    setDuracionTipo(tipo);
+    const today = new Date();
+
+    if (tipo === '1_MES') {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + 1);
+      setDueDate(d.toISOString().slice(0, 10));
+      setConcept('Cuota mensualidad (1 Mes)');
+      if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount));
+    } else if (tipo === '2_MESES') {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + 2);
+      setDueDate(d.toISOString().slice(0, 10));
+      setConcept('Cuota Bimestral (2 Meses)');
+      if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount * 2));
+    } else if (tipo === '3_MESES') {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + 3);
+      setDueDate(d.toISOString().slice(0, 10));
+      setConcept('Cuota Trimestral (3 Meses)');
+      if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount * 3));
+    } else if (tipo === 'CLASE_SUELTA') {
+      setDueDate(today.toISOString().slice(0, 10));
+      setConcept('Clase suelta individual');
+      setAmount('8000');
+    } else if (tipo === 'INSCRIPCION') {
+      setDueDate(today.toISOString().slice(0, 10));
+      setConcept('Matrícula de inscripción inicial');
+      setAmount('9500');
+    } else {
+      setConcept('Pago personalizado');
+    }
+  };
 
   const fetchAlumnas = async () => {
     const { data } = await getAlumnas({ status: 'ACTIVE', limit: 200 });
@@ -82,7 +146,6 @@ export function PagoFormModal({
     setSelectedAlumna(alumna);
     setAlumnaSearch(`${alumna.last_name || ''}, ${alumna.first_name}`);
     setShowDropdown(false);
-    // Pre-rellenar monto si tiene plan
     if (alumna.plan_amount && alumna.plan_amount > 0) {
       setAmount(String(alumna.plan_amount));
     }
@@ -115,6 +178,9 @@ export function PagoFormModal({
       payment_method: paymentMethod,
       due_date: dueDate,
       commission_rate: (parseFloat(commissionRate) || 40) / 100,
+      concept: concept.trim() || 'Cuota mensualidad',
+      period: new Date().toISOString().slice(0, 7),
+      profesora_id: defaultProfesoraId || selectedAlumna.profesora_id || undefined,
       notes: notes.trim(),
     });
 
@@ -125,16 +191,46 @@ export function PagoFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Registrar Pago de Mensualidad"
-      description="Cobro con calculo automatico de comision e ingreso a caja"
+      title="Registrar Pago y Duración"
+      description="Cobro con cálculo automático de comisión e impacto en caja y liquidación"
       size="md"
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 text-[var(--text-primary)]">
         {errorMsg && (
           <div className="px-3.5 py-2.5 rounded-md bg-[var(--color-danger-soft)] text-xs text-[var(--color-danger)] font-medium">
             {errorMsg}
           </div>
         )}
+
+        {/* Tipo de Concepto y Duración */}
+        <div>
+          <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
+            Concepto y Duración del Cobro *
+          </label>
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)]">
+            {[
+              { id: '1_MES', label: '1 Mes' },
+              { id: '2_MESES', label: '2 Meses' },
+              { id: '3_MESES', label: '3 Meses' },
+              { id: 'CLASE_SUELTA', label: 'Clase Suelta' },
+              { id: 'INSCRIPCION', label: 'Inscripción' },
+              { id: 'OTRO', label: 'Otro' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleDuracionChange(item.id as any)}
+                className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer text-center ${
+                  duracionTipo === item.id
+                    ? 'bg-[var(--color-wood)] text-[var(--color-dark)] shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Buscador de Alumna */}
         <div ref={dropdownRef} className="relative">

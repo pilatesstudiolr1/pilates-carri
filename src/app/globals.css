@@ -72,12 +72,13 @@
   /* Sidebar */
   --sidebar-width: 260px;
   --sidebar-collapsed-width: 72px;
-  --header-height: 64px;
+  color-scheme: light;
 }
 
 /* Tema Oscuro (Midnight Terracotta) */
 [data-theme="dark"],
 .dark {
+  color-scheme: dark;
   --bg-primary: #1A1615;
   --bg-secondary: #241E1D;
   --bg-tertiary: #2F2726;
@@ -163,26 +164,40 @@ body {
   border-radius: var(--radius-sm);
 }
 
-/* Fix browser autofill background and text color on hover/focus */
+/* Browser autofill background and text color adapted for light/dark */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px #ffffff inset !important;
-  -webkit-text-fill-color: #1E1E1E !important;
-  caret-color: #1E1E1E !important;
+  -webkit-box-shadow: 0 0 0 30px var(--bg-secondary) inset !important;
+  -webkit-text-fill-color: var(--text-primary) !important;
+  caret-color: var(--color-wood) !important;
   transition: background-color 5000s ease-in-out 0s;
 }
 
 input,
-textarea {
-  caret-color: #1E1E1E;
+textarea,
+select {
+  caret-color: var(--color-wood);
+}
+
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* Date and Time picker indicator icons in dark mode */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
 }
 
 input::selection,
 textarea::selection {
-  background: rgba(223, 178, 103, 0.4);
-  color: #1E1E1E;
+  background: rgba(200, 122, 91, 0.4);
+  color: var(--text-primary);
 }
 
 /* Selection */
