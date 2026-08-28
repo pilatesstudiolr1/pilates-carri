@@ -242,13 +242,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     section: 'Principal',
   },
   {
-    label: 'Barre',
-    href: '/barre',
-    icon: 'Sparkles',
-    roles: ['ADMIN'],
-    section: 'Módulos',
-  },
-  {
     label: 'Estética',
     href: '/estetica',
     icon: 'Flower2',

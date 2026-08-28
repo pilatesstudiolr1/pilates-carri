@@ -12,17 +12,47 @@ import { getMovimientos, registrarMovimiento } from '@/lib/services/caja';
 import { getSedes } from '@/lib/services/sedes';
 import { METODOS_PAGO } from '@/lib/constants';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
-import { Wallet, Plus, TrendingUp, TrendingDown, DollarSign, CreditCard, ArrowUpRight, ArrowDownLeft, Filter, Building2 } from 'lucide-react';
+import {
+  Wallet,
+  Plus,
+  TrendingUp,
+  TrendingDown,
+  DollarSign,
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownLeft,
+  Filter,
+  Building2,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  Receipt,
+  Search,
+} from 'lucide-react';
+
+const ITEMS_PER_PAGE = 30;
+
+function formatMonthLabel(monthKey: string) {
+  if (!monthKey || monthKey === 'ALL') return 'Todos los Meses';
+  const [year, month] = monthKey.split('-');
+  const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+  return date.toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+}
 
 export default function CajaPage() {
   const { alert: alertDialog } = useConfirm();
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selectedSedeId, setSelectedSedeId] = useState<string>('ALL');
+  const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
+  const [tipoFilter, setTipoFilter] = useState<'ALL' | 'INGRESO' | 'EGRESO'>('ALL');
+  const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
   const [movimientos, setMovimientos] = useState<CajaMovimiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Modal movimiento
+  // Modal nuevo movimiento
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [tipo, setTipo] = useState<'INGRESO' | 'EGRESO'>('EGRESO');
   const [concepto, setConcepto] = useState('');
@@ -52,7 +82,7 @@ export default function CajaPage() {
     if (movsRes.error) {
       setErrorMsg(movsRes.error);
     } else {
-      setMovimientos(movsRes.data);
+      setMovimientos(movsRes.data || []);
     }
 
     setLoading(false);
@@ -61,6 +91,15 @@ export default function CajaPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Lista de meses únicos disponibles en los movimientos
+  const availableMonths = Array.from(
+    new Set(
+      movimientos
+        .map((m) => (m.creado_en ? m.creado_en.slice(0, 7) : ''))
+        .filter(Boolean)
+    )
+  ).sort().reverse();
 
   const handleCreateMovimiento = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,167 +136,393 @@ export default function CajaPage() {
     }
   };
 
-  const totalIngresos = movimientos
-    .filter((m) => m.tipo === 'INGRESO')
-    .reduce((acc, m) => acc + m.monto, 0);
+  // Filtrado de movimientos por Mes, Tipo y Búsqueda
+  const movimientosFiltrados = movimientos.filter((m) => {
+    if (selectedMonth !== 'ALL') {
+      const mMonth = m.creado_en ? m.creado_en.slice(0, 7) : '';
+      if (mMonth !== selectedMonth) return false;
+    }
+    if (tipoFilter !== 'ALL' && m.tipo !== tipoFilter) {
+      return false;
+    }
+    if (search.trim()) {
+      const term = search.toLowerCase();
+      const conc = (m.concepto || '').toLowerCase();
+      const metodo = (m.metodo_pago || '').toLowerCase();
+      if (!conc.includes(term) && !metodo.includes(term)) return false;
+    }
+    return true;
+  });
 
-  const totalEgresos = movimientos
+  // Métricas Calculadas Dinámicamente para el filtro activo
+  const totalIngresos = movimientosFiltrados
+    .filter((m) => m.tipo === 'INGRESO')
+    .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
+
+  const totalEgresos = movimientosFiltrados
     .filter((m) => m.tipo === 'EGRESO')
-    .reduce((acc, m) => acc + m.monto, 0);
+    .reduce((acc, m) => acc + (Number(m.monto) || 0), 0);
 
   const saldoCaja = totalIngresos - totalEgresos;
 
+  // Paginación
+  const totalPages = Math.ceil(movimientosFiltrados.length / ITEMS_PER_PAGE) || 1;
+  const paginatedMovimientos = movimientosFiltrados.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
   return (
-    <div className="flex flex-col gap-6 animate-fade-in text-[var(--text-primary)]">
-      {/* Encabezado y Filtro Dinámico de Sede */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="flex flex-col gap-6 animate-fade-in text-[var(--text-primary)] max-w-[var(--page-max-width)] mx-auto pb-16">
+      {/* Encabezado y Acciones */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 pt-2">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Wallet className="h-6 w-6 text-[var(--color-wood)]" /> Caja y Movimientos Diarios
+          <div className="flex items-center gap-2 mb-2">
+            <span className="badge-meadow text-[11px] font-medium px-3 py-0.5 uppercase">
+              Pilates Studio
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-medium tracking-tight text-[var(--text-primary)]">
+            Caja y Movimientos Diarios
           </h1>
-          <p className="text-sm text-[var(--text-muted)] mt-0.5">
-            Arqueo, desglose por métodos de pago e ingresos/egresos filtrados por sede
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Arqueo, desglose por métodos de pago e ingresos/egresos filtrados por sede y mes.
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
-          {/* Selector de Sede */}
-          <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)]">
-            <Filter className="h-4 w-4 text-[var(--color-wood)] ml-1 shrink-0" />
-            <select
-              value={selectedSedeId}
-              onChange={(e) => setSelectedSedeId(e.target.value)}
-              className="bg-transparent text-xs font-bold text-[var(--text-primary)] focus:outline-none cursor-pointer pr-1"
-            >
-              <option value="ALL" className="bg-[var(--bg-secondary)]">Todas las Sedes</option>
-              {sedes.map((s) => (
-                <option key={s.id} value={s.id} className="bg-[var(--bg-secondary)]">
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-2.5">
+          <Button
+            onClick={() => {
+              setTipo('EGRESO');
+              setIsModalOpen(true);
+            }}
+            variant="outline"
+            icon={<TrendingDown className="h-4 w-4 text-rose-600" />}
+          >
+            Registrar Gasto
+          </Button>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button
-              onClick={() => {
-                setTipo('EGRESO');
-                setIsModalOpen(true);
-              }}
-              variant="outline"
-              icon={<TrendingDown className="h-4 w-4 text-[var(--color-danger)]" />}
-              className="flex-1 sm:flex-initial"
-            >
-              Registrar Gasto
-            </Button>
-
-            <Button
-              onClick={() => {
-                setTipo('INGRESO');
-                setIsModalOpen(true);
-              }}
-              icon={<Plus className="h-4 w-4" />}
-              className="flex-1 sm:flex-initial"
-            >
-              Registrar Ingreso
-            </Button>
-          </div>
+          <Button
+            onClick={() => {
+              setTipo('INGRESO');
+              setIsModalOpen(true);
+            }}
+            variant="primary"
+            icon={<Plus className="h-4 w-4" />}
+          >
+            Registrar Ingreso
+          </Button>
         </div>
       </div>
 
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-[var(--color-danger-soft)] text-xs text-[var(--color-danger)] font-medium">
+        <div className="p-4 rounded-[12px] bg-rose-500/15 border border-rose-500/30 text-xs text-rose-700 dark:text-rose-300 font-semibold shadow-xs">
           {errorMsg}
         </div>
       )}
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card className="p-4 flex items-center gap-3 border-l-4 border-l-[var(--color-wood)] shadow-xs">
-          <div className="w-10 h-10 rounded-full bg-[var(--color-wood)]/15 flex items-center justify-center text-[var(--color-wood)] shrink-0">
-            <Wallet className="h-5 w-5" />
+      {/* 1. BARRA DE FILTROS (SEDE + MES + TIPO + BUSCADOR) */}
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 sm:p-5 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Selector de Sede */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1 mr-1">
+              <Building2 className="h-3.5 w-3.5 text-[var(--badge-meadow-text)]" /> Sede:
+            </span>
+            <button
+              onClick={() => {
+                setSelectedSedeId('ALL');
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${selectedSedeId === 'ALL' ? 'filter-pill-active' : ''}`}
+            >
+              Todas las Sedes
+            </button>
+            {sedes.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => {
+                  setSelectedSedeId(s.id);
+                  setCurrentPage(1);
+                }}
+                className={`filter-pill ${selectedSedeId === s.id ? 'filter-pill-active' : ''}`}
+              >
+                {s.name}
+              </button>
+            ))}
           </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]">Saldo Actual en Caja</p>
-            <p className="text-xl font-extrabold text-[var(--text-primary)]">${saldoCaja.toLocaleString()} ARS</p>
-          </div>
-        </Card>
 
-        <Card className="p-4 flex items-center gap-3 border-l-4 border-l-[var(--color-success)] shadow-xs">
-          <div className="w-10 h-10 rounded-full bg-[var(--color-success-soft)] flex items-center justify-center text-[var(--color-success)] shrink-0">
-            <ArrowUpRight className="h-5 w-5" />
+          {/* Buscador Rápido */}
+          <div className="relative w-full lg:w-72">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+            <Input
+              placeholder="Buscar concepto o método..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-10 text-xs w-full"
+            />
           </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]">Total Ingresos</p>
-            <p className="text-lg font-extrabold text-[var(--text-primary)]">${totalIngresos.toLocaleString()} ARS</p>
-          </div>
-        </Card>
+        </div>
 
-        <Card className="p-4 flex items-center gap-3 border-l-4 border-l-[var(--color-danger)] shadow-xs">
-          <div className="w-10 h-10 rounded-full bg-[var(--color-danger-soft)] flex items-center justify-center text-[var(--color-danger)] shrink-0">
-            <ArrowDownLeft className="h-5 w-5" />
+        {/* Fila 2: Filtro por Mes y Tipo de Movimiento */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-[var(--border-default)]">
+          {/* Selector de Mes: Histórico vs Mes Corriente */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-1 mr-1">
+              <Calendar className="h-3.5 w-3.5 text-[var(--badge-meadow-text)]" /> Período:
+            </span>
+            <button
+              onClick={() => {
+                setSelectedMonth('ALL');
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${selectedMonth === 'ALL' ? 'filter-pill-active' : ''}`}
+            >
+              Histórico
+            </button>
+            <button
+              onClick={() => {
+                const currentMonthKey = new Date().toISOString().slice(0, 7);
+                setSelectedMonth(currentMonthKey);
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${selectedMonth !== 'ALL' ? 'filter-pill-active' : ''}`}
+            >
+              Mes Corriente
+            </button>
           </div>
-          <div>
-            <p className="text-xs text-[var(--text-muted)]">Total Egresos / Gastos</p>
-            <p className="text-lg font-extrabold text-[var(--text-primary)]">${totalEgresos.toLocaleString()} ARS</p>
+
+          {/* Selector Tipo */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mr-1">
+              Tipo:
+            </span>
+            <button
+              onClick={() => {
+                setTipoFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${tipoFilter === 'ALL' ? 'filter-pill-active' : ''}`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => {
+                setTipoFilter('INGRESO');
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${tipoFilter === 'INGRESO' ? 'filter-pill-active-success' : ''}`}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" /> Ingresos
+            </button>
+            <button
+              onClick={() => {
+                setTipoFilter('EGRESO');
+                setCurrentPage(1);
+              }}
+              className={`filter-pill ${tipoFilter === 'EGRESO' ? 'filter-pill-active-danger' : ''}`}
+            >
+              <ArrowDownLeft className="h-3.5 w-3.5" /> Egresos
+            </button>
           </div>
-        </Card>
+        </div>
       </div>
 
-      {/* Tabla de Movimientos */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <Spinner size="lg" />
-          <p className="text-xs text-[var(--text-muted)]">Cargando movimientos de caja dinámicos...</p>
-        </div>
-      ) : movimientos.length === 0 ? (
-        <Card className="p-12 text-center flex flex-col items-center justify-center gap-3 border border-[var(--border-default)]">
-          <div className="w-12 h-12 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center text-[var(--text-muted)]">
-            <Wallet className="h-6 w-6" />
+      {/* 2. TARJETAS DE ESTADÍSTICAS Y SALDO */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Saldo Actual */}
+        <div className="p-5 rounded-[14px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border border-[var(--border-default)] shadow-md flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider opacity-85">
+              Saldo en Caja {selectedMonth !== 'ALL' ? `(${formatMonthLabel(selectedMonth)})` : ''}
+            </span>
+            <Wallet className="h-5 w-5 opacity-90" />
           </div>
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">
-            No hay movimientos registrados para la sede seleccionada
-          </h3>
-          <p className="text-xs text-[var(--text-muted)]">
-            Ingresa un gasto o ingreso para actualizar el saldo.
+          <p className="text-2xl sm:text-3xl font-black my-2 font-mono leading-none">
+            ${saldoCaja.toLocaleString('es-AR')} ARS
           </p>
-        </Card>
-      ) : (
-        <Card className="overflow-hidden p-0 border border-[var(--border-default)]">
+          <span className="text-xs opacity-80 font-medium">
+            Balance neto de ingresos menos egresos
+          </span>
+        </div>
+
+        {/* Total Ingresos */}
+        <div className="p-5 rounded-[14px] bg-[var(--bg-secondary)] border border-[var(--border-default)] shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-secondary)]">
+              Total Ingresos
+            </span>
+            <ArrowUpRight className="h-5 w-5 text-emerald-600" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black my-2 font-mono text-emerald-700 dark:text-emerald-400 leading-none">
+            +${totalIngresos.toLocaleString('es-AR')} ARS
+          </p>
+          <span className="text-xs text-[var(--text-secondary)] font-medium">
+            Cobros de cuotas e ingresos registrados
+          </span>
+        </div>
+
+        {/* Total Egresos */}
+        <div className="p-5 rounded-[14px] bg-[var(--bg-secondary)] border border-[var(--border-default)] shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-secondary)]">
+              Total Egresos / Gastos
+            </span>
+            <ArrowDownLeft className="h-5 w-5 text-rose-600" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black my-2 font-mono text-rose-700 dark:text-rose-400 leading-none">
+            -${totalEgresos.toLocaleString('es-AR')} ARS
+          </p>
+          <span className="text-xs text-[var(--text-secondary)] font-medium">
+            Sueldos, alquileres y gastos operativos
+          </span>
+        </div>
+      </div>
+
+      {/* 3. TABLA DE MOVIMIENTOS CON BADGES DE ALTO CONTRASTE */}
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
+          <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+            <Receipt className="h-5 w-5 text-[var(--badge-meadow-text)]" /> Movimientos Registrados ({movimientosFiltrados.length})
+          </h2>
+          <span className="text-xs text-[var(--text-secondary)]">
+            Página {currentPage} de {totalPages} (30 por página)
+          </span>
+        </div>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Spinner size="lg" />
+            <p className="text-xs text-[var(--text-secondary)]">Cargando movimientos de caja...</p>
+          </div>
+        ) : movimientosFiltrados.length === 0 ? (
+          <p className="text-xs text-[var(--text-secondary)] py-12 text-center">
+            No hay movimientos registrados para los filtros seleccionados.
+          </p>
+        ) : (
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-xs border-collapse min-w-[580px]">
-              <thead className="bg-[var(--bg-tertiary)] text-[var(--text-muted)] font-bold uppercase tracking-wider border-b border-[var(--border-default)]">
-                <tr>
-                  <th className="p-3.5">Tipo</th>
-                  <th className="p-3.5">Concepto</th>
-                  <th className="p-3.5">Método de Pago</th>
-                  <th className="p-3.5">Monto</th>
-                  <th className="p-3.5 text-right">Fecha y Hora</th>
+            <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+              <thead>
+                <tr className="border-b border-[var(--border-default)] text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                  <th className="py-3 px-4 font-semibold">Tipo</th>
+                  <th className="py-3 px-4 font-semibold">Concepto</th>
+                  <th className="py-3 px-4 font-semibold">Método de Pago</th>
+                  <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Monto</th>
+                  <th className="py-3 px-4 font-semibold text-right">Fecha y Hora</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
-                {movimientos.map((mov) => (
-                  <tr key={mov.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
-                    <td className="p-3.5">
-                      <Badge variant={mov.tipo === 'INGRESO' ? 'success' : 'danger'}>
-                        {mov.tipo}
-                      </Badge>
+                {paginatedMovimientos.map((mov) => (
+                  <tr key={mov.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                    {/* BADGES SÓLIDOS DE MÁXIMO CONTRASTE Y NITIDEZ */}
+                    <td className="py-3.5 px-4">
+                      {mov.tipo === 'INGRESO' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[22px] bg-emerald-600 text-white font-extrabold text-[11px] uppercase tracking-wider shadow-xs">
+                          <ArrowUpRight className="h-3.5 w-3.5" /> Ingreso
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[22px] bg-rose-600 text-white font-extrabold text-[11px] uppercase tracking-wider shadow-xs">
+                          <ArrowDownLeft className="h-3.5 w-3.5" /> Egreso
+                        </span>
+                      )}
                     </td>
-                    <td className="p-3.5 font-bold">{mov.concepto}</td>
-                    <td className="p-3.5 capitalize font-medium">{mov.metodo_pago.replace('_', ' ')}</td>
-                    <td className={`p-3.5 font-black ${mov.tipo === 'INGRESO' ? 'text-[var(--color-wood)]' : 'text-[var(--color-danger)]'}`}>
-                      {mov.tipo === 'INGRESO' ? '+' : '-'}${mov.monto.toLocaleString()}
+
+                    <td className="py-3.5 px-4 font-bold text-sm">
+                      {mov.concepto}
                     </td>
-                    <td className="p-3.5 text-right text-[var(--text-muted)] font-mono">
-                      {new Date(mov.creado_en).toLocaleString()}
+
+                    <td className="py-3.5 px-4 capitalize text-[var(--text-secondary)] font-medium">
+                      {(mov.metodo_pago || '').replace('_', ' ')}
+                    </td>
+
+                    <td className="py-3.5 px-4 font-mono font-black text-sm">
+                      {mov.tipo === 'INGRESO' ? (
+                        <span className="text-emerald-700 dark:text-emerald-400">
+                          +${(Number(mov.monto) || 0).toLocaleString('es-AR')}
+                        </span>
+                      ) : (
+                        <span className="text-rose-700 dark:text-rose-400">
+                          -${(Number(mov.monto) || 0).toLocaleString('es-AR')}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right text-[var(--text-secondary)] font-mono text-[11px]">
+                      {new Date(mov.creado_en).toLocaleString('es-AR', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                      })}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </Card>
-      )}
+        )}
+
+        {/* 4. BARRA DE PAGINACIÓN */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[var(--border-default)]">
+            <p className="text-xs text-[var(--text-secondary)]">
+              Mostrando <strong className="text-[var(--text-primary)] font-bold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> a{' '}
+              <strong className="text-[var(--text-primary)] font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, movimientosFiltrados.length)}</strong> de{' '}
+              <strong className="text-[var(--text-primary)] font-bold">{movimientosFiltrados.length}</strong> movimientos
+            </p>
+
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                icon={<ChevronLeft className="h-4 w-4" />}
+              >
+                Anterior
+              </Button>
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .map((p, idx, arr) => {
+                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                    return (
+                      <div key={p} className="flex items-center">
+                        {showEllipsis && <span className="px-1 text-xs text-[var(--text-muted)]">...</span>}
+                        <button
+                          onClick={() => setCurrentPage(p)}
+                          className={`w-8 h-8 rounded-[8px] text-xs font-bold transition-all cursor-pointer ${
+                            currentPage === p
+                              ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                              : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)]'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                icon={<ChevronRight className="h-4 w-4" />}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Modal Nuevo Movimiento */}
       <Modal
@@ -275,7 +540,7 @@ export default function CajaPage() {
             <select
               value={movimientoSedeId}
               onChange={(e) => setMovimientoSedeId(e.target.value)}
-              className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-bold"
+              className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-bold cursor-pointer"
             >
               {sedes.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -299,9 +564,10 @@ export default function CajaPage() {
               type="number"
               min="0"
               step="100"
+              placeholder="Ej. 15000"
               value={monto}
               onChange={(e) => setMonto(e.target.value)}
-              icon={<DollarSign className="h-4 w-4 text-[var(--color-wood)]" />}
+              icon={<DollarSign className="h-4 w-4 text-[var(--text-muted)]" />}
               required
             />
 
@@ -312,7 +578,7 @@ export default function CajaPage() {
               <select
                 value={metodoPago}
                 onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
+                className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-medium cursor-pointer"
               >
                 {METODOS_PAGO.map((m) => (
                   <option key={m.value} value={m.value}>
@@ -324,10 +590,10 @@ export default function CajaPage() {
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-default)]">
-            <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)} disabled={submitting}>
+            <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)} disabled={submitting}>
               Cancelar
             </Button>
-            <Button type="submit" loading={submitting}>
+            <Button type="submit" variant="primary" loading={submitting}>
               Guardar Movimiento
             </Button>
           </div>

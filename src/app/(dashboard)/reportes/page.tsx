@@ -97,11 +97,9 @@ export default function ReportesPage() {
   });
 
   const totalPagos = pagosFiltrados.reduce((acc, p) => acc + (p.amount || 0), 0);
-  const totalIngresosCaja = movimientosFiltrados
-    .filter((m) => m.tipo === 'INGRESO')
-    .reduce((acc, m) => acc + (m.monto || 0), 0);
-
-  const ingresosTotalesFinanzas = totalPagos + totalIngresosCaja;
+  
+  // Ingresos operativos reales del estudio (Cobros de cuotas y mensualidades)
+  const ingresosTotalesFinanzas = totalPagos;
   const egresosTotalesFinanzas = movimientosFiltrados
     .filter((m) => m.tipo === 'EGRESO')
     .reduce((acc, m) => acc + (m.monto || 0), 0);
@@ -473,11 +471,7 @@ export default function ReportesPage() {
                   );
                   const movsSede = movimientos.filter((m) => m.sede_id === s.id);
 
-                  const ingSede =
-                    pagosSede.reduce((acc, p) => acc + (p.amount || 0), 0) +
-                    movsSede
-                      .filter((m) => m.tipo === 'INGRESO')
-                      .reduce((acc, m) => acc + (m.monto || 0), 0);
+                  const ingSede = pagosSede.reduce((acc, p) => acc + (p.amount || 0), 0);
 
                   const egrSede = movsSede
                     .filter((m) => m.tipo === 'EGRESO')

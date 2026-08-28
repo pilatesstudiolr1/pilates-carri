@@ -4,6 +4,7 @@ import { Alumna, AlumnaInsert, AlumnaUpdate, AlumnaStatus } from '@/types/databa
 export async function getAlumnas(options?: {
   search?: string;
   status?: AlumnaStatus | 'ALL';
+  vencimientoFilter?: 'ALL' | 'OVERDUE' | 'UPCOMING';
   limit?: number;
   offset?: number;
   sedeId?: string;
@@ -20,6 +21,15 @@ export async function getAlumnas(options?: {
 
     if (options?.status && options.status !== 'ALL') {
       query = query.eq('status', options.status);
+    }
+
+    if (options?.vencimientoFilter === 'OVERDUE') {
+      const hoyISO = new Date().toISOString().split('T')[0];
+      query = query.not('billing_due_date', 'is', null).lt('billing_due_date', hoyISO);
+    } else if (options?.vencimientoFilter === 'UPCOMING') {
+      const hoyISO = new Date().toISOString().split('T')[0];
+      const mas7DiasISO = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+      query = query.not('billing_due_date', 'is', null).gte('billing_due_date', hoyISO).lte('billing_due_date', mas7DiasISO);
     }
 
     if (options?.search && options.search.trim() !== '') {

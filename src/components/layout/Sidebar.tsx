@@ -74,7 +74,6 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     router.push('/login');
   };
 
-  // Configuración de Sidebars Independientes por Módulo
   const filteredItems = useMemo(() => {
     if (userRole === 'PROFESORA') {
       return [
@@ -86,7 +85,6 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     const roleFiltered = NAVIGATION_ITEMS.filter((item) => item.roles.includes(userRole));
 
     if (pathname.startsWith('/estetica')) {
-      // Sidebar Exclusivo Estética
       return [
         { label: 'Portal de Módulos', href: '/portal', icon: 'LayoutGrid', section: 'Navegación' },
         { label: 'Centro de Estética', href: '/estetica', icon: 'Flower2', section: 'Estética' },
@@ -96,18 +94,15 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     }
 
     if (pathname.startsWith('/finanzas-personales')) {
-      // Sidebar Exclusivo Finanzas Personales
       return [
         { label: 'Portal de Módulos', href: '/portal', icon: 'LayoutGrid', section: 'Navegación' },
         { label: 'Resumen Financiero', href: '/finanzas-personales', icon: 'WalletCards', section: 'Finanzas Personales' },
-        { label: 'Centro de control', href: '/reformer', icon: 'Layers', section: 'Pilates Studio' },
-
+        { label: 'Centro de Control', href: '/reformer', icon: 'Layers', section: 'Pilates Studio' },
         { label: 'Reportes del Studio', href: '/reportes', icon: 'BarChart3', section: 'Pilates Studio' },
       ].filter((item) => roleFiltered.some((r) => r.href === item.href || item.href === '/portal'));
     }
 
     if (pathname.startsWith('/liquidaciones-semanales')) {
-      // Sidebar Exclusivo Liquidaciones Semanales
       return [
         { label: 'Portal de Módulos', href: '/portal', icon: 'LayoutGrid', section: 'Navegación' },
         { label: 'Liquidación Semanal', href: '/liquidaciones-semanales', icon: 'Receipt', section: 'Liquidaciones' },
@@ -117,13 +112,11 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
       ].filter((item) => roleFiltered.some((r) => r.href === item.href || item.href === '/portal'));
     }
 
-    // Sidebar Principal Studio Reformer (Sin el acceso a /barre)
     return roleFiltered.filter((item) =>
-      ['/portal', '/reformer', '/profesora', '/agenda', '/alumnas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
+      ['/portal', '/reformer', '/agenda', '/alumnas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
     );
   }, [userRole, pathname]);
 
-  // Group items by section
   const groupedSections = useMemo(() => {
     const groups: Record<string, typeof NAVIGATION_ITEMS> = {};
     filteredItems.forEach((item: any) => {
@@ -134,10 +127,9 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     return groups;
   }, [filteredItems]);
 
-  // Dynamic Sidebar Title Header Accent
   const sidebarHeaderTitle = useMemo(() => {
-    if (pathname.startsWith('/estetica')) return 'Estética Panel';
-    if (pathname.startsWith('/finanzas-personales')) return 'Finanzas Personales';
+    if (pathname.startsWith('/estetica')) return 'Estética';
+    if (pathname.startsWith('/finanzas-personales')) return 'Finanzas';
     if (pathname.startsWith('/liquidaciones-semanales')) return 'Liquidaciones';
     return 'Pilates Studio';
   }, [pathname]);
@@ -146,37 +138,35 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     <aside
       className={cn(
         'fixed top-0 left-0 z-40 h-screen w-[var(--sidebar-width)]',
-        'bg-[var(--bg-secondary)] border-r border-[var(--border-default)]',
-        'flex flex-col justify-between shadow-xl'
+        'bg-[var(--color-paper-white)] border-r border-[var(--border-default)]',
+        'flex flex-col justify-between shadow-[0_4px_24px_rgba(0,31,31,0.03)]'
       )}
     >
-      {/* Top Header Logo Container (Centrado perfecto) */}
-      <div className="flex flex-col border-b border-[var(--border-default)] bg-gradient-to-b from-[var(--bg-secondary)] to-[var(--bg-tertiary)]/40">
-        <div className="flex items-center justify-center h-[var(--header-height)] px-4">
-          <Link href="/portal" className="flex items-center justify-center gap-3 overflow-hidden group">
+      {/* Top Header Logo */}
+      <div className="flex flex-col border-b border-[var(--border-default)] bg-[var(--color-parchment)]/50">
+        <div className="flex items-center justify-between h-[var(--header-height)] px-4">
+          <Link href="/portal" className="flex items-center gap-2.5 overflow-hidden group">
             <Image
               src={theme === 'dark' ? '/media/LOGO BLANCO.webp' : '/media/LOGO.webp'}
               alt="Pilates Studio Logo"
-              width={145}
-              height={40}
+              width={140}
+              height={38}
               priority
-              className="h-9 w-auto object-contain transition-all group-hover:scale-105"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-102"
             />
           </Link>
-        </div>
-        <div className="px-4 py-1.5 bg-[var(--bg-tertiary)]/60 border-t border-[var(--border-default)] flex items-center justify-between text-[10px] font-extrabold text-[var(--color-wood)] uppercase tracking-wider">
-          <span>{sidebarHeaderTitle}</span>
-          <span className="w-2 h-2 rounded-full bg-[var(--color-wood)]" />
+          <span className="text-[10px] font-medium tracking-[0.08em] uppercase px-2 py-0.5 rounded-[22px] bg-[var(--color-meadow)] text-[var(--color-forest-ink)] border border-[var(--color-forest-ink)]">
+            {sidebarHeaderTitle}
+          </span>
         </div>
       </div>
 
       {/* Navigation Links List */}
-      <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-5 custom-scrollbar">
+      <nav className="flex-1 overflow-y-auto py-5 px-3.5 space-y-6 custom-scrollbar">
         {Object.entries(groupedSections).map(([sectionTitle, items]) => (
-          <div key={sectionTitle} className="space-y-1.5">
-            <div className="px-3 flex items-center gap-2 mb-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-wood)] opacity-70" />
-              <h3 className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--color-wood)]">
+          <div key={sectionTitle} className="space-y-1">
+            <div className="px-3 mb-2">
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-[var(--color-lichen-gray)]">
                 {sectionTitle}
               </h3>
             </div>
@@ -194,35 +184,27 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
                     <Link
                       href={item.href}
                       className={cn(
-                        'flex items-center gap-3 px-3 py-2 rounded-xl',
-                        'text-xs font-semibold',
-                        'transition-all duration-200',
-                        'group relative overflow-hidden',
+                        'flex items-center gap-2.5 px-3 py-2 rounded-[29px]',
+                        'text-xs font-medium',
+                        'transition-all duration-150',
                         isActive
-                          ? 'bg-gradient-to-r from-[var(--color-wood)]/20 to-[var(--color-wood)]/5 text-[var(--text-primary)] font-extrabold border border-[var(--color-wood)]/30 shadow-xs'
-                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] hover:translate-x-0.5'
+                          ? 'bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)] border border-[var(--badge-meadow-border)] shadow-2xs font-semibold'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                       )}
                     >
-                      {/* Active Indicator Bar */}
-                      {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-[var(--color-wood)] rounded-r-md shadow-xs" />
-                      )}
-
                       {Icon && (
                         <Icon
                           className={cn(
-                            'shrink-0 h-4.5 w-4.5 transition-transform group-hover:scale-110',
-                            isActive
-                              ? 'text-[var(--color-wood)]'
-                              : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'
+                            'shrink-0 h-4 w-4 transition-transform',
+                            isActive ? 'text-[var(--badge-meadow-text)]' : 'text-[var(--text-muted)]'
                           )}
                         />
                       )}
 
-                      <span className="whitespace-nowrap truncate">{item.label}</span>
+                      <span className="whitespace-nowrap truncate tracking-tight">{item.label}</span>
 
                       {item.badge !== undefined && (
-                        <span className="ml-auto text-[10px] font-extrabold bg-[var(--color-wood)]/20 text-[var(--color-wood)] px-2 py-0.5 rounded-md border border-[var(--color-wood)]/30">
+                        <span className="ml-auto text-[10px] font-medium bg-[var(--text-primary)] text-[var(--bg-primary)] px-2 py-0.2 rounded-[22px]">
                           {item.badge}
                         </span>
                       )}
@@ -235,20 +217,20 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
         ))}
       </nav>
 
-      {/* Bottom User Card Container */}
-      <div className="p-3 border-t border-[var(--border-default)] bg-gradient-to-t from-[var(--bg-secondary)] to-[var(--bg-tertiary)]/30">
-        <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[var(--bg-tertiary)]/80 border border-[var(--border-default)]">
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-[var(--text-primary)] truncate leading-tight">
+      {/* Bottom User Profile Card */}
+      <div className="p-3 border-t border-[var(--border-default)] bg-[var(--color-parchment)]/60">
+        <div className="flex items-center justify-between gap-2.5 p-2 rounded-[14px] bg-[var(--color-paper-white)] border border-[var(--border-default)]">
+          <div className="min-w-0 flex-1 pl-1">
+            <p className="text-xs font-medium text-[var(--color-forest-ink)] truncate">
               {profile?.full_name || 'Usuario'}
             </p>
             <div className="flex items-center gap-1 mt-0.5">
               {userRole === 'ADMIN' ? (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--color-wood)] uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-deep-forest)] uppercase tracking-[0.06em]">
                   <ShieldCheck className="h-3 w-3" /> Admin
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--color-lichen-gray)] uppercase tracking-[0.06em]">
                   <UserCheck className="h-3 w-3" /> Profesor
                 </span>
               )}
@@ -257,11 +239,11 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
 
           <button
             onClick={handleLogout}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] transition-all cursor-pointer shrink-0"
+            className="w-8 h-8 rounded-[29px] flex items-center justify-center text-[var(--color-stone)] hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
             title="Cerrar sesión"
             aria-label="Cerrar sesión"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

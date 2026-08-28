@@ -1,6 +1,17 @@
 import { cn } from '@/lib/utils';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'muted';
+type BadgeVariant =
+  | 'default'
+  | 'meadow'
+  | 'mint'
+  | 'lime'
+  | 'lavender'
+  | 'buttercream'
+  | 'success'
+  | 'warning'
+  | 'danger'
+  | 'info'
+  | 'muted';
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -10,26 +21,42 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
+  // Signature Lattice Meadow
   default:
-    'bg-[var(--color-wood)]/15 text-[var(--color-wood)] border border-[var(--color-wood)]/30',
+    'bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)] border border-[var(--badge-meadow-border)]',
+  meadow:
+    'bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)] border border-[var(--badge-meadow-border)]',
+  mint:
+    'bg-[var(--color-mint-surface)] text-[var(--color-deep-teal)] border border-[var(--surface-mint-border)]',
+  lime:
+    'bg-[var(--color-lime-surface)] text-[var(--color-olive)] border border-[var(--surface-lime-border)]',
+  lavender:
+    'bg-[var(--color-lavender-surface)] text-[var(--color-iris)] border border-[var(--surface-lavender-border)]',
+  buttercream:
+    'bg-[var(--color-buttercream)] text-[var(--color-saffron)] border border-[var(--surface-buttercream-border)]',
   success:
-    'bg-[var(--color-success-soft)] text-[var(--color-success)] border border-[var(--color-success)]/30',
+    'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-semibold border border-emerald-500/30',
   warning:
-    'bg-[var(--color-warning-soft)] text-[var(--color-warning)] border border-[var(--color-warning)]/30',
+    'bg-amber-500/15 text-amber-900 dark:text-amber-200 font-semibold border border-amber-500/30',
   danger:
-    'bg-[var(--color-danger-soft)] text-[var(--color-danger)] border border-[var(--color-danger)]/30',
+    'bg-rose-500/15 text-rose-900 dark:text-rose-200 font-semibold border border-rose-500/30',
   info:
-    'bg-[var(--color-info-soft)] text-[var(--color-info)] border border-[var(--color-info)]/30',
+    'bg-blue-500/15 text-blue-900 dark:text-blue-200 font-semibold border border-blue-500/30',
   muted:
-    'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-default)]',
+    'bg-[var(--bg-tertiary)] text-[var(--text-primary)] font-semibold border border-[var(--border-default)]',
 };
 
 const dotColors: Record<BadgeVariant, string> = {
-  default: 'bg-[var(--color-wood)]',
-  success: 'bg-[var(--color-success)]',
-  warning: 'bg-[var(--color-warning)]',
-  danger: 'bg-[var(--color-danger)]',
-  info: 'bg-[var(--color-info)]',
+  default: 'bg-[var(--badge-meadow-text)]',
+  meadow: 'bg-[var(--badge-meadow-text)]',
+  mint: 'bg-[var(--color-deep-teal)]',
+  lime: 'bg-[var(--color-olive)]',
+  lavender: 'bg-[var(--color-iris)]',
+  buttercream: 'bg-[var(--color-saffron)]',
+  success: 'bg-emerald-500',
+  warning: 'bg-amber-500',
+  danger: 'bg-rose-500',
+  info: 'bg-blue-500',
   muted: 'bg-[var(--text-muted)]',
 };
 
@@ -42,8 +69,9 @@ export function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 px-2.5 py-0.5',
-        'text-[11px] font-mono font-medium rounded-[2px] tracking-tight shadow-2xs',
+        'inline-flex items-center gap-1.5 px-3 py-0.5',
+        'text-[11px] font-medium tracking-[0.06em] uppercase rounded-[22px]',
+        'shadow-2xs select-none',
         variantStyles[variant],
         className
       )}

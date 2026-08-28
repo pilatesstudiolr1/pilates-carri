@@ -1,24 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Modal } from '@/components/ui/Modal';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { Alumna, Clase } from '@/types/database';
 import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
-import { createClient } from '@/lib/supabase/client';
 import {
+  X,
   CheckCircle2,
-  XCircle,
+  AlertCircle,
   RotateCcw,
-  PauseCircle,
-  Search,
   MessageCircle,
   Trash2,
-  BedDouble,
-  Clock,
-  User,
-  Phone,
 } from 'lucide-react';
 
 interface TurnoModalProps {
@@ -28,7 +21,7 @@ interface TurnoModalProps {
   dayName: string;
   presetTime: string;
   presetCamilla: number;
-  alumnaAsignada?: any | null; // Si ya hay alumna inscripta en esta camilla
+  alumnaAsignada?: any | null;
   onSave: (data: {
     claseId?: string;
     alumnaId: string;
@@ -52,8 +45,8 @@ export function TurnoModal({
   alumnaAsignada = null,
   onSave,
   onDeleteTurno,
-  loading = false,
 }: TurnoModalProps) {
+  const [mounted, setMounted] = useState(false);
   const isOccupied = !!alumnaAsignada;
 
   // Estado de Asistencia
@@ -61,140 +54,112 @@ export function TurnoModal({
     'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED'
   >('UNMARKED');
 
-  // Búsqueda de Alumna
-  const [searchQuery, setSearchQuery] = useState('');
+  // Listado y selección de Alumnas
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
-  const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
-  const [fetchingAlumnas, setFetchingAlumnas] = useState(false);
-
-  // Carga Manual
-  const [manualFirstName, setManualFirstName] = useState('');
-  const [manualLastName, setManualLastName] = useState('');
-  const [manualPhone, setManualPhone] = useState('');
-
-  // Horario y Reformer
-  const [time, setTime] = useState(presetTime);
-  const [camilla, setCamilla] = useState(presetCamilla);
-  const [observaciones, setObservaciones] = useState('');
+  const [selectedAlumnaId, setSelectedAlumnaId] = useState<string>('');
+  const [nuevaAlumnaNombre, setNuevaAlumnaNombre] = useState('');
+  const [nuevaAlumnaTelefono, setNuevaAlumnaTelefono] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
-  const [occupiedCamillas, setOccupiedCamillas] = useState<number[]>([]);
 
-  const fechaHoy = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (open) {
       setErrorMsg('');
-      setTime(presetTime);
-      setCamilla(presetCamilla);
+      document.body.style.overflow = 'hidden';
 
       if (alumnaAsignada) {
         const alumnaObj = alumnaAsignada.alumna || alumnaAsignada;
-        setSelectedAlumna(alumnaObj);
-        setManualFirstName(alumnaObj.first_name || '');
-        setManualLastName(alumnaObj.last_name || '');
-        setManualPhone(alumnaObj.phone || '');
-        setObservaciones(alumnaAsignada.notes || 'Turno fijo semanal');
+        setSelectedAlumnaId(alumnaObj.id || '');
         setAsistenciaStatus(alumnaAsignada.status || 'UNMARKED');
       } else {
-        setSelectedAlumna(null);
-        setManualFirstName('');
-        setManualLastName('');
-        setManualPhone('');
-        setObservaciones('');
+        setSelectedAlumnaId('');
+        setNuevaAlumnaNombre('');
+        setNuevaAlumnaTelefono('');
         setAsistenciaStatus('UNMARKED');
       }
 
-      fetchAlumnas();
-      fetchOccupiedCamillas();
+      // Cargar lista de alumnas activas
+      getAlumnas({ status: 'ACTIVE', limit: 300 }).then((res) => {
+        setAlumnas(res.data || []);
+      });
     }
-  }, [open, alumnaAsignada, presetTime, presetCamilla]);
 
-  const fetchOccupiedCamillas = async () => {
-    if (!clase?.id) {
-      setOccupiedCamillas([]);
-      return;
-    }
-    try {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('clase_alumnas')
-        .select('camilla')
-        .eq('clase_id', clase.id)
-        .not('camilla', 'is', null);
-      
-      if (data) {
-        const occupied = data.map((d: any) => d.camilla).filter(Boolean);
-        setOccupiedCamillas(occupied);
-      }
-    } catch (err) {
-      console.error('Error fetching occupied camillas:', err);
-    }
-  };
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open, alumnaAsignada]);
 
-  const fetchAlumnas = async (query = '') => {
-    setFetchingAlumnas(true);
-    const { data } = await getAlumnas({ status: 'ACTIVE', search: query });
-    setAlumnas(data || []);
-    setFetchingAlumnas(false);
-  };
+  if (!open || !mounted) return null;
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setSearchQuery(val);
-    fetchAlumnas(val);
-  };
+  const currentAlumna = isOccupied
+    ? alumnaAsignada.alumna || alumnaAsignada
+    : alumnas.find((a) => a.id === selectedAlumnaId);
 
-  const handleSelectAlumnaFromList = (a: Alumna) => {
-    setSelectedAlumna(a);
-    setManualFirstName(a.first_name || '');
-    setManualLastName(a.last_name || '');
-    setManualPhone(a.phone || '');
-  };
+  const alumnaNombreCompleto = currentAlumna
+    ? `${currentAlumna.first_name || ''} ${currentAlumna.last_name || ''}`.trim()
+    : nuevaAlumnaNombre || 'Alumna';
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const alumnaTelefono = currentAlumna?.phone || nuevaAlumnaTelefono || '';
+
+  const handleSave = async (statusOverride?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'UNMARKED') => {
     setErrorMsg('');
     setSaving(true);
 
     try {
-      let finalAlumnaId = selectedAlumna?.id;
+      let finalAlumnaId = isOccupied ? currentAlumna?.id : selectedAlumnaId;
 
-      // Si no seleccionó de lista pero escribió datos manuales
-      if (!finalAlumnaId && manualFirstName.trim()) {
-        const { data: newAlumna, error: createErr } = await createAlumna({
-          first_name: manualFirstName.trim(),
-          last_name: manualLastName.trim() || 'Sin apellido',
-          phone: manualPhone.trim() || 'Sin teléfono',
+      // Si es alta rápida de nueva alumna escrita a mano
+      if (!finalAlumnaId && nuevaAlumnaNombre.trim()) {
+        const partes = nuevaAlumnaNombre.trim().split(' ');
+        const first_name = partes[0] || 'Alumna';
+        const last_name = partes.slice(1).join(' ') || 'Sin apellido';
+
+        const res = await createAlumna({
+          first_name,
+          last_name,
+          phone: nuevaAlumnaTelefono.trim() || 'Sin teléfono',
           status: 'ACTIVE',
         });
 
-        if (createErr || !newAlumna) {
-          setErrorMsg(createErr || 'Error al crear la alumna');
+        if (res.error || !res.data) {
+          setErrorMsg(res.error || 'Error al crear la alumna');
           setSaving(false);
           return;
         }
-
-        finalAlumnaId = newAlumna.id;
+        finalAlumnaId = res.data.id;
       }
 
       if (!finalAlumnaId) {
-        setErrorMsg('Por favor selecciona una alumna existente o completa el nombre en la carga manual.');
+        setErrorMsg('Seleccioná una alumna o ingresá el nombre para asignarla.');
         setSaving(false);
         return;
       }
 
-      const dayOfWeekNum = getDayOfWeekNumber(dayName);
+      const dayMap: Record<string, number> = {
+        Lunes: 1,
+        Martes: 2,
+        Miércoles: 3,
+        Jueves: 4,
+        Viernes: 5,
+        Sábado: 6,
+        Domingo: 7,
+      };
+      const dayOfWeekNum = dayMap[dayName] || 1;
+
+      const targetStatus = statusOverride !== undefined ? statusOverride : asistenciaStatus;
 
       const ok = await onSave({
         claseId: clase?.id,
         alumnaId: finalAlumnaId,
-        camilla,
+        camilla: presetCamilla,
         dayOfWeek: dayOfWeekNum,
-        startTime: time,
-        observaciones,
-        asistenciaStatus,
+        startTime: presetTime,
+        asistenciaStatus: targetStatus,
       });
 
       if (ok) {
@@ -209,319 +174,254 @@ export function TurnoModal({
 
   const handleDelete = async () => {
     if (!onDeleteTurno || !clase) return;
-    if (confirm('¿Estás seguro de eliminar este turno de la agenda?')) {
-      const ok = await onDeleteTurno(clase.id, selectedAlumna?.id);
+    if (confirm('¿Deseas quitar a esta alumna de este turno?')) {
+      const ok = await onDeleteTurno(clase.id, currentAlumna?.id);
       if (ok) onClose();
     }
   };
 
-  const title = isOccupied ? 'Turno y asistencia' : 'Agregar turno';
-  const subtitle = `${dayName} · ${time} · Reformer ${camilla}`;
+  const handleWhatsApp = () => {
+    if (!alumnaTelefono) return;
+    const clean = alumnaTelefono.replace(/\D/g, '');
+    const msg = encodeURIComponent(
+      `Hola ${alumnaNombreCompleto}! Nos comunicamos de Pilates Studio respecto a tu turno de Reformer ${presetCamilla} (${dayName} a las ${presetTime} hs).`
+    );
+    window.open(`https://wa.me/${clean}?text=${msg}`, '_blank');
+  };
 
-  return (
-    <Modal open={open} onClose={onClose} title={title} description={subtitle} size="lg">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 text-[var(--text-primary)]">
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 text-xs font-semibold">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* SI ES OCUPADO: SECCIÓN DE ASISTENCIA */}
-        {isOccupied && (
-          <div className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/70 border border-[var(--border-default)] space-y-3">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-[var(--text-primary)]">
-                Asistencia del {fechaHoy}
+  const modalNode = (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      {/* CUADRO SIMPLE Y RECTO (Modal Cuadrado Centrado en Viewport) */}
+      <div className="relative w-full max-w-md bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] shadow-2xl overflow-hidden rounded-none sm:rounded-md text-[var(--text-primary)] animate-scale-in">
+        {/* HEADER DEL RECUADRO */}
+        <div className="flex items-center justify-between p-4 bg-[var(--bg-tertiary)] border-b-2 border-[var(--border-default)]">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-[11px] font-mono font-bold uppercase">
+                Reformer {presetCamilla}
               </span>
-              <span className="text-[var(--text-muted)] font-medium">
-                Estado actual:{' '}
-                <strong className="text-[var(--color-wood)] capitalize">
-                  {asistenciaStatus === 'PRESENT'
-                    ? 'Presente'
-                    : asistenciaStatus === 'ABSENT'
-                    ? 'Ausente'
-                    : asistenciaStatus === 'RECOVERY'
-                    ? 'Recupera'
-                    : asistenciaStatus === 'SUSPENDED'
-                    ? 'Suspendida'
-                    : 'Sin marcar'}
-                </strong>
+              <span className="text-xs font-bold text-[var(--text-secondary)]">
+                {dayName} · {presetTime} hs
               </span>
             </div>
-
-            {/* 4 Botones de Asistencia Gigantes */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <button
-                type="button"
-                onClick={() => setAsistenciaStatus('PRESENT')}
-                className={`py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  asistenciaStatus === 'PRESENT'
-                    ? 'bg-emerald-600 text-white shadow-md'
-                    : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 hover:bg-emerald-600 hover:text-white'
-                }`}
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Presente</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAsistenciaStatus('ABSENT')}
-                className={`py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  asistenciaStatus === 'ABSENT'
-                    ? 'bg-rose-600 text-white shadow-md'
-                    : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 hover:bg-rose-600 hover:text-white'
-                }`}
-              >
-                <XCircle className="h-4 w-4" />
-                <span>Ausente</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAsistenciaStatus('RECOVERY')}
-                className={`py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  asistenciaStatus === 'RECOVERY'
-                    ? 'bg-amber-500 text-white shadow-md'
-                    : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 hover:bg-amber-500 hover:text-white'
-                }`}
-              >
-                <RotateCcw className="h-4 w-4" />
-                <span>Recupera</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setAsistenciaStatus('SUSPENDED')}
-                className={`py-2 px-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  asistenciaStatus === 'SUSPENDED'
-                    ? 'bg-slate-700 text-white shadow-md'
-                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 hover:bg-slate-700 hover:text-white'
-                }`}
-              >
-                <PauseCircle className="h-4 w-4" />
-                <span>Suspendida</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* BUSCAR ALUMNA */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-[var(--text-primary)] block">
-            Buscar alumna
-          </label>
-          <div className="flex flex-col sm:flex-row items-center gap-2">
-            <div className="relative flex-1 w-full">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-[var(--text-muted)]" />
-              <input
-                type="text"
-                placeholder="Nombre o teléfono"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="w-full pl-9 pr-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-wood)]"
-              />
-            </div>
-
-            <select
-              value={selectedAlumna?.id || ''}
-              onChange={(e) => {
-                const found = alumnas.find((a) => a.id === e.target.value);
-                if (found) handleSelectAlumnaFromList(found);
-              }}
-              className="w-full sm:w-auto min-w-[200px] px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] font-semibold focus:outline-none cursor-pointer"
-            >
-              <option value="">Elegir alumna existente</option>
-              {alumnas.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.first_name} {a.last_name} ({a.phone})
-                </option>
-              ))}
-            </select>
+            <h3 className="text-base font-extrabold text-[var(--text-primary)] mt-1">
+              {isOccupied ? 'Gestión de Asistencia & Turno' : 'Asignar Alumna al Turno'}
+            </h3>
           </div>
 
-          {/* CARD PREVIEW DE LA ALUMNA SI YA ESTÁ SELECCIONADA */}
-          {selectedAlumna && (
-            <div className="p-3.5 rounded-2xl bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/30 space-y-2 text-xs">
-              <div className="flex items-center justify-between font-bold">
-                <span className="text-[var(--text-primary)] capitalize">
-                  {selectedAlumna.first_name} {selectedAlumna.last_name} &mdash;{' '}
-                  {selectedAlumna.plan || '3 veces por semana'} - $
-                  {selectedAlumna.plan_amount ? selectedAlumna.plan_amount.toLocaleString() : '55.000'} &mdash;{' '}
-                  <span className="text-emerald-600 font-extrabold">
-                    {selectedAlumna.status || 'Activa'}
-                  </span>
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] text-[var(--text-secondary)] font-medium pt-1 border-t border-[var(--color-wood)]/20">
-                <div>
-                  <strong>Plan:</strong> {selectedAlumna.plan || 'Sin plan'}
-                </div>
-                <div>
-                  <strong>Teléfono:</strong> {selectedAlumna.phone || 'Sin teléfono'}
-                </div>
-                <div>
-                  <strong>Estado:</strong> {selectedAlumna.status || 'Activa'}
-                </div>
-                <div>
-                  <strong>Vencimiento:</strong> {selectedAlumna.billing_due_date || 'Sin fecha'}
-                </div>
-              </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 bg-[var(--bg-secondary)] border border-[var(--border-default)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            aria-label="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* CONTENIDO DEL RECUADRO */}
+        <div className="p-4 sm:p-5 space-y-4">
+          {errorMsg && (
+            <div className="p-2.5 bg-rose-500/15 border border-rose-500/40 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+              {errorMsg}
             </div>
           )}
-        </div>
 
-        {/* TAMBIÉN PODÉS CARGAR UNA PERSONA MANUALMENTE */}
-        <div className="space-y-3 p-4 rounded-2xl bg-[var(--bg-tertiary)]/40 border border-[var(--border-default)]">
-          <label className="text-xs font-bold text-[var(--text-secondary)] block">
-            También podés cargar una persona manualmente:
-          </label>
+          {/* CASO 1: LUGAR OCUPADO -> MARCAR ASISTENCIA EN 1 CLIC */}
+          {isOccupied ? (
+            <div className="space-y-4">
+              {/* Información de la Alumna */}
+              <div className="p-3 bg-[var(--bg-primary)] border border-[var(--border-default)]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase font-bold text-[var(--text-secondary)] tracking-wider">
+                    Alumna Asignada
+                  </span>
+                  {alumnaTelefono && (
+                    <span className="text-xs font-mono text-[var(--text-secondary)]">
+                      Tel: {alumnaTelefono}
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-base font-extrabold text-[var(--text-primary)] mt-0.5 capitalize">
+                  {alumnaNombreCompleto.toLowerCase()}
+                </h4>
+              </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="text-[11px] font-semibold text-[var(--text-muted)] mb-1 block">
-                Nombre
-              </label>
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={manualFirstName}
-                onChange={(e) => setManualFirstName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-wood)]"
-              />
-            </div>
+              {/* Botones de Asistencia Grandes */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block mb-2">
+                  Seleccionar Estado de Asistencia:
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Presente */}
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaStatus('PRESENT')}
+                    className={`p-3 border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      asistenciaStatus === 'PRESENT'
+                        ? 'bg-[#fefce8] dark:bg-[#261f0b] text-[#854d0e] dark:text-[#fde047] border-[#eab308] shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#eab308]'
+                    }`}
+                  >
+                    <CheckCircle2 className="h-4 w-4 text-[#eab308]" />
+                    <span>✓ Presente</span>
+                  </button>
 
-            <div>
-              <label className="text-[11px] font-semibold text-[var(--text-muted)] mb-1 block">
-                Apellido
-              </label>
-              <input
-                type="text"
-                placeholder="Apellido"
-                value={manualLastName}
-                onChange={(e) => setManualLastName(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-wood)]"
-              />
-            </div>
+                  {/* Ausente */}
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaStatus('ABSENT')}
+                    className={`p-3 border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      asistenciaStatus === 'ABSENT'
+                        ? 'bg-[#fff1f2] dark:bg-[#271015] text-[#9f1239] dark:text-[#fda4af] border-[#f43f5e] shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#f43f5e]'
+                    }`}
+                  >
+                    <AlertCircle className="h-4 w-4 text-[#f43f5e]" />
+                    <span>✗ Ausente</span>
+                  </button>
 
-            <div>
-              <label className="text-[11px] font-semibold text-[var(--text-muted)] mb-1 block">
-                Teléfono
-              </label>
-              <input
-                type="text"
-                placeholder="Teléfono"
-                value={manualPhone}
-                onChange={(e) => setManualPhone(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--color-wood)]"
-              />
-            </div>
-          </div>
-        </div>
+                  {/* Recupera */}
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaStatus('RECOVERY')}
+                    className={`p-3 border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      asistenciaStatus === 'RECOVERY'
+                        ? 'bg-[#eef2ff] dark:bg-[#13122b] text-[#3730a3] dark:text-[#c7d2fe] border-[#6366f1] shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#6366f1]'
+                    }`}
+                  >
+                    <RotateCcw className="h-4 w-4 text-[#6366f1]" />
+                    <span>↻ Recupera</span>
+                  </button>
 
-        {/* HORARIO Y REFORMER */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-bold text-[var(--text-primary)] mb-1 block">
-              Horario
-            </label>
-            <input
-              type="text"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] font-bold focus:outline-none"
-            />
-          </div>
+                  {/* Sin Marcar */}
+                  <button
+                    type="button"
+                    onClick={() => setAsistenciaStatus('UNMARKED')}
+                    className={`p-3 border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                      asistenciaStatus === 'UNMARKED'
+                        ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] border-[var(--border-focus)] shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)]'
+                    }`}
+                  >
+                    <span>Sin Marcar</span>
+                  </button>
+                </div>
+              </div>
 
-          <div>
-            <label className="text-xs font-bold text-[var(--text-primary)] mb-1 block">
-              Reformer
-            </label>
-            <select
-              value={camilla}
-              onChange={(e) => setCamilla(parseInt(e.target.value, 10))}
-              className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer"
-            >
-              {[1, 2, 3, 4, 5, 6].map((num) => {
-                const isCurrentAlumna = isOccupied && num === presetCamilla;
-                const isOccupiedByOther = occupiedCamillas.includes(num) && !isCurrentAlumna;
-                return (
-                  <option key={num} value={num} disabled={isOccupiedByOther}>
-                    Reformer {num}{isOccupiedByOther ? ' — Ocupado' : isCurrentAlumna ? ' (actual)' : ' — Disponible'}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-        </div>
+              {/* Acciones Rápidas (WhatsApp & Quitar) */}
+              <div className="flex items-center gap-2 pt-2 border-t border-[var(--border-default)]">
+                {alumnaTelefono && (
+                  <button
+                    type="button"
+                    onClick={handleWhatsApp}
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    <span>WhatsApp</span>
+                  </button>
+                )}
 
-        {/* OBSERVACIONES */}
-        <div className="space-y-1">
-          <label className="text-xs font-bold text-[var(--text-primary)] block">
-            Observaciones
-          </label>
-          <textarea
-            rows={2}
-            placeholder="Ejemplo: clase de prueba, recuperación o información importante"
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            className="w-full p-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-xs placeholder:text-[var(--text-muted)] resize-none"
-          />
-        </div>
-
-        {/* BOTONES DE ACCIÓN */}
-        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-4 border-t border-[var(--border-default)]">
-          {isOccupied && (
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              {manualPhone && (
-                <a
-                  href={`https://wa.me/${manualPhone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-2xs flex-1 sm:flex-initial"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>WhatsApp</span>
-                </a>
-              )}
-
-              {onDeleteTurno && (
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all shadow-2xs cursor-pointer flex-1 sm:flex-initial"
+                  className="py-2 px-3 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Trash2 className="h-4 w-4" />
-                  <span>Eliminar turno</span>
+                  <span>Quitar</span>
                 </button>
-              )}
+              </div>
+            </div>
+          ) : (
+            /* CASO 2: LUGAR DISPONIBLE -> SELECCIONAR ALUMNA */
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)] block mb-1.5">
+                  Seleccionar Alumna Existente:
+                </label>
+                <select
+                  value={selectedAlumnaId}
+                  onChange={(e) => {
+                    setSelectedAlumnaId(e.target.value);
+                    if (e.target.value) {
+                      setNuevaAlumnaNombre('');
+                      setNuevaAlumnaTelefono('');
+                    }
+                  }}
+                  className="w-full h-10 px-3 bg-[var(--bg-primary)] text-[var(--text-primary)] border-2 border-[var(--border-default)] text-xs font-bold focus:outline-none focus:border-[var(--border-focus)] cursor-pointer"
+                >
+                  <option value="">-- Elegir de la lista ({alumnas.length} alumnas) --</option>
+                  {alumnas.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.first_name} {a.last_name || ''} {a.phone ? `(${a.phone})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-[var(--border-default)]"></div>
+                <span className="shrink-0 mx-3 text-[10px] font-bold text-[var(--text-secondary)] uppercase">
+                  O Crear Alumna Rápida
+                </span>
+                <div className="flex-grow border-t border-[var(--border-default)]"></div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[var(--text-primary)] block mb-1">
+                  Nombre y Apellido
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: María González"
+                  value={nuevaAlumnaNombre}
+                  onChange={(e) => {
+                    setNuevaAlumnaNombre(e.target.value);
+                    if (e.target.value) setSelectedAlumnaId('');
+                  }}
+                  className="w-full h-9 px-3 bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs focus:outline-none focus:border-[var(--border-focus)]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[var(--text-primary)] block mb-1">
+                  Teléfono (WhatsApp)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ej: 3814123456"
+                  value={nuevaAlumnaTelefono}
+                  onChange={(e) => setNuevaAlumnaTelefono(e.target.value)}
+                  className="w-full h-9 px-3 bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs focus:outline-none focus:border-[var(--border-focus)]"
+                />
+              </div>
             </div>
           )}
 
-          <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto sm:ml-auto">
-            <Button type="button" variant="ghost" onClick={onClose} disabled={saving} className="w-full sm:w-auto">
+          {/* FOOTER DEL RECUADRO */}
+          <div className="flex items-center justify-end gap-2 pt-3 border-t-2 border-[var(--border-default)]">
+            <Button type="button" variant="ghost" onClick={onClose} disabled={saving} size="sm">
               Cancelar
             </Button>
-            <Button type="submit" loading={saving} icon={<CheckCircle2 className="h-4 w-4" />} className="w-full sm:w-auto">
-              {isOccupied ? 'Guardar cambios del turno' : 'Agregar a la agenda'}
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => handleSave()}
+              loading={saving}
+              size="sm"
+            >
+              {isOccupied ? 'Guardar Cambios' : 'Confirmar Asignación'}
             </Button>
           </div>
         </div>
-      </form>
-    </Modal>
+      </div>
+    </div>
   );
-}
 
-function getDayOfWeekNumber(name: string): number {
-  const map: Record<string, number> = {
-    Lunes: 1,
-    Martes: 2,
-    Miércoles: 3,
-    Jueves: 4,
-    Viernes: 5,
-    Sábado: 6,
-    Domingo: 7,
-  };
-  return map[name] || 1;
+  return createPortal(modalNode, document.body);
 }

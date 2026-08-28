@@ -1,39 +1,38 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
 import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
 import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
-import { getAlumnas, updateAlumna, updateAlumnaStatus, deleteAlumna } from '@/lib/services/alumnas';
-import { getBarreAlumnas, BarreAlumna } from '@/lib/services/barre';
+import { getAlumnas, updateAlumna, createAlumna, deleteAlumna } from '@/lib/services/alumnas';
 import { addAlumnaToClase } from '@/lib/services/agenda';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import {
   Users,
-  UserPlus,
+  Plus,
   Search,
-  Filter,
   Eye,
   Edit2,
   Trash2,
   AlertTriangle,
   List,
-  Layers,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  CheckCircle2,
+  UserPlus,
 } from 'lucide-react';
 
-export type ModalityFilterAlumnas = 'ALL' | 'REFORMER' | 'BARRE';
+const ITEMS_PER_PAGE = 30;
 
 function getVencimientoCell(fechaVencimiento: string | null) {
   if (!fechaVencimiento) {
-    return <span className="text-[var(--text-muted)] text-[11px]">Sin fecha</span>;
+    return <span className="text-[var(--text-muted)] text-[11px] font-medium">Sin fecha</span>;
   }
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
@@ -42,22 +41,22 @@ function getVencimientoCell(fechaVencimiento: string | null) {
 
   if (diffDias < 0) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-        <AlertTriangle className="h-2.5 w-2.5" />
-        Vencida
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[22px] text-[11px] font-extrabold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+        <AlertTriangle className="h-3 w-3" />
+        Vencida ({fechaVencimiento})
       </span>
     );
   }
   if (diffDias <= 5) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        <AlertTriangle className="h-2.5 w-2.5" />
-        {diffDias}d
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-[22px] text-[11px] font-extrabold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+        <Clock className="h-3 w-3" />
+        {diffDias === 0 ? 'Vence hoy' : `${diffDias}d`} ({fechaVencimiento})
       </span>
     );
   }
   return (
-    <span className="text-[11px] text-[var(--text-secondary)] font-mono">
+    <span className="text-xs font-bold text-[var(--text-primary)] font-mono tracking-tight">
       {fechaVencimiento}
     </span>
   );
@@ -66,14 +65,14 @@ function getVencimientoCell(fechaVencimiento: string | null) {
 export default function AlumnasPage() {
   const { confirm, alert: alertDialog } = useConfirm();
   const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>('LIST');
-  const [modalityFilter, setModalityFilter] = useState<ModalityFilterAlumnas>('ALL');
 
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
-  const [alumnasBarre, setAlumnasBarre] = useState<BarreAlumna[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<AlumnaStatus | 'ALL'>('ALL');
+  const [vencimientoFilter, setVencimientoFilter] = useState<'ALL' | 'OVERDUE' | 'UPCOMING'>('ALL');
 
   // Modales
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,20 +84,18 @@ export default function AlumnasPage() {
   const fetchAlumnas = useCallback(async () => {
     setLoading(true);
 
-    const [refRes, barreRes] = await Promise.all([
-      getAlumnas({
-        search: search || undefined,
-        status: statusFilter,
-      }),
-      getBarreAlumnas(),
-    ]);
+    const refRes = await getAlumnas({
+      search: search || undefined,
+      status: statusFilter,
+      vencimientoFilter,
+      limit: ITEMS_PER_PAGE,
+      offset: (currentPage - 1) * ITEMS_PER_PAGE,
+    });
 
     setAlumnas(refRes.data || []);
     setTotalCount(refRes.count || 0);
-
-    setAlumnasBarre(barreRes.data || []);
     setLoading(false);
-  }, [search, statusFilter]);
+  }, [search, statusFilter, vencimientoFilter, currentPage]);
 
   useEffect(() => {
     fetchAlumnas();
@@ -128,19 +125,28 @@ export default function AlumnasPage() {
     return true;
   };
 
-  const handleUpdateAlumna = async (id: string, data: Partial<AlumnaInsert>) => {
+  const handleSaveAlumnaModal = async (data: AlumnaInsert) => {
     setSubmitting(true);
-    const { error } = await updateAlumna(id, data);
-    setSubmitting(false);
-
-    if (error) {
-      await alertDialog({ title: 'Error al guardar', message: error, variant: 'danger' });
-      return;
+    if (selectedAlumna) {
+      const { error } = await updateAlumna(selectedAlumna.id, data);
+      setSubmitting(false);
+      if (error) {
+        await alertDialog({ title: 'Error al guardar', message: error, variant: 'danger' });
+        return false;
+      }
+    } else {
+      const { error } = await createAlumna(data);
+      setSubmitting(false);
+      if (error) {
+        await alertDialog({ title: 'Error al crear', message: error, variant: 'danger' });
+        return false;
+      }
     }
 
     setIsFormOpen(false);
     setSelectedAlumna(null);
     fetchAlumnas();
+    return true;
   };
 
   const handleDeleteAlumna = async (alumna: Alumna) => {
@@ -161,51 +167,66 @@ export default function AlumnasPage() {
     }
   };
 
-  // Filtrado final de lista según modalidad seleccionada (Reformer | Barre | All)
-  const displayReformerList = modalityFilter === 'ALL' || modalityFilter === 'REFORMER';
-  const displayBarreList = modalityFilter === 'ALL' || modalityFilter === 'BARRE';
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE) || 1;
 
   return (
-    <div className="flex flex-col gap-6 animate-fade-in pb-12 max-w-7xl mx-auto">
-      {/* Encabezado y Acciones */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="flex flex-col gap-6 animate-fade-in pb-16 max-w-[var(--page-max-width)] mx-auto text-[var(--text-primary)]">
+      {/* 1. ENCABEZADO Y ACCIÓN RÁPIDA A CREAR ALUMNA */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 pt-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-            <Users className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Gestión de Alumnas
+          <div className="flex items-center gap-2 mb-2">
+            <span className="badge-meadow text-[11px] font-medium px-3 py-0.5 uppercase">
+              Pilates Studio
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-4xl font-medium tracking-tight text-[var(--text-primary)]">
+            Gestión de Alumnas
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-            Registro de fichas de alumnas, estado de cuotas y asignación de turnos divididos por modalidad.
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            Registro de fichas, estado de cuotas y asignación de turnos de Reformer.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="flex items-center bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] w-full sm:w-auto">
+        {/* BOTÓN TRANQUILIZADOR Y VISIBLE: NUEVA ALUMNA */}
+        <div className="flex items-center gap-3">
+          <Button
+            variant="primary"
+            icon={<Plus className="h-4 w-4" />}
+            onClick={() => {
+              setSelectedAlumna(null);
+              setIsFormOpen(true);
+            }}
+          >
+            Nueva Alumna
+          </Button>
+
+          <div className="flex items-center bg-[var(--bg-secondary)] p-1 rounded-[29px] border border-[var(--border-default)]">
             <button
               onClick={() => setActiveTab('LIST')}
-              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'LIST'
-                  ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <List className="h-4 w-4" /> Alumnas Registradas
+              <List className="h-3.5 w-3.5" /> Listado
             </button>
             <button
               onClick={() => setActiveTab('NEW')}
-              className={`flex-1 sm:flex-initial px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'NEW'
-                  ? 'bg-[var(--color-wood)] text-white shadow-xs'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <UserPlus className="h-4 w-4" /> Nueva Alumna
+              <UserPlus className="h-3.5 w-3.5" /> Formulario
             </button>
           </div>
         </div>
       </div>
 
       {activeTab === 'NEW' ? (
-        /* Pestaña: Registro de Nueva Alumna (Espacioso max-w-6xl para evitar superposición) */
+        /* Pestaña: Registro de Nueva Alumna Completo */
         <div className="w-full max-w-6xl mx-auto">
           <NuevaAlumnaForm
             onSuccess={() => {
@@ -215,219 +236,263 @@ export default function AlumnasPage() {
           />
         </div>
       ) : (
-        /* Pestaña: Listado de Alumnas con Filtros por Modalidad y Estado */
+        /* Pestaña: Listado de Alumnas con Filtros Interactivos */
         <div className="flex flex-col gap-4">
-          {/* Barra de Filtros (Modalidad + Buscador + Estado) */}
-          <Card className="p-3 sm:p-4 border border-[var(--border-default)] shadow-xs flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
-            {/* Filter Pill 1: Modalidad (Reformer vs Barre vs Todas) */}
-            <div className="flex items-center gap-1.5 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] text-xs font-semibold w-full md:w-auto overflow-x-auto custom-scrollbar">
-              <span className="px-2 text-[var(--text-muted)] flex items-center gap-1 shrink-0">
-                <Filter className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Modalidad:
-              </span>
-              <button
-                onClick={() => setModalityFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer shrink-0 ${
-                  modalityFilter === 'ALL'
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                Todas ({totalCount + alumnasBarre.length})
-              </button>
-
-              <button
-                onClick={() => setModalityFilter('REFORMER')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                  modalityFilter === 'REFORMER'
-                    ? 'bg-[var(--color-wood)] text-white shadow-xs'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" /> Reformer ({totalCount})
-              </button>
-
-              <button
-                onClick={() => setModalityFilter('BARRE')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                  modalityFilter === 'BARRE'
-                    ? 'bg-amber-600 text-white shadow-xs'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                <Image src="/media/berre.webp" alt="Barre" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
-                Barre ({alumnasBarre.length})
-              </button>
+          {/* 2. PANEL DE BÚSQUEDA Y BOTONES DE FILTRADO INTERACTIVOS */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 sm:p-5 shadow-sm space-y-4">
+            {/* Fila Superior: Buscador */}
+            <div className="relative w-full">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+              <Input
+                placeholder="Buscar por nombre, apellido, DNI o teléfono..."
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="pl-10 text-xs sm:text-sm w-full"
+              />
             </div>
 
-            {/* Buscador & Estado */}
-            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
-                <Input
-                  placeholder="Buscar por nombre, DNI o tel..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9 text-xs w-full"
-                />
+            {/* Fila Inferior: Botones Interactivos de Filtrado */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-2 border-t border-[var(--border-default)]">
+              {/* Botones de Estado: Activas, Inactivas, Suspendidas */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mr-1">
+                  Estado:
+                </span>
+                <button
+                  onClick={() => {
+                    setStatusFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${statusFilter === 'ALL' ? 'filter-pill-active' : ''}`}
+                >
+                  Todas
+                </button>
+                <button
+                  onClick={() => {
+                    setStatusFilter('ACTIVE');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${statusFilter === 'ACTIVE' ? 'filter-pill-active-success' : ''}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${statusFilter === 'ACTIVE' ? 'bg-white' : 'bg-emerald-500'}`} />
+                  Activas
+                </button>
+                <button
+                  onClick={() => {
+                    setStatusFilter('INACTIVE');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${statusFilter === 'INACTIVE' ? 'filter-pill-active-muted' : ''}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${statusFilter === 'INACTIVE' ? 'bg-white' : 'bg-slate-400'}`} />
+                  Inactivas
+                </button>
+                <button
+                  onClick={() => {
+                    setStatusFilter('SUSPENDED');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${statusFilter === 'SUSPENDED' ? 'filter-pill-active-warning' : ''}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${statusFilter === 'SUSPENDED' ? 'bg-white' : 'bg-amber-500'}`} />
+                  Suspendidas
+                </button>
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e: any) => setStatusFilter(e.target.value)}
-                className="w-full sm:w-auto h-10 px-3 rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
-              >
-                <option value="ALL">Todos los Estados</option>
-                <option value="ACTIVE">Activas</option>
-                <option value="INACTIVE">Inactivas</option>
-                <option value="SUSPENDED">Suspendidas</option>
-              </select>
+              {/* Botones de Referencia: Vencimientos & Cuotas */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mr-1">
+                  Vencimiento:
+                </span>
+                <button
+                  onClick={() => {
+                    setVencimientoFilter('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${vencimientoFilter === 'ALL' ? 'filter-pill-active' : ''}`}
+                >
+                  Todos
+                </button>
+                <button
+                  onClick={() => {
+                    setVencimientoFilter('OVERDUE');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${vencimientoFilter === 'OVERDUE' ? 'filter-pill-active-danger' : ''}`}
+                >
+                  <AlertTriangle className={`h-3.5 w-3.5 ${vencimientoFilter === 'OVERDUE' ? 'text-white' : 'text-rose-500'}`} />
+                  Cuotas Vencidas
+                </button>
+                <button
+                  onClick={() => {
+                    setVencimientoFilter('UPCOMING');
+                    setCurrentPage(1);
+                  }}
+                  className={`filter-pill ${vencimientoFilter === 'UPCOMING' ? 'filter-pill-active-warning' : ''}`}
+                >
+                  <Clock className={`h-3.5 w-3.5 ${vencimientoFilter === 'UPCOMING' ? 'text-white' : 'text-amber-500'}`} />
+                  Vencen en 7 días
+                </button>
+              </div>
             </div>
-          </Card>
+          </div>
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <div className="flex flex-col items-center justify-center py-24 gap-3 bg-[var(--bg-secondary)] rounded-[14px] border border-[var(--border-default)]">
               <Spinner size="lg" />
-              <p className="text-xs text-[var(--text-muted)]">Cargando alumnas por modalidad...</p>
+              <p className="text-xs text-[var(--text-secondary)]">Cargando listado de alumnas...</p>
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Sección 1: Alumnas Reformer */}
-              {displayReformerList && (
-                <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
-                  <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
-                    <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                      <Layers className="h-5 w-5 text-[var(--color-wood)]" /> Alumnas de Pilates Reformer ({alumnas.length})
-                    </h3>
-                  </div>
+            <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 sm:p-6 shadow-sm space-y-4">
+              <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
+                <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <Users className="h-5 w-5 text-[var(--badge-meadow-text)]" /> Listado de Alumnas ({totalCount})
+                </h3>
+                <span className="text-xs text-[var(--text-secondary)]">
+                  Página {currentPage} de {totalPages} (30 por página)
+                </span>
+              </div>
 
-                  {alumnas.length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)] py-8 text-center">
-                      No se encontraron alumnas de Reformer con el filtro seleccionado.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left text-xs border-collapse min-w-[650px]">
-                        <thead>
-                          <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
-                            <th className="py-3 px-4 font-semibold">Alumna</th>
-                            <th className="py-3 px-4 font-semibold">DNI / Teléfono</th>
-                            <th className="py-3 px-4 font-semibold">Plan Actual</th>
-                            <th className="py-3 px-4 font-semibold">Vencimiento</th>
-                            <th className="py-3 px-4 font-semibold">Estado</th>
-                            <th className="py-3 px-4 font-semibold">Acciones</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
-                          {alumnas.map((a) => (
-                            <tr key={a.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
-                              <td className="py-3.5 px-4 font-bold capitalize">
-                                {a.first_name} {a.last_name || ''}
-                              </td>
-                              <td className="py-3.5 px-4 font-mono text-[var(--text-secondary)]">
-                                {a.phone} {a.dni ? `· DNI ${a.dni}` : ''}
-                              </td>
-                              <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">
-                                {a.plan || 'Sin plan asignado'}
-                              </td>
-                              <td className="py-3.5 px-4">{getVencimientoCell(a.billing_due_date)}</td>
-                              <td className="py-3.5 px-4">
-                                {a.status === 'ACTIVE' ? (
-                                  <Badge variant="success">Activa</Badge>
-                                ) : a.status === 'INACTIVE' ? (
-                                  <Badge variant="muted">Inactiva</Badge>
-                                ) : (
-                                  <Badge variant="warning">Suspendida</Badge>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4">
-                                <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      setSelectedAlumna(a);
-                                      setIsDetailOpen(true);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)]/20 text-[var(--text-secondary)] hover:text-[var(--color-wood)] transition-colors cursor-pointer"
-                                    title="Ver Ficha Completa"
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setSelectedAlumna(a);
-                                      setIsFormOpen(true);
-                                    }}
-                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-blue-500/20 text-[var(--text-secondary)] hover:text-blue-500 transition-colors cursor-pointer"
-                                    title="Editar Alumna"
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteAlumna(a)}
-                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500 transition-colors cursor-pointer"
-                                    title="Eliminar Alumna"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </Card>
+              {alumnas.length === 0 ? (
+                <p className="text-xs text-[var(--text-secondary)] py-12 text-center">
+                  No se encontraron alumnas con los filtros seleccionados.
+                </p>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+                    <thead>
+                      <tr className="border-b border-[var(--border-default)] text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">
+                        <th className="py-3 px-4 font-semibold">Alumna</th>
+                        <th className="py-3 px-4 font-semibold">DNI / Teléfono</th>
+                        <th className="py-3 px-4 font-semibold">Plan Actual</th>
+                        <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Vencimiento</th>
+                        <th className="py-3 px-4 font-semibold">Estado</th>
+                        <th className="py-3 px-4 font-semibold text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
+                      {alumnas.map((a) => (
+                        <tr key={a.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
+                          <td className="py-3.5 px-4 font-bold capitalize text-sm">
+                            {a.first_name} {a.last_name || ''}
+                          </td>
+                          <td className="py-3.5 px-4 font-mono text-[var(--text-secondary)]">
+                            {a.phone} {a.dni ? `· DNI ${a.dni}` : ''}
+                          </td>
+                          <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">
+                            {a.plan || 'Sin plan asignado'}
+                          </td>
+                          <td className="py-3.5 px-4 font-bold">{getVencimientoCell(a.billing_due_date)}</td>
+                          <td className="py-3.5 px-4">
+                            {a.status === 'ACTIVE' ? (
+                              <span className="px-2.5 py-0.5 rounded-[22px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[11px] font-medium border border-emerald-500/30">
+                                Activa
+                              </span>
+                            ) : a.status === 'INACTIVE' ? (
+                              <span className="px-2.5 py-0.5 rounded-[22px] bg-slate-500/15 text-slate-600 dark:text-slate-400 text-[11px] font-medium border border-slate-500/30">
+                                Inactiva
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-[22px] bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[11px] font-medium border border-amber-500/30">
+                                Suspendida
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  setSelectedAlumna(a);
+                                  setIsDetailOpen(true);
+                                }}
+                                className="p-2 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)] transition-colors cursor-pointer"
+                                title="Ver Ficha Completa"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSelectedAlumna(a);
+                                  setIsFormOpen(true);
+                                }}
+                                className="p-2 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-blue-500/20 text-[var(--text-secondary)] hover:text-blue-500 border border-[var(--border-default)] transition-colors cursor-pointer"
+                                title="Editar Alumna"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteAlumna(a)}
+                                className="p-2 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-500 border border-[var(--border-default)] transition-colors cursor-pointer"
+                                title="Eliminar Alumna"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
 
-              {/* Sección 2: Alumnas Barre */}
-              {displayBarreList && (
-                <Card className="p-4 sm:p-6 border border-[var(--border-default)] shadow-xs">
-                  <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4 mb-4">
-                    <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                      <Image src="/media/berre.webp" alt="Barre" width={20} height={20} className="h-5 w-5 object-contain" />
-                      Alumnas de Studio Barre ({alumnasBarre.length})
-                    </h3>
-                  </div>
+              {/* Barra de Paginación */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[var(--border-default)]">
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    Mostrando <strong className="text-[var(--text-primary)] font-bold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</strong> a{' '}
+                    <strong className="text-[var(--text-primary)] font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}</strong> de{' '}
+                    <strong className="text-[var(--text-primary)] font-bold">{totalCount}</strong> alumnas
+                  </p>
 
-                  {alumnasBarre.length === 0 ? (
-                    <p className="text-xs text-[var(--text-muted)] py-8 text-center">
-                      No hay alumnas registradas en Studio Barre.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left text-xs border-collapse min-w-[600px]">
-                        <thead>
-                          <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
-                            <th className="py-3 px-4 font-semibold">Alumna Barre</th>
-                            <th className="py-3 px-4 font-semibold">Plan Barre</th>
-                            <th className="py-3 px-4 font-semibold">Mensualidad</th>
-                            <th className="py-3 px-4 font-semibold">Vencimiento</th>
-                            <th className="py-3 px-4 font-semibold">Estado</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
-                          {alumnasBarre.map((b) => (
-                            <tr key={b.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
-                              <td className="py-3.5 px-4 font-bold capitalize">{b.alumna_name}</td>
-                              <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">{b.plan_name}</td>
-                              <td className="py-3.5 px-4 font-mono font-bold text-amber-600 dark:text-amber-400">
-                                ${b.monthly_fee.toLocaleString()} ARS
-                              </td>
-                              <td className="py-3.5 px-4 font-mono">{b.due_date}</td>
-                              <td className="py-3.5 px-4">
-                                {b.status === 'ACTIVE' ? (
-                                  <Badge variant="success">Activa</Badge>
-                                ) : (
-                                  <Badge variant="muted">Inactiva</Badge>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      icon={<ChevronLeft className="h-4 w-4" />}
+                    >
+                      Anterior
+                    </Button>
+
+                    <div className="flex items-center gap-1 px-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, idx, arr) => {
+                          const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                          return (
+                            <div key={p} className="flex items-center">
+                              {showEllipsis && <span className="px-1 text-xs text-[var(--text-muted)]">...</span>}
+                              <button
+                                onClick={() => setCurrentPage(p)}
+                                className={`w-8 h-8 rounded-[8px] text-xs font-bold transition-all cursor-pointer ${
+                                  currentPage === p
+                                    ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                                    : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)]'
+                                }`}
+                              >
+                                {p}
+                              </button>
+                            </div>
+                          );
+                        })}
                     </div>
-                  )}
-                </Card>
+
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      icon={<ChevronRight className="h-4 w-4" />}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -435,7 +500,7 @@ export default function AlumnasPage() {
       )}
 
       {/* Modales */}
-      {isFormOpen && selectedAlumna && (
+      {isFormOpen && (
         <AlumnaFormModal
           isOpen={isFormOpen}
           alumnaToEdit={selectedAlumna}
@@ -443,10 +508,7 @@ export default function AlumnasPage() {
             setIsFormOpen(false);
             setSelectedAlumna(null);
           }}
-          onSubmit={async (data) => {
-            await handleUpdateAlumna(selectedAlumna.id, data);
-            return true;
-          }}
+          onSubmit={handleSaveAlumnaModal}
           loading={submitting}
         />
       )}

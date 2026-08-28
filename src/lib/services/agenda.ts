@@ -10,7 +10,7 @@ export async function getClases(options?: {
     const supabase = createClient();
     let query = supabase
       .from('clases')
-      .select('*, profesora:profiles(*), clase_alumnas(id, alumna:alumnas(*))')
+      .select('*, profesora:profiles(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(*))')
       .eq('is_active', true);
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -21,21 +21,30 @@ export async function getClases(options?: {
       query = query.eq('day_of_week', options.dayOfWeek);
     }
 
-    if (options?.profesoraId) {
-      query = query.eq('profesora_id', options.profesoraId);
-    }
-
     query = query.order('start_time', { ascending: true });
 
     const { data, error } = await query;
 
     if (error) return { data: [], error: error.message };
 
-    const formattedClases: Clase[] = (data || []).map((item: any) => ({
-      ...item,
-      alumnas_count: item.clase_alumnas?.length || 0,
-      alumnas: item.clase_alumnas?.map((ca: any) => ca.alumna).filter(Boolean) || [],
-    }));
+    const formattedClases: Clase[] = (data || []).map((item: any) => {
+      let filteredAlumnas = item.clase_alumnas || [];
+
+      // Si se filtra por profesora, mostrar las alumnas vinculadas a esa profesora (o si la clase está asignada a ella)
+      if (options?.profesoraId && options.profesoraId !== 'ALL') {
+        filteredAlumnas = filteredAlumnas.filter(
+          (ca: any) =>
+            ca.alumna?.profesora_id === options.profesoraId ||
+            item.profesora_id === options.profesoraId
+        );
+      }
+
+      return {
+        ...item,
+        alumnas_count: filteredAlumnas.length,
+        alumnas: filteredAlumnas,
+      };
+    });
 
     return { data: formattedClases, error: null };
   } catch (err) {
@@ -55,7 +64,7 @@ export async function getClasesConAlumnas(options?: {
     const supabase = createClient();
     let query = supabase
       .from('clases')
-      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, dni, phone))')
+      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, dni, phone, profesora_id))')
       .eq('is_active', true);
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -65,19 +74,28 @@ export async function getClasesConAlumnas(options?: {
     if (options?.dayOfWeek) {
       query = query.eq('day_of_week', options.dayOfWeek);
     }
-    if (options?.profesoraId) {
-      query = query.eq('profesora_id', options.profesoraId);
-    }
     query = query.order('day_of_week').order('start_time');
 
     const { data, error } = await query;
     if (error) return { data: [], error: error.message };
 
-    const formattedClases: Clase[] = (data || []).map((item: any) => ({
-      ...item,
-      alumnas_count: item.clase_alumnas?.length || 0,
-      alumnas: item.clase_alumnas || [],
-    }));
+    const formattedClases: Clase[] = (data || []).map((item: any) => {
+      let filteredAlumnas = item.clase_alumnas || [];
+
+      if (options?.profesoraId && options.profesoraId !== 'ALL') {
+        filteredAlumnas = filteredAlumnas.filter(
+          (ca: any) =>
+            ca.alumna?.profesora_id === options.profesoraId ||
+            item.profesora_id === options.profesoraId
+        );
+      }
+
+      return {
+        ...item,
+        alumnas_count: filteredAlumnas.length,
+        alumnas: filteredAlumnas,
+      };
+    });
 
     return { data: formattedClases, error: null };
   } catch (err) {

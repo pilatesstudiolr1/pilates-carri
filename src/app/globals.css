@@ -1,129 +1,202 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&display=swap');
 @import "tailwindcss";
 
 :root {
-  /* Paleta recomendada: Terracota & Arena Serena (Boutique Wellness) */
-  --color-wood: #C87A5B;
-  --color-wood-light: #D98D6E;
-  --color-wood-dark: #B2674A;
-  --color-dark: #241E1C;
-  --color-dark-soft: #2E2725;
-  --color-dark-muted: #3B3330;
-  --color-cream: #EFECE6;
-  --color-cream-soft: #F9F7F3;
-  --color-warm: #F2E3D5;
-  --color-warm-soft: #FAF3EC;
-  --color-olive: #4E5E53;
-  --color-olive-light: #617366;
-  --color-olive-dark: #3B473F;
+  /* ==========================================================================
+     LIGHT THEME — LATTICE DESIGN TOKENS
+     ========================================================================== */
+  
+  /* Superficies y Fondos */
+  --bg-primary: #f7f6f2;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #edebe4;
+  --bg-elevated: #ffffff;
+  --bg-overlay: rgba(0, 31, 31, 0.5);
 
-  /* Semanticos */
-  --color-primary: var(--color-wood);
-  --color-primary-hover: var(--color-wood-light);
-  --color-primary-active: var(--color-wood-dark);
-
-  --color-success: #16A34A;
-  --color-success-soft: rgba(22, 163, 74, 0.1);
-  --color-warning: #D97706;
-  --color-warning-soft: rgba(217, 119, 6, 0.1);
-  --color-danger: #DC2626;
-  --color-danger-soft: rgba(220, 38, 38, 0.1);
-  --color-info: #2563EB;
-  --color-info-soft: rgba(37, 99, 235, 0.1);
-
-  /* Tema Por Defecto: Alabastro & Arena (Light) */
-  --bg-primary: #F9F7F3;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #EFECE6;
-  --bg-elevated: #FFFFFF;
-  --bg-overlay: rgba(24, 20, 18, 0.45);
+  --color-parchment: #f7f6f2;
+  --color-paper-white: #ffffff;
 
   /* Texto */
-  --text-primary: #241E1C;
-  --text-secondary: #635B57;
-  --text-muted: #877E78;
-  --text-accent: var(--color-wood);
+  --text-primary: #001f1f;
+  --text-secondary: #5c7070;
+  --text-muted: #788e8e;
+  --text-accent: #2a4e1c;
+
+  --color-forest-ink: #001f1f;
+  --color-lichen-gray: #5c7070;
+  --color-stone: #788e8e;
+  --color-slate: #455252;
+  --color-mist: #889494;
+
+  /* Botones Semánticos */
+  --btn-primary-bg: #001f1f;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #003333;
+  --btn-primary-active: #001414;
+
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: #001f1f;
+  --btn-secondary-text: #001f1f;
+  --btn-secondary-hover: rgba(0, 31, 31, 0.05);
+
+  /* Badges */
+  --color-meadow: #cdface;
+  --badge-meadow-bg: #cdface;
+  --badge-meadow-text: #001f1f;
+  --badge-meadow-border: #001f1f;
+
+  /* Superficies Pastel (Specimen Trays) */
+  --color-mint-surface: #e4f7f9;
+  --surface-mint-border: rgba(0, 61, 61, 0.12);
+  --color-deep-teal: #003d3d;
+
+  --color-lime-surface: #f8fbe7;
+  --surface-lime-border: rgba(81, 92, 11, 0.12);
+  --color-olive: #515c0b;
+
+  --color-lavender-surface: #e1e1fa;
+  --surface-lavender-border: rgba(101, 46, 163, 0.12);
+  --color-iris: #652ea3;
+
+  --color-buttercream: #fff3c2;
+  --surface-buttercream-border: rgba(163, 106, 20, 0.12);
+  --color-saffron: #a36a14;
+
+  --color-blush-surface: #fcf2fe;
+  --surface-blush-border: rgba(122, 34, 81, 0.12);
+  --color-plum: #7a2251;
+
+  /* Estados Funcionales */
+  --color-success: #1b873f;
+  --color-success-soft: rgba(205, 250, 206, 0.6);
+  --color-warning: #a36a14;
+  --color-warning-soft: rgba(255, 243, 194, 0.6);
+  --color-danger: #c53030;
+  --color-danger-soft: rgba(254, 226, 226, 0.7);
+  --color-info: #003d3d;
+  --color-info-soft: rgba(228, 247, 249, 0.7);
 
   /* Bordes */
-  --border-default: #E4DFD7;
-  --border-hover: #D6CECE;
-  --border-focus: var(--color-wood);
+  --border-default: #e5e2d9;
+  --border-hover: #cfcbbe;
+  --border-focus: #001f1f;
 
-  /* Sombras */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.07);
-  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.09);
-  --shadow-glow: 0 0 20px rgba(200, 122, 91, 0.2);
+  /* Sombras sutiles Lattice */
+  --shadow-sm: 0 1px 2px rgba(0, 31, 31, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(0, 31, 31, 0.04), 0 2px 4px -1px rgba(0, 31, 31, 0.02), 0 0 0 1px rgba(0, 31, 31, 0.03);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 31, 31, 0.05), 0 4px 8px -2px rgba(0, 31, 31, 0.02), 0 0 0 1px rgba(0, 31, 31, 0.04);
+  --shadow-xl: 0 20px 32px -6px rgba(0, 31, 31, 0.07);
 
-  /* Radios (Mínimamente Redondeados / Subtle Soft Baseline) */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 10px;
-  --radius-full: 9999px;
+  /* Radios */
+  --radius-sm: 7px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 22px;
+  --radius-full: 29px;
 
-
-  /* Transiciones */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Sidebar */
+  /* Layout */
   --sidebar-width: 260px;
-  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
+  --page-max-width: 1200px;
+  
   color-scheme: light;
 }
 
-/* Tema Oscuro (Midnight Terracotta) */
+/* ==========================================================================
+   DARK THEME — DEEP FOREST BOTANICAL
+   ========================================================================== */
 [data-theme="dark"],
 .dark {
   color-scheme: dark;
-  --bg-primary: #1A1615;
-  --bg-secondary: #241E1D;
-  --bg-tertiary: #2F2726;
-  --bg-elevated: #282120;
-  --bg-overlay: rgba(0, 0, 0, 0.65);
+  
+  /* Superficies y Fondos */
+  --bg-primary: #0c1212;
+  --bg-secondary: #141c1c;
+  --bg-tertiary: #1c2727;
+  --bg-elevated: #182222;
+  --bg-overlay: rgba(0, 0, 0, 0.75);
 
-  --text-primary: #F7F4F0;
-  --text-secondary: #A89F99;
-  --text-muted: #7A716B;
+  --color-parchment: #0c1212;
+  --color-paper-white: #141c1c;
 
-  --border-default: rgba(247, 244, 240, 0.12);
-  --border-hover: rgba(247, 244, 240, 0.2);
+  /* Texto */
+  --text-primary: #f2f7f7;
+  --text-secondary: #9cb5b5;
+  --text-muted: #728c8c;
+  --text-accent: #a3f0a5;
 
-  --color-success: #4ADE80;
-  --color-success-soft: rgba(74, 222, 128, 0.15);
-  --color-warning: #FBBF24;
-  --color-warning-soft: rgba(251, 191, 36, 0.15);
-  --color-danger: #F87171;
-  --color-danger-soft: rgba(248, 113, 113, 0.15);
+  --color-forest-ink: #f2f7f7;
+  --color-lichen-gray: #9cb5b5;
+  --color-stone: #728c8c;
+  --color-slate: #8fa4a4;
+  --color-mist: #5d7575;
+
+  /* Botones Semánticos */
+  --btn-primary-bg: #cdface;
+  --btn-primary-text: #001f1f;
+  --btn-primary-hover: #baf5bd;
+  --btn-primary-active: #a5f0a8;
+
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: rgba(242, 247, 247, 0.35);
+  --btn-secondary-text: #f2f7f7;
+  --btn-secondary-hover: rgba(242, 247, 247, 0.08);
+
+  /* Badges */
+  --color-meadow: #cdface;
+  --badge-meadow-bg: rgba(205, 250, 206, 0.15);
+  --badge-meadow-text: #a3f0a5;
+  --badge-meadow-border: rgba(205, 250, 206, 0.35);
+
+  /* Superficies Pastel Dark */
+  --color-mint-surface: #112326;
+  --surface-mint-border: rgba(103, 226, 235, 0.22);
+  --color-deep-teal: #7ee7f0;
+
+  --color-lime-surface: #1b2410;
+  --surface-lime-border: rgba(205, 250, 206, 0.22);
+  --color-olive: #c5f27c;
+
+  --color-lavender-surface: #1b172a;
+  --surface-lavender-border: rgba(225, 225, 250, 0.22);
+  --color-iris: #c1b8f5;
+
+  --color-buttercream: #241e0f;
+  --surface-buttercream-border: rgba(255, 243, 194, 0.22);
+  --color-saffron: #f5d47a;
+
+  --color-blush-surface: #261324;
+  --surface-blush-border: rgba(253, 229, 255, 0.22);
+  --color-plum: #f5a6d5;
+
+  /* Bordes */
+  --border-default: rgba(242, 247, 247, 0.12);
+  --border-hover: rgba(242, 247, 247, 0.22);
+  --border-focus: #cdface;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.07);
 }
-
-
-
 
 @theme inline {
   --color-background: var(--bg-primary);
   --color-foreground: var(--text-primary);
-  --color-primary: var(--color-wood);
-  --color-primary-hover: var(--color-wood-light);
+  --color-primary: var(--btn-primary-bg);
   --color-surface: var(--bg-secondary);
   --color-surface-hover: var(--bg-tertiary);
   --color-border: var(--border-default);
-  --color-border-hover: var(--border-hover);
   --color-muted: var(--text-muted);
-  --color-accent: var(--color-wood);
-  --color-success: #4ADE80;
-  --color-warning: #FBBF24;
-  --color-danger: #F87171;
-  --font-sans: 'Inter', sans-serif;
+  --color-accent: var(--color-meadow);
+  
+  --font-sans: 'Inter', 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Base styles */
+/* Base Styles */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-dark-muted) transparent;
+  scrollbar-color: var(--border-hover) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -136,8 +209,8 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--color-dark-muted);
-  border-radius: var(--radius-full);
+  background: var(--border-default);
+  border-radius: 9999px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
@@ -151,218 +224,167 @@ html {
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
   min-height: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus visible */
+/* Focus Visible */
 *:focus-visible {
-  outline: 2px solid var(--color-wood);
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
-/* Browser autofill background and text color adapted for light/dark */
-input:-webkit-autofill,
-input:-webkit-autofill:hover,
-input:-webkit-autofill:focus,
-input:-webkit-autofill:active {
-  -webkit-box-shadow: 0 0 0 30px var(--bg-secondary) inset !important;
-  -webkit-text-fill-color: var(--text-primary) !important;
-  caret-color: var(--color-wood) !important;
-  transition: background-color 5000s ease-in-out 0s;
-}
-
-input,
-textarea,
-select {
-  caret-color: var(--color-wood);
-}
-
-select option {
-  background-color: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-/* Date and Time picker indicator icons in dark mode */
-[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
-[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
-.dark input[type="date"]::-webkit-calendar-picker-indicator,
-.dark input[type="time"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.85);
-}
-
-input::selection,
-textarea::selection {
-  background: rgba(200, 122, 91, 0.4);
-  color: var(--text-primary);
-}
-
 /* Selection */
 ::selection {
-  background: rgba(223, 178, 103, 0.3);
-  color: var(--color-cream);
+  background: var(--color-meadow);
+  color: #001f1f;
 }
 
+/* Clases de Superficie Pastel (Lattice Specimen Cards) */
+.surface-mint {
+  background-color: var(--color-mint-surface);
+  border: 1px solid var(--surface-mint-border);
+}
 
-/* Animations */
+.surface-lime {
+  background-color: var(--color-lime-surface);
+  border: 1px solid var(--surface-lime-border);
+}
+
+.surface-lavender {
+  background-color: var(--color-lavender-surface);
+  border: 1px solid var(--surface-lavender-border);
+}
+
+.surface-buttercream {
+  background-color: var(--color-buttercream);
+  border: 1px solid var(--surface-buttercream-border);
+}
+
+.surface-blush {
+  background-color: var(--color-blush-surface);
+  border: 1px solid var(--surface-blush-border);
+}
+
+/* Badge Pill Estilo Lattice */
+.badge-meadow {
+  background-color: var(--badge-meadow-bg);
+  color: var(--badge-meadow-text);
+  border: 1px solid var(--badge-meadow-border);
+  border-radius: 22px;
+  letter-spacing: 0.06em;
+}
+
+/* Animaciones */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes pulse-soft {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.7;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-fade-in {
-  animation: fadeIn var(--transition-base) ease-out;
+  animation: fadeIn 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp var(--transition-slow) ease-out;
-}
+/* ==========================================================================
+   LATTICE STANDARDIZED FILTER PILLS & STATUS CONTROLS
+   ========================================================================== */
 
-.animate-slide-in-left {
-  animation: slideInLeft var(--transition-slow) ease-out;
-}
-
-.animate-slide-in-right {
-  animation: slideInRight var(--transition-slow) ease-out;
-}
-
-.animate-scale-in {
-  animation: scaleIn var(--transition-base) ease-out;
-}
-
-.animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg,
-      var(--bg-secondary) 25%,
-      var(--bg-tertiary) 50%,
-      var(--bg-secondary) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-spin {
-  animation: spin 1s linear infinite;
-}
-
-/* Glass effect */
-.glass {
-  background: rgba(42, 42, 42, 0.7);
-  backdrop-filter: blur(12px);
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  border-radius: 22px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+  user-select: none;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
   border: 1px solid var(--border-default);
 }
 
-/* Custom Scrollbar */
-.custom-scrollbar {
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border-default) transparent;
+.filter-pill:hover {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-hover);
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
+.filter-pill-active {
+  background-color: var(--btn-primary-bg) !important;
+  color: var(--btn-primary-text) !important;
+  border-color: transparent !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(0, 31, 31, 0.05);
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+.filter-pill-active-success {
+  background-color: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #15803d !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(22, 163, 74, 0.2);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 9999px;
+.filter-pill-active-warning {
+  background-color: #d97706 !important;
+  color: #ffffff !important;
+  border-color: #b45309 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(217, 119, 6, 0.2);
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--color-wood);
+.filter-pill-active-danger {
+  background-color: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #b91c1c !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(220, 38, 38, 0.2);
+}
+
+.filter-pill-active-muted {
+  background-color: #334155 !important;
+  color: #ffffff !important;
+  border-color: #1e293b !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(51, 65, 85, 0.2);
+}
+
+.filter-pill-active-info {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #1d4ed8 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+/* ==========================================================================
+   PRINT STYLES FOR COMPROBANTES
+   ========================================================================== */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 24px;
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

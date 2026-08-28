@@ -40,7 +40,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 
-export type ModalityFilter = 'ALL' | 'REFORMER' | 'BARRE' | 'ESTETICA';
+export type ModalityFilter = 'ALL' | 'REFORMER' | 'ESTETICA';
 
 export default function LiquidacionesSemanalesPage() {
   const { confirm, alert: alertDialog } = useConfirm();
@@ -106,8 +106,7 @@ export default function LiquidacionesSemanalesPage() {
         if (modalityFilter !== 'ALL') {
           const filteredDetalles = data.detalles.filter((d) => {
             const planLower = (d.plan_name || '').toLowerCase();
-            if (modalityFilter === 'REFORMER') return planLower.includes('reformer') || !planLower.includes('barre');
-            if (modalityFilter === 'BARRE') return planLower.includes('barre');
+            if (modalityFilter === 'REFORMER') return planLower.includes('reformer') || !planLower.includes('estética');
             if (modalityFilter === 'ESTETICA') return planLower.includes('estética') || planLower.includes('estetica');
             return true;
           });
@@ -256,33 +255,19 @@ export default function LiquidacionesSemanalesPage() {
             </span>
             <button
               onClick={() => setModalityFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                modalityFilter === 'ALL' ? 'bg-blue-600 text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
+              className={`filter-pill ${modalityFilter === 'ALL' ? 'filter-pill-active' : ''}`}
             >
               Todas
             </button>
             <button
               onClick={() => setModalityFilter('REFORMER')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                modalityFilter === 'REFORMER' ? 'bg-[var(--color-wood)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
+              className={`filter-pill ${modalityFilter === 'REFORMER' ? 'filter-pill-active' : ''}`}
             >
               Reformer
             </button>
             <button
-              onClick={() => setModalityFilter('BARRE')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                modalityFilter === 'BARRE' ? 'bg-amber-600 text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Barre
-            </button>
-            <button
               onClick={() => setModalityFilter('ESTETICA')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                modalityFilter === 'ESTETICA' ? 'bg-emerald-600 text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
+              className={`filter-pill ${modalityFilter === 'ESTETICA' ? 'filter-pill-active-success' : ''}`}
             >
               Estética
             </button>

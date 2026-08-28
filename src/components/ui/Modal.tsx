@@ -2,7 +2,8 @@
 
 import { cn } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { useEffect, useCallback, type ReactNode } from 'react';
+import { useEffect, useCallback, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ModalProps {
   open?: boolean;
@@ -33,7 +34,12 @@ export function Modal({
   size = 'lg',
   showClose = true,
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
   const isModalOpen = open ?? isOpen ?? false;
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -54,20 +60,20 @@ export function Modal({
     };
   }, [isModalOpen, handleEscape]);
 
-  if (!isModalOpen) return null;
+  if (!isModalOpen || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6">
-      {/* Overlay Backdrop Blur */}
+  const modalNode = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-5 md:p-6">
+      {/* Overlay Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/65 backdrop-blur-xs animate-fade-in"
         onClick={onClose}
       />
 
       {/* Modal Container */}
       <div
         className={cn(
-          'relative w-full rounded-xl flex flex-col',
+          'relative w-full rounded-[14px] flex flex-col',
           'bg-[var(--bg-secondary)] border border-[var(--border-default)]',
           'shadow-2xl overflow-hidden',
           'animate-scale-in max-h-[92vh] sm:max-h-[90vh]',
@@ -79,12 +85,12 @@ export function Modal({
           <div className="flex items-start justify-between p-4 sm:p-5 md:p-6 border-b border-[var(--border-default)] bg-[var(--bg-tertiary)]/50 shrink-0">
             <div className="pr-3 sm:pr-4">
               {title && (
-                <h2 className="text-base sm:text-lg font-bold tracking-tight text-[var(--text-primary)] leading-tight">
+                <h2 className="text-base sm:text-lg font-medium tracking-tight text-[var(--text-primary)] leading-tight">
                   {title}
                 </h2>
               )}
               {description && (
-                <p className="mt-1 text-xs sm:text-sm text-[var(--text-muted)] leading-snug">
+                <p className="mt-1 text-xs sm:text-sm text-[var(--text-secondary)] leading-snug">
                   {description}
                 </p>
               )}
@@ -93,15 +99,15 @@ export function Modal({
               <button
                 onClick={onClose}
                 className={cn(
-                  'w-8 h-8 sm:w-9 sm:h-9 rounded-full shrink-0',
+                  'w-8 h-8 rounded-[29px] shrink-0',
                   'flex items-center justify-center',
-                  'bg-[var(--bg-tertiary)] border border-[var(--border-default)]',
-                  'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]',
-                  'transition-all duration-200 cursor-pointer shadow-xs'
+                  'bg-[var(--bg-secondary)] border border-[var(--border-default)]',
+                  'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]',
+                  'transition-all duration-150 cursor-pointer shadow-2xs'
                 )}
                 aria-label="Cerrar modal"
               >
-                <X className="h-4 w-4 sm:h-4.5 sm:w-4.5" />
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -114,4 +120,6 @@ export function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 }
