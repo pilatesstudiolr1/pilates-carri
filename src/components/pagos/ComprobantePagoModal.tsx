@@ -30,7 +30,6 @@ export function ComprobantePagoModal({
 
   const alumna = pago.alumna;
   const alumnaNombre = alumna ? `${alumna.first_name} ${alumna.last_name || ''}`.trim() : 'Alumna';
-  const reciboNumero = `REC-${(pago.id || '00000000').slice(0, 8).toUpperCase()}`;
   const montoFormateado = `$${(Number(pago.amount) || 0).toLocaleString('es-AR')} ARS`;
 
   const metodoLabel =
@@ -63,7 +62,7 @@ export function ComprobantePagoModal({
       <html>
       <head>
         <meta charset="utf-8">
-        <title>Comprobante de Pago - ${reciboNumero}</title>
+        <title>Comprobante de Pago</title>
         <style>
           @page {
             size: A4 portrait;
@@ -90,7 +89,7 @@ export function ComprobantePagoModal({
             margin: 0 auto;
             border: 2px solid #e2e8f0;
             border-radius: 16px;
-            padding: 32px 36px;
+            padding: 36px 40px;
             background: #ffffff;
           }
           .badge {
@@ -110,20 +109,22 @@ export function ComprobantePagoModal({
             text-align: center;
             border-bottom: 2px solid #f1f5f9;
             padding-bottom: 18px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
           }
           .studio-title {
-            font-size: 22px;
+            font-size: 24px;
             font-weight: 900;
             color: #001f1f;
             letter-spacing: -0.02em;
             margin: 0 0 4px 0;
           }
           .subtitle {
-            font-size: 12px;
+            font-size: 14px;
             color: #64748b;
             margin: 0 0 10px 0;
-            font-weight: 500;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
           }
           .meta-row {
             font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -136,7 +137,7 @@ export function ComprobantePagoModal({
             border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 16px 20px;
-            margin-bottom: 18px;
+            margin-bottom: 20px;
           }
           .info-row {
             display: flex;
@@ -161,8 +162,7 @@ export function ComprobantePagoModal({
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 20px;
-            margin-bottom: 20px;
+            margin-top: 24px;
           }
           .total-label {
             font-size: 13px;
@@ -177,14 +177,6 @@ export function ComprobantePagoModal({
             color: #001f1f;
             font-family: ui-monospace, monospace;
           }
-          .footer {
-            text-align: center;
-            font-size: 10px;
-            color: #94a3b8;
-            font-weight: 500;
-            border-top: 1px solid #f1f5f9;
-            padding-top: 14px;
-          }
         </style>
       </head>
       <body>
@@ -192,9 +184,9 @@ export function ComprobantePagoModal({
           <div class="header">
             <div class="badge">&#10003; Pago Confirmado</div>
             <h1 class="studio-title">PILATES REFORMER STUDIO</h1>
-            <p class="subtitle">Comprobante Oficial de Recepción de Pago</p>
+            <p class="subtitle">Comprobante</p>
             <div class="meta-row">
-              <span>N° Recibo: ${reciboNumero}</span> &bull; <span>Fecha: ${pago.payment_date}</span>
+              <span>Fecha: ${pago.payment_date}</span>
             </div>
           </div>
 
@@ -238,11 +230,6 @@ export function ComprobantePagoModal({
             </div>
             <span class="total-amount">${montoFormateado}</span>
           </div>
-
-          <div class="footer">
-            Documento de control operativo interno emitido electrónicamente por el sistema de gestión.<br/>
-            Pilates Reformer Studio &mdash; Todos los derechos reservados.
-          </div>
         </div>
       </body>
       </html>
@@ -269,7 +256,6 @@ export function ComprobantePagoModal({
     const textMsg = encodeURIComponent(
       `🧾 *COMPROBANTE DE PAGO — PILATES STUDIO*\n` +
       `-----------------------------------------\n` +
-      `📄 *Recibo N°:* ${reciboNumero}\n` +
       `👤 *Alumna:* ${alumnaNombre}\n` +
       `📅 *Fecha:* ${pago.payment_date}\n` +
       `📌 *Concepto:* ${pago.concept || 'Mensualidad Pilates Reformer'}\n` +
@@ -294,7 +280,7 @@ export function ComprobantePagoModal({
           <X className="h-4 w-4" />
         </button>
 
-        {/* CONTENEDOR VISTA PREVIA (RECIBO FORMAL) */}
+        {/* CONTENEDOR VISTA PREVIA */}
         <div className="space-y-6">
           {/* 1. Header del Comprobante */}
           <div className="text-center border-b border-[var(--border-default)] pb-5">
@@ -304,13 +290,11 @@ export function ComprobantePagoModal({
             <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
               PILATES REFORMER STUDIO
             </h2>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Comprobante de Recepción de Pago
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5 uppercase tracking-wider font-semibold">
+              Comprobante
             </p>
             <div className="flex items-center justify-center gap-4 text-xs font-mono font-bold text-[var(--text-secondary)] mt-2">
-              <span>{reciboNumero}</span>
-              <span>&bull;</span>
-              <span>{pago.payment_date}</span>
+              <span>Fecha: {pago.payment_date}</span>
             </div>
           </div>
 
@@ -389,13 +373,6 @@ export function ComprobantePagoModal({
                 {montoFormateado}
               </strong>
             </div>
-          </div>
-
-          {/* 4. Sello / Seguridad */}
-          <div className="text-center pt-1">
-            <p className="text-[10px] text-[var(--text-muted)] font-medium">
-              Documento de control operativo interno emitido electrónicamente por el sistema de gestión.
-            </p>
           </div>
         </div>
 
