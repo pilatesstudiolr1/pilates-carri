@@ -9,6 +9,7 @@ import { createAlumna } from '@/lib/services/alumnas';
 import { getProfiles } from '@/lib/services/profesoras';
 import { getPlanes, PlanItem } from '@/lib/services/planes';
 import { addAlumnaToClase, getClases, createClase } from '@/lib/services/agenda';
+import { createClient } from '@/lib/supabase/client';
 import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble } from 'lucide-react';
 
 const DIAS = [
@@ -95,6 +96,8 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [allClases, setAllClases] = useState<any[]>([]);
+  const [occupiedMap, setOccupiedMap] = useState<Record<string, number[]>>({});
 
   useEffect(() => {
     async function loadData() {
@@ -104,6 +107,11 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       ]);
       setProfesoras(profsRes.data);
       setPlanes(planesRes.data);
+
+      // Load all clases for availability check
+      const clasesRes = await getClases();
+      setAllClases(clasesRes.data || []);
+      await fetchAllOccupied(clasesRes.data || []);
 
       if (planesRes.data.length > 0) {
         setSelectedPlanName(planesRes.data[0].name);
@@ -167,6 +175,36 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     setTurnosFijos((prev) =>
       prev.map((t) => (t.id === id ? { ...t, [field]: value } : t))
     );
+  };
+
+  // Fetch occupied camillas for all clases
+  const fetchAllOccupied = async (clasesList: any[]) => {
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('clase_alumnas')
+        .select('clase_id, camilla')
+        .not('camilla', 'is', null);
+
+      if (data) {
+        const map: Record<string, number[]> = {};
+        data.forEach((d: any) => {
+          if (!map[d.clase_id]) map[d.clase_id] = [];
+          map[d.clase_id].push(d.camilla);
+        });
+        setOccupiedMap(map);
+      }
+    } catch (err) {
+      console.error('Error fetching occupied:', err);
+    }
+  };
+
+  const getOccupiedCamillasForTurno = (dayOfWeek: number, startTime: string): number[] => {
+    const matchingClase = allClases.find(
+      (c) => c.day_of_week === dayOfWeek && c.start_time.startsWith(startTime)
+    );
+    if (!matchingClase) return [];
+    return occupiedMap[matchingClase.id] || [];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -515,20 +553,24 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
-                  <select
-                    value={tf.camilla}
-                    onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
-                  >
-                    {[1, 2, 3, 4, 5, 6].map((num) => (
-                      <option key={num} value={num}>
-                        Reformer {num}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
+                    <select
+                      value={tf.camilla}
+                      onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
+                      className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
+                    >
+                      {[1, 2, 3, 4, 5, 6].map((num) => {
+                        const occupied = getOccupiedCamillasForTurno(tf.day_of_week, tf.start_time);
+                        const isOccupied = occupied.includes(num);
+                        return (
+                          <option key={num} value={num} disabled={isOccupied}>
+                            Reformer {num}{isOccupied ? ' — Ocupado' : ' — Disponible'}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
 
                 <div className="flex items-end justify-start sm:justify-end">
                   <button

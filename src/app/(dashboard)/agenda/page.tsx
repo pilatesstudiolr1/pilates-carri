@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Spinner } from '@/components/ui/Spinner';
@@ -60,6 +61,7 @@ export default function AgendaPage() {
   const [presetTime, setPresetTime] = useState<string>('08:00');
   const [presetCamilla, setPresetCamilla] = useState<number>(1);
   const [submitting, setSubmitting] = useState(false);
+  const [asistencias, setAsistencias] = useState<Record<string, string>>({});
 
   const fetchAgenda = useCallback(async () => {
     setLoading(true);
@@ -83,6 +85,32 @@ export default function AgendaPage() {
   useEffect(() => {
     fetchAgenda();
   }, [fetchAgenda]);
+
+  // Fetch asistencias para la fecha de hoy
+  const fetchAsistencias = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('asistencias')
+        .select('clase_alumna_id, status')
+        .eq('date', fechaHoy);
+
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach((a: any) => {
+          if (a.clase_alumna_id) map[a.clase_alumna_id] = a.status;
+        });
+        setAsistencias(map);
+      }
+    } catch (err) {
+      console.error('Error cargando asistencias:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAsistencias();
+  }, [fetchAsistencias]);
 
   const handleCreateClase = async (data: {
     name: string;
@@ -319,22 +347,20 @@ export default function AgendaPage() {
           </span>
           <button
             onClick={() => setModality('REFORMER')}
-            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              modality === 'REFORMER'
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${modality === 'REFORMER'
                 ? 'bg-[var(--color-wood)] text-white shadow-xs'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             <Layers className="h-3.5 w-3.5" /> Reformer ({clases.length})
           </button>
 
           <button
             onClick={() => setModality('BARRE')}
-            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-              modality === 'BARRE'
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all flex items-center gap-1.5 cursor-pointer ${modality === 'BARRE'
                 ? 'bg-amber-600 text-white shadow-xs'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             <Image src="/media/berre.webp" alt="Barre" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
             Barre ({barreClases.length})
@@ -342,11 +368,10 @@ export default function AgendaPage() {
 
           <button
             onClick={() => setModality('ALL')}
-            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-              modality === 'ALL'
+            className={`px-3.5 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${modality === 'ALL'
                 ? 'bg-blue-600 text-white shadow-xs'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-            }`}
+              }`}
           >
             Todas ({clases.length + barreClases.length})
           </button>
@@ -413,21 +438,19 @@ export default function AgendaPage() {
           <div className="flex items-center gap-2 bg-[var(--bg-tertiary)] p-1 rounded-xl border border-[var(--border-default)] w-fit">
             <button
               onClick={() => setViewMode('REFORMER')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === 'REFORMER'
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === 'REFORMER'
                   ? 'bg-[var(--color-wood)] text-white shadow-xs'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
+                }`}
             >
               <BedDouble className="h-3.5 w-3.5" /> Vista por Reformer (Camillas)
             </button>
             <button
               onClick={() => setViewMode('WEEK')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                viewMode === 'WEEK'
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === 'WEEK'
                   ? 'bg-[var(--color-wood)] text-white shadow-xs'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-              }`}
+                }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" /> Vista Semanal
             </button>
@@ -442,6 +465,7 @@ export default function AgendaPage() {
 
               onSelectOccupiedSlot={(day, time, camilla, item) => handleAbrirTurnoModal(day, time, camilla, item)}
               onSelectClase={handleSelectClaseBlock}
+              asistencias={asistencias}
             />
           ) : (
             <GoogleCalendarGrid

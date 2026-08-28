@@ -4,13 +4,14 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alumna } from '@/types/database';
-import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock } from 'lucide-react';
+import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock, Trash2 } from 'lucide-react';
 
 interface AlumnaDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   alumna: Alumna | null;
   onEdit?: (alumna: Alumna) => void;
+  onDelete?: (alumna: Alumna) => void;
 }
 
 function calcularEdad(fechaNacimiento: string | null): number | null {
@@ -44,6 +45,7 @@ export function AlumnaDetailModal({
   onClose,
   alumna,
   onEdit,
+  onDelete,
 }: AlumnaDetailModalProps) {
   if (!alumna) return null;
 
@@ -216,9 +218,24 @@ export function AlumnaDetailModal({
 
         {/* Footer */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-[var(--border-default)]">
-          <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
-            Cerrar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
+              Cerrar
+            </Button>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  onClose();
+                  onDelete(alumna);
+                }}
+                className="w-full sm:w-auto text-red-500 hover:bg-red-500/10"
+                icon={<Trash2 className="h-4 w-4" />}
+              >
+                Eliminar
+              </Button>
+            )}
+          </div>
           {onEdit && (
             <Button
               onClick={() => {

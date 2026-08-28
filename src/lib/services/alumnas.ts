@@ -149,3 +149,30 @@ export async function updateAlumnaStatus(
     };
   }
 }
+
+export async function deleteAlumna(
+  id: string
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = createClient();
+
+    // Primero eliminar inscripciones en clases (clase_alumnas tiene ON DELETE CASCADE pero por seguridad)
+    await supabase
+      .from('clase_alumnas')
+      .delete()
+      .eq('alumna_id', id);
+
+    // Eliminar la alumna
+    const { error } = await supabase
+      .from('alumnas')
+      .delete()
+      .eq('id', id);
+
+    if (error) return { error: error.message };
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al eliminar alumna del sistema',
+    };
+  }
+}

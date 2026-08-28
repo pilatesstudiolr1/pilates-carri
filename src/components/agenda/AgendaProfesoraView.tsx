@@ -58,7 +58,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
   const [clases, setClases] = useState<Clase[]>([]);
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filtroSoloMisClases, setFiltroSoloMisClases] = useState(false);
+  const [filtroSoloMisClases, setFiltroSoloMisClases] = useState(true);
 
   // Modales
   const [isClaseModalOpen, setIsClaseModalOpen] = useState(false);

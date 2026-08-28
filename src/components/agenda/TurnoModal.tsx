@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alumna, Clase } from '@/types/database';
 import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
+import { createClient } from '@/lib/supabase/client';
 import {
   CheckCircle2,
   XCircle,
@@ -78,6 +79,7 @@ export function TurnoModal({
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [occupiedCamillas, setOccupiedCamillas] = useState<number[]>([]);
 
   const fechaHoy = new Date().toISOString().split('T')[0];
 
@@ -105,8 +107,31 @@ export function TurnoModal({
       }
 
       fetchAlumnas();
+      fetchOccupiedCamillas();
     }
   }, [open, alumnaAsignada, presetTime, presetCamilla]);
+
+  const fetchOccupiedCamillas = async () => {
+    if (!clase?.id) {
+      setOccupiedCamillas([]);
+      return;
+    }
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('clase_alumnas')
+        .select('camilla')
+        .eq('clase_id', clase.id)
+        .not('camilla', 'is', null);
+      
+      if (data) {
+        const occupied = data.map((d: any) => d.camilla).filter(Boolean);
+        setOccupiedCamillas(occupied);
+      }
+    } catch (err) {
+      console.error('Error fetching occupied camillas:', err);
+    }
+  };
 
   const fetchAlumnas = async (query = '') => {
     setFetchingAlumnas(true);
@@ -418,11 +443,15 @@ export function TurnoModal({
               onChange={(e) => setCamilla(parseInt(e.target.value, 10))}
               className="w-full px-3 py-2 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] font-bold focus:outline-none cursor-pointer"
             >
-              {[1, 2, 3, 4, 5, 6].map((num) => (
-                <option key={num} value={num}>
-                  Reformer {num}
-                </option>
-              ))}
+              {[1, 2, 3, 4, 5, 6].map((num) => {
+                const isCurrentAlumna = isOccupied && num === presetCamilla;
+                const isOccupiedByOther = occupiedCamillas.includes(num) && !isCurrentAlumna;
+                return (
+                  <option key={num} value={num} disabled={isOccupiedByOther}>
+                    Reformer {num}{isOccupiedByOther ? ' — Ocupado' : isCurrentAlumna ? ' (actual)' : ' — Disponible'}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>

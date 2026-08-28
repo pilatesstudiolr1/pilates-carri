@@ -1,0 +1,2282 @@
+[
+  {
+    "table_name": "alumnas",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "dni",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "telefono",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "fecha_nacimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "direccion",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "contacto_emergencia",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "lesiones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "fecha_ingreso",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "apellido",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "apto_fisico",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "telefono_emergencia",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "enfermedades",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "cirugias",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "observaciones_salud",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "embarazo",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "mensualidad_pagada",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "inscripcion_pagada",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "foto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "importe_plan",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "dias_asiste",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "fecha_inicio",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "alumnas",
+    "column_name": "fecha_inicio_real",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "horario",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencia",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "reserva_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "nombre_alumna",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "dia",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "hora",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "asistencias",
+    "column_name": "usuario_cambio",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "fecha_inicio",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_alumnas",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "clase_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "barre_alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "usuario_cambio",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_asistencias",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "hora_inicio",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "duracion_min",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "cupo",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_clases",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "dia_preferido",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "hora_preferida",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_lista_espera",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "barre_alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "estado_pago",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "barre_pagos",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "concepto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "categoria",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "descripcion",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "caja",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "estado_anterior",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "estado_nuevo",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "motivo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "usuario",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "fecha",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_estado_historial",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "fecha_programada",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "notas",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "usuario",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "realizado_en",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "crm_seguimientos",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "concepto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "monto_total",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "monto_pagado",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "saldo",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "fecha_emision",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "mes",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "fecha_inicio",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "mes_vencimiento",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "mes_pagado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "pagado_en",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "es_registro_activo",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "cuota_duplicada_de",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas",
+    "column_name": "depurado_en",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "cuota_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "mes_vencimiento",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "cuota_duplicada_de",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "snapshot",
+    "data_type": "jsonb",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "cuotas_duplicados_historial",
+    "column_name": "archivado_en",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "fecha",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "concepto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "categoria",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "egresos",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "liquidacion_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "nombre_alumna",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "estado_alumna",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "veces_por_semana",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "importe_mensual",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "pago_registrado",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "monto_pagado",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "porcentaje_comision",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "importe_profesora",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "fecha_alta",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidacion_detalles",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "mes",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "porcentaje_comision",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "cantidad_activas",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "cantidad_bajas",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "cantidad_pagaron",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "monto_base",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "total_profesora",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "fecha_cierre",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_profesores",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "profesora_nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "porcentaje",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "semana_inicio",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "semana_fin",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "total_alumnas",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "pagaron_semana",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "pendientes",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "total_cobrado_semana",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "total_a_pagar",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "cerrada",
+    "data_type": "boolean",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "pagada",
+    "data_type": "boolean",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "cerrada_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "cerrada_por",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "liquidacion_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "alumna_nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "mensualidad",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "monto_pagado_semana",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "comision",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_detalle",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "profesora_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "profesora_nombre",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "semana_desde",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "semana_hasta",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "porcentaje",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "total_cobrado_semana",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "monto_liquidado",
+    "data_type": "numeric",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "cantidad_pagos",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "liquidado_en",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "liquidado_por_usuario_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "liquidado_por_usuario_nombre",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "liquidaciones_semanales_profesora",
+    "column_name": "updated_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "producto_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "cantidad",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "precio_unitario",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "total",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "movimientos_stock",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "concepto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "nombre_alumna",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "pagos",
+    "column_name": "mes_pagado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "talle",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "color",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "precio",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "costo",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "stock_actual",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "stock_minimo",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "activo",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "productos",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesoras",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "profesoras",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "profesoras",
+    "column_name": "usuario",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesoras",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesoras",
+    "column_name": "activa",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "telefono",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "email",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "activo",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "apellido",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "dni",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "turno",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "porcentaje",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "fecha_ingreso",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "profesores",
+    "column_name": "porcentaje_comision",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "reserva_original_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "fecha_original",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "fecha_recuperacion",
+    "data_type": "date",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "hora",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "camilla",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "recuperaciones",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "created_at",
+    "data_type": "timestamp with time zone",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "dia",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "hora",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "camilla",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "telefono",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "asistencia",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "pago",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "dni",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "fecha_nacimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "fecha_inicio",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "clases_semana",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "inscripcion",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "fecha_inscripcion",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "mesualidad",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "comprobante",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "reservas",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "sedes",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "sedes",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "sedes",
+    "column_name": "camillas",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "sedes",
+    "column_name": "porcentaje_profe",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "dia",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "horario",
+    "data_type": "text",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "cupo",
+    "data_type": "integer",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "turnos",
+    "column_name": "activa",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "id",
+    "data_type": "bigint",
+    "is_nullable": "NO"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "usuario",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "password",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "nombre",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "rol",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "sede_id",
+    "data_type": "integer",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "profesor_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "activo",
+    "data_type": "boolean",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "dias_trabajo",
+    "data_type": "ARRAY",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "usuarios",
+    "column_name": "horas_trabajo",
+    "data_type": "ARRAY",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "nombre_alumna",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "telefono",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "plan",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "importe_plan",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "estado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "fecha_inicio",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "fecha_inicio_real",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "fecha_vencimiento",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_alumnas_vencimientos",
+    "column_name": "estado_vencimiento",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "pago_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "sede_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "alumna_id",
+    "data_type": "bigint",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "nombre_alumna",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "telefono",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "tipo",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "monto",
+    "data_type": "numeric",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "metodo_pago",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "fecha_pago",
+    "data_type": "date",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "mes_pagado",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "observaciones",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "comprobante_texto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  },
+  {
+    "table_name": "v_pagos_comprobantes",
+    "column_name": "whatsapp_texto",
+    "data_type": "text",
+    "is_nullable": "YES"
+  }
+]

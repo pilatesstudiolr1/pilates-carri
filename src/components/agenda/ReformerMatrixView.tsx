@@ -40,6 +40,7 @@ interface ReformerMatrixViewProps {
   onSelectEmptySlot?: (dayOfWeek: number, startTime: string, camilla?: number) => void;
   onOpenAssignModal?: (clase: Clase, camilla?: number) => void;
   onSelectOccupiedSlot?: (dayOfWeek: number, startTime: string, camilla: number, alumnaItem: any, clase: Clase | null) => void;
+  asistencias?: Record<string, string>; // clase_alumna_id -> status (PRESENT, ABSENT, RECOVERY, SUSPENDED)
 }
 
 export function ReformerMatrixView({
@@ -50,6 +51,7 @@ export function ReformerMatrixView({
   onSelectEmptySlot,
   onOpenAssignModal,
   onSelectOccupiedSlot,
+  asistencias = {},
 }: ReformerMatrixViewProps) {
 
 
@@ -63,6 +65,11 @@ export function ReformerMatrixView({
   // Metricas del dia
   const totalLugaresOcupados = clasesDelDia.reduce((acc, c) => acc + (c.alumnas_count || 0), 0);
   const totalCapacidadDia = clasesDelDia.reduce((acc, c) => acc + (c.max_capacity || 6), 0);
+
+  // Contar asistencias del día
+  const presentesCount = Object.values(asistencias).filter(s => s === 'PRESENT').length;
+  const ausentesCount = Object.values(asistencias).filter(s => s === 'ABSENT').length;
+  const recuperacionesCount = Object.values(asistencias).filter(s => s === 'RECOVERY').length;
 
   // Mapear matriz por hora y camilla (1 a 6)
   const matrizHorarios = HORARIOS_ESTANDAR.map((hora) => {
@@ -140,19 +147,19 @@ export function ReformerMatrixView({
 
         <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
           <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Presentes hoy</span>
-          <p className="text-xl sm:text-2xl font-black text-[var(--color-success)] my-1">0</p>
+          <p className="text-xl sm:text-2xl font-black text-[var(--color-success)] my-1">{presentesCount}</p>
           <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
 
         <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
           <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Ausentes</span>
-          <p className="text-xl sm:text-2xl font-black text-red-400 my-1">0</p>
+          <p className="text-xl sm:text-2xl font-black text-red-400 my-1">{ausentesCount}</p>
           <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
 
         <Card className="p-3.5 sm:p-4 flex flex-col justify-between">
           <span className="text-[11px] sm:text-xs text-[var(--text-muted)] font-semibold">Recuperaciones</span>
-          <p className="text-xl sm:text-2xl font-black text-[var(--color-wood)] my-1">0</p>
+          <p className="text-xl sm:text-2xl font-black text-[var(--color-wood)] my-1">{recuperacionesCount}</p>
           <span className="text-[10px] text-[var(--text-muted)] truncate">{fechaAsistencia}</span>
         </Card>
       </div>
@@ -222,9 +229,40 @@ export function ReformerMatrixView({
                               {alumnaNombre.toLowerCase()}
                             </span>
                             <div className="flex items-center justify-between text-[10px] text-[var(--text-muted)] mt-1">
-                              <span className="px-1.5 py-0.5 rounded bg-[var(--color-wood)]/20 text-[var(--color-wood)] font-semibold">
-                                Sin marcar
-                              </span>
+                              {(() => {
+                                const caId = item.caId;
+                                const status = asistencias[caId];
+                                if (status === 'PRESENT') {
+                                  return (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-semibold">
+                                      ✓ Presente
+                                    </span>
+                                  );
+                                } else if (status === 'ABSENT') {
+                                  return (
+                                    <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-500 font-semibold">
+                                      ✗ Ausente
+                                    </span>
+                                  );
+                                } else if (status === 'RECOVERY') {
+                                  return (
+                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-semibold">
+                                      ↻ Recupera
+                                    </span>
+                                  );
+                                } else if (status === 'SUSPENDED') {
+                                  return (
+                                    <span className="px-1.5 py-0.5 rounded bg-slate-500/20 text-slate-400 font-semibold">
+                                      ⏸ Suspendida
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="px-1.5 py-0.5 rounded bg-[var(--color-wood)]/20 text-[var(--color-wood)] font-semibold">
+                                    Sin marcar
+                                  </span>
+                                );
+                              })()}
                               {item.alumna.phone && (
                                 <span className="font-mono text-[9px] truncate max-w-[70px]">
                                   {item.alumna.phone.slice(-6)}

@@ -12,7 +12,7 @@ import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
 import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
-import { getAlumnas, updateAlumna, updateAlumnaStatus } from '@/lib/services/alumnas';
+import { getAlumnas, updateAlumna, updateAlumnaStatus, deleteAlumna } from '@/lib/services/alumnas';
 import { getBarreAlumnas, BarreAlumna } from '@/lib/services/barre';
 import { addAlumnaToClase } from '@/lib/services/agenda';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -23,6 +23,7 @@ import {
   Filter,
   Eye,
   Edit2,
+  Trash2,
   AlertTriangle,
   List,
   Layers,
@@ -140,6 +141,24 @@ export default function AlumnasPage() {
     setIsFormOpen(false);
     setSelectedAlumna(null);
     fetchAlumnas();
+  };
+
+  const handleDeleteAlumna = async (alumna: Alumna) => {
+    const isOk = await confirm({
+      title: 'Eliminar Alumna',
+      message: `¿Estás segura de eliminar a ${alumna.first_name} ${alumna.last_name || ''} del sistema? Esta acción no se puede deshacer y también la quitará de todos los turnos asignados.`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
+
+    const { error } = await deleteAlumna(alumna.id);
+    if (error) {
+      await alertDialog({ title: 'Error al eliminar', message: error, variant: 'danger' });
+    } else {
+      await alertDialog({ title: 'Alumna eliminada', message: `${alumna.first_name} ${alumna.last_name || ''} fue eliminada del sistema correctamente.`, variant: 'success' });
+      fetchAlumnas();
+    }
   };
 
   // Filtrado final de lista según modalidad seleccionada (Reformer | Barre | All)
@@ -342,6 +361,13 @@ export default function AlumnasPage() {
                                   >
                                     <Edit2 className="h-4 w-4" />
                                   </button>
+                                  <button
+                                    onClick={() => handleDeleteAlumna(a)}
+                                    className="p-1.5 rounded-lg bg-[var(--bg-tertiary)] hover:bg-red-500/20 text-[var(--text-secondary)] hover:text-red-500 transition-colors cursor-pointer"
+                                    title="Eliminar Alumna"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
@@ -437,6 +463,11 @@ export default function AlumnasPage() {
             setSelectedAlumna(a);
             setIsDetailOpen(false);
             setIsFormOpen(true);
+          }}
+          onDelete={(a) => {
+            setIsDetailOpen(false);
+            setSelectedAlumna(null);
+            handleDeleteAlumna(a);
           }}
         />
       )}
