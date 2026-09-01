@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
@@ -8,9 +9,10 @@ import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
-import { Alumna, AlumnaInsert, AlumnaStatus } from '@/types/database';
+import { Alumna, AlumnaInsert, AlumnaStatus, MetodoPago } from '@/types/database';
 import { getAlumnas, updateAlumna, createAlumna, deleteAlumna } from '@/lib/services/alumnas';
 import { addAlumnaToClase } from '@/lib/services/agenda';
+import { registrarPago } from '@/lib/services/pagos';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import {
   Users,
@@ -62,9 +64,14 @@ function getVencimientoCell(fechaVencimiento: string | null) {
   );
 }
 
-export default function AlumnasPage() {
+function AlumnasPageContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const { confirm, alert: alertDialog } = useConfirm();
-  const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>('LIST');
+  const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>(() => {
+    return tabParam === 'new' ? 'NEW' : 'LIST';
+  });
 
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -80,6 +87,13 @@ export default function AlumnasPage() {
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (tabParam === 'new') {
+      setSelectedAlumna(null);
+      setActiveTab('NEW');
+    }
+  }, [tabParam]);
 
   const fetchAlumnas = useCallback(async () => {
     setLoading(true);
@@ -135,11 +149,27 @@ export default function AlumnasPage() {
         return false;
       }
     } else {
-      const { error } = await createAlumna(data);
+      const { data: created, error } = await createAlumna(data);
       setSubmitting(false);
-      if (error) {
-        await alertDialog({ title: 'Error al crear', message: error, variant: 'danger' });
+      if (error || !created) {
+        await alertDialog({ title: 'Error al crear', message: error || 'Error al registrar la alumna', variant: 'danger' });
         return false;
+      }
+
+      // Si se marcó cobrar inscripción inicial
+      if (data.enrollment_paid && data.enrollment_amount) {
+        try {
+          await registrarPago({
+            alumna_id: created.id,
+            amount: data.enrollment_amount,
+            payment_method: (data.preferred_payment_method as MetodoPago) || 'efectivo',
+            payment_type: 'INSCRIPCION',
+            concept: 'Inscripción inicial',
+            sede_id: data.sede_id || undefined,
+          });
+        } catch (pagoErr) {
+          console.error('Error al registrar cobro de inscripción:', pagoErr);
+        }
       }
     }
 
@@ -189,20 +219,36 @@ export default function AlumnasPage() {
 
         {/* BOTÓN TRANQUILIZADOR Y VISIBLE: NUEVA ALUMNA */}
         <div className="flex items-center gap-3">
-          <Button
-            variant="primary"
-            icon={<Plus className="h-4 w-4" />}
-            onClick={() => {
-              setSelectedAlumna(null);
-              setIsFormOpen(true);
-            }}
-          >
-            Nueva Alumna
-          </Button>
+          {activeTab === 'NEW' ? (
+            <Button
+              variant="secondary"
+              icon={<List className="h-4 w-4" />}
+              onClick={() => {
+                setSelectedAlumna(null);
+                setActiveTab('LIST');
+              }}
+            >
+              Volver al Listado
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              icon={<Plus className="h-4 w-4" />}
+              onClick={() => {
+                setSelectedAlumna(null);
+                setActiveTab('NEW');
+              }}
+            >
+              Nueva Alumna
+            </Button>
+          )}
 
           <div className="flex items-center bg-[var(--bg-secondary)] p-1 rounded-[29px] border border-[var(--border-default)]">
             <button
-              onClick={() => setActiveTab('LIST')}
+              onClick={() => {
+                setSelectedAlumna(null);
+                setActiveTab('LIST');
+              }}
               className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'LIST'
                   ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
@@ -212,7 +258,10 @@ export default function AlumnasPage() {
               <List className="h-3.5 w-3.5" /> Listado
             </button>
             <button
-              onClick={() => setActiveTab('NEW')}
+              onClick={() => {
+                setSelectedAlumna(null);
+                setActiveTab('NEW');
+              }}
               className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'NEW'
                   ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
@@ -226,10 +275,16 @@ export default function AlumnasPage() {
       </div>
 
       {activeTab === 'NEW' ? (
-        /* Pestaña: Registro de Nueva Alumna Completo */
+        /* Pestaña: Registro y Edición de Alumna Completo */
         <div className="w-full max-w-6xl mx-auto">
           <NuevaAlumnaForm
+            alumnaToEdit={selectedAlumna}
+            onCancel={() => {
+              setSelectedAlumna(null);
+              setActiveTab('LIST');
+            }}
             onSuccess={() => {
+              setSelectedAlumna(null);
               setActiveTab('LIST');
               fetchAlumnas();
             }}
@@ -416,7 +471,7 @@ export default function AlumnasPage() {
                               <button
                                 onClick={() => {
                                   setSelectedAlumna(a);
-                                  setIsFormOpen(true);
+                                  setActiveTab('NEW');
                                 }}
                                 className="p-2 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-blue-500/20 text-[var(--text-secondary)] hover:text-blue-500 border border-[var(--border-default)] transition-colors cursor-pointer"
                                 title="Editar Alumna"
@@ -524,7 +579,7 @@ export default function AlumnasPage() {
           onEdit={(a) => {
             setSelectedAlumna(a);
             setIsDetailOpen(false);
-            setIsFormOpen(true);
+            setActiveTab('NEW');
           }}
           onDelete={(a) => {
             setIsDetailOpen(false);
@@ -547,5 +602,13 @@ export default function AlumnasPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function AlumnasPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-muted)]">Cargando alumnas...</div>}>
+      <AlumnasPageContent />
+    </Suspense>
   );
 }

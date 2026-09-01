@@ -15,6 +15,7 @@ import {
   BedDouble,
   Check,
   User,
+  Calendar,
 } from 'lucide-react';
 
 interface TurnoModalProps {
@@ -73,6 +74,7 @@ export function TurnoModal({
   const [selectedAlumnaId, setSelectedAlumnaId] = useState<string>('');
   const [nuevaAlumnaNombre, setNuevaAlumnaNombre] = useState('');
   const [nuevaAlumnaTelefono, setNuevaAlumnaTelefono] = useState('');
+  const [fechaInicioClases, setFechaInicioClases] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -114,11 +116,13 @@ export function TurnoModal({
         setSelectedAlumnaId(alumnaObj.id || '');
         setAsistenciaStatus(alumnaAsignada.status || 'UNMARKED');
         setSelectedCamilla(presetCamilla || alumnaAsignada.camilla || 1);
+        setFechaInicioClases(alumnaObj.billing_start_date || alumnaObj.start_date || new Date().toISOString().split('T')[0]);
       } else {
         setSelectedAlumnaId('');
         setNuevaAlumnaNombre('');
         setNuevaAlumnaTelefono('');
         setAsistenciaStatus('UNMARKED');
+        setFechaInicioClases(new Date().toISOString().split('T')[0]);
 
         // Si la camilla preset está libre usarla, de lo contrario elegir la primera libre
         if (camillasLibres.includes(presetCamilla)) {
@@ -149,6 +153,15 @@ export function TurnoModal({
       document.body.style.overflow = '';
     };
   }, [open, alumnaAsignada, presetCamilla, clase, profesoraFilter]);
+
+  useEffect(() => {
+    if (selectedAlumnaId && !isOccupied) {
+      const found = alumnas.find((a) => a.id === selectedAlumnaId);
+      if (found?.billing_start_date) {
+        setFechaInicioClases(found.billing_start_date);
+      }
+    }
+  }, [selectedAlumnaId, isOccupied, alumnas]);
 
   if (!open || !mounted) return null;
 
@@ -181,6 +194,8 @@ export function TurnoModal({
           phone: nuevaAlumnaTelefono.trim() || 'Sin teléfono',
           status: 'ACTIVE',
           sede_id: clase?.sede_id || null,
+          billing_start_date: fechaInicioClases || null,
+          entry_date: fechaInicioClases || new Date().toISOString().split('T')[0],
         });
 
         if (res.error || !res.data) {
@@ -189,6 +204,13 @@ export function TurnoModal({
           return;
         }
         finalAlumnaId = res.data.id;
+      } else if (finalAlumnaId && fechaInicioClases) {
+        // Actualizar la fecha de inicio de clases en la ficha de la alumna
+        const supabase = (await import('@/lib/supabase/client')).createClient();
+        await supabase
+          .from('alumnas')
+          .update({ billing_start_date: fechaInicioClases })
+          .eq('id', finalAlumnaId);
       }
 
       if (!finalAlumnaId) {
@@ -379,6 +401,20 @@ export function TurnoModal({
                 <h4 className="text-base font-extrabold text-[var(--text-primary)] mt-0.5 capitalize">
                   {alumnaNombreCompleto.toLowerCase()}
                 </h4>
+
+                {/* Fecha en que comienza las clases */}
+                <div className="flex items-center justify-between pt-2 border-t border-[var(--border-default)] mt-2">
+                  <span className="text-[11px] font-bold text-[var(--text-secondary)] flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                    Comienza clases:
+                  </span>
+                  <input
+                    type="date"
+                    value={fechaInicioClases}
+                    onChange={(e) => setFechaInicioClases(e.target.value)}
+                    className="h-8 px-2 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-bold focus:outline-none cursor-pointer"
+                  />
+                </div>
               </div>
 
               {/* Botones de Asistencia */}
@@ -529,6 +565,25 @@ export function TurnoModal({
                   onChange={(e) => setNuevaAlumnaTelefono(e.target.value)}
                   className="w-full h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs focus:outline-none focus:border-[var(--border-focus)]"
                 />
+              </div>
+
+              {/* Fecha en la que comienza las clases */}
+              <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-default)] space-y-1.5 mt-2">
+                <label className="text-[11px] font-extrabold uppercase tracking-wider text-[var(--text-secondary)] flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                  <span>Fecha en la que comienza las clases:</span>
+                </label>
+                <input
+                  type="date"
+                  value={fechaInicioClases}
+                  onChange={(e) => setFechaInicioClases(e.target.value)}
+                  className="w-full h-9 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-bold focus:outline-none focus:border-[var(--color-wood)] cursor-pointer"
+                />
+                {fechaInicioClases > new Date().toISOString().split('T')[0] && (
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1">
+                    <span>★</span> Figurará como "Pendiente de inicio" en la agenda hasta esa fecha.
+                  </p>
+                )}
               </div>
             </div>
           )}

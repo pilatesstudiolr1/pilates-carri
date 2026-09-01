@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { Pago, MetodoPago, EstadoPago } from '@/types/database';
+import { Pago, MetodoPago, EstadoPago, TipoPago } from '@/types/database';
 
 export async function getPagos(options?: {
   status?: EstadoPago | 'ALL';
@@ -42,6 +42,7 @@ export async function registrarPago(pagoData: {
   alumna_id: string;
   amount: number;
   payment_method: MetodoPago;
+  payment_type?: TipoPago;
   due_date?: string;
   concept?: string;
   billing_month?: string;
@@ -60,8 +61,9 @@ export async function registrarPago(pagoData: {
         alumna_id: pagoData.alumna_id,
         amount: pagoData.amount,
         payment_method: pagoData.payment_method,
+        payment_type: pagoData.payment_type || 'MENSUALIDAD',
         payment_date: today,
-        concept: pagoData.concept || 'Cuota mensualidad',
+        concept: pagoData.concept || (pagoData.payment_type === 'INSCRIPCION' ? 'Inscripción inicial' : 'Cuota mensualidad'),
         notes: pagoData.notes || null,
         sede_id: pagoData.sede_id || null,
         profesora_id: pagoData.profesora_id || null,
@@ -85,7 +87,7 @@ export async function registrarPago(pagoData: {
     try {
       await supabase.from('caja_movimientos').insert({
         tipo: 'INGRESO',
-        concepto: `Cobro cuota mensualidad - Alumna`,
+        concepto: pagoData.concept || (pagoData.payment_type === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
         monto: pagoData.amount,
         metodo_pago: pagoData.payment_method,
         sede_id: pagoData.sede_id || null,

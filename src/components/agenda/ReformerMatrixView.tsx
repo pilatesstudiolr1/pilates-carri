@@ -366,8 +366,10 @@ export function ReformerMatrixView({
                   const statusAsistencia = asistencias[item.caId];
 
                   // Evaluar si es pendiente de inicio (fecha futura)
+                  const fechaInicio = alumna.billing_start_date || alumna.start_date || alumna.entry_date;
+                  const fechaReferencia = fechaAsistencia || hoyStr;
                   const isPendienteInicio =
-                    (alumna.start_date && alumna.start_date > hoyStr) ||
+                    (fechaInicio && fechaInicio > fechaReferencia) ||
                     alumna.status === 'PENDING' ||
                     item.status === 'PENDING';
 
@@ -398,7 +400,7 @@ export function ReformerMatrixView({
 
                           {/* Badge Violeta Pendiente de Inicio */}
                           <div className="mt-1.5 inline-block px-2 py-0.5 rounded-md bg-[#ede9fe] dark:bg-[#4c1d95] text-[#5b21b6] dark:text-[#ddd6fe] text-[10px] font-bold">
-                            Pendiente de inicio {alumna.start_date ? `– Comienza ${formatFechaCorta(alumna.start_date)}` : ''}
+                            Pendiente de inicio {fechaInicio ? `– Comienza ${formatFechaCorta(fechaInicio)}` : ''}
                           </div>
                         </div>
 

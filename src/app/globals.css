@@ -49,25 +49,25 @@
   --color-wood: #b48450;
 
   /* Superficies Pastel (Specimen Trays) */
-  --color-mint-surface: #e4f7f9;
-  --surface-mint-border: rgba(0, 61, 61, 0.12);
-  --color-deep-teal: #003d3d;
+  --color-mint-surface: #eaf4ee;
+  --surface-mint-border: rgba(26, 77, 56, 0.14);
+  --color-deep-teal: #1a4d38;
 
-  --color-lime-surface: #f8fbe7;
-  --surface-lime-border: rgba(81, 92, 11, 0.12);
-  --color-olive: #515c0b;
+  --color-lime-surface: #f4f8ec;
+  --surface-lime-border: rgba(61, 82, 24, 0.14);
+  --color-olive: #3d5218;
 
-  --color-lavender-surface: #e1e1fa;
-  --surface-lavender-border: rgba(101, 46, 163, 0.12);
-  --color-iris: #652ea3;
+  --color-lavender-surface: #eeeff8;
+  --surface-lavender-border: rgba(53, 61, 114, 0.14);
+  --color-iris: #353d72;
 
-  --color-buttercream: #fff3c2;
-  --surface-buttercream-border: rgba(163, 106, 20, 0.12);
-  --color-saffron: #a36a14;
+  --color-buttercream: #fdf6ea;
+  --surface-buttercream-border: rgba(138, 90, 30, 0.14);
+  --color-saffron: #8a5a1e;
 
-  --color-blush-surface: #fcf2fe;
-  --surface-blush-border: rgba(122, 34, 81, 0.12);
-  --color-plum: #7a2251;
+  --color-blush-surface: #fdf1f3;
+  --surface-blush-border: rgba(126, 38, 61, 0.14);
+  --color-plum: #7e263d;
 
   /* Estados Funcionales */
   --color-success: #1b873f;
@@ -155,25 +155,25 @@
   --color-wood: #d4a775;
 
   /* Superficies Pastel Dark */
-  --color-mint-surface: #112326;
-  --surface-mint-border: rgba(103, 226, 235, 0.22);
-  --color-deep-teal: #7ee7f0;
+  --color-mint-surface: #12211a;
+  --surface-mint-border: rgba(126, 224, 175, 0.22);
+  --color-deep-teal: #7ee0af;
 
-  --color-lime-surface: #1b2410;
-  --surface-lime-border: rgba(205, 250, 206, 0.22);
+  --color-lime-surface: #1a2212;
+  --surface-lime-border: rgba(197, 242, 124, 0.22);
   --color-olive: #c5f27c;
 
-  --color-lavender-surface: #1b172a;
-  --surface-lavender-border: rgba(225, 225, 250, 0.22);
+  --color-lavender-surface: #181928;
+  --surface-lavender-border: rgba(193, 184, 245, 0.22);
   --color-iris: #c1b8f5;
 
   --color-buttercream: #241e0f;
-  --surface-buttercream-border: rgba(255, 243, 194, 0.22);
+  --surface-buttercream-border: rgba(245, 212, 122, 0.22);
   --color-saffron: #f5d47a;
 
-  --color-blush-surface: #261324;
-  --surface-blush-border: rgba(253, 229, 255, 0.22);
-  --color-plum: #f5a6d5;
+  --color-blush-surface: #26141c;
+  --surface-blush-border: rgba(245, 166, 186, 0.22);
+  --color-plum: #f59fba;
 
   /* Bordes */
   --border-default: rgba(242, 247, 247, 0.12);

@@ -107,10 +107,10 @@ export default function LatticePortalPage() {
             </Link>
           )}
 
-          {/* Cards Exclusivas ADMIN */}
-          {!loading && profile?.role === 'ADMIN' && (
+          {/* Cards Exclusivas ADMIN / Acceso General */}
+          {!loading && (profile?.role === 'ADMIN' || !profile?.role) && (
             <>
-              {/* Card 1: Studio Pilates Reformer (Mint Surface) */}
+              {/* Card 1: Studio Pilates Reformer */}
               <Link href="/reformer" className="group block">
                 <div className="surface-mint rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
                   <div className="flex items-center gap-3.5">
@@ -133,7 +133,7 @@ export default function LatticePortalPage() {
                 </div>
               </Link>
 
-              {/* Card 2: Liquidaciones Semanales (Lavender Surface) */}
+              {/* Card 2: Liquidaciones Semanales */}
               <Link href="/liquidaciones-semanales" className="group block">
                 <div className="surface-lavender rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
                   <div className="flex items-center gap-3.5">
@@ -156,11 +156,11 @@ export default function LatticePortalPage() {
                 </div>
               </Link>
 
-              {/* Card 3: Centro de Estética (Lime / Buttercream Surface) */}
+              {/* Card 3: Centro de Estética */}
               <Link href="/estetica" className="group block">
-                <div className="surface-lime rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
+                <div className="surface-blush rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
                   <div className="flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-full bg-[var(--color-olive)] text-white dark:text-[#001f1f] flex items-center justify-center">
+                    <div className="w-11 h-11 rounded-full bg-[var(--color-plum)] text-white dark:text-[#001f1f] flex items-center justify-center">
                       <Flower2 className="h-5 w-5" />
                     </div>
                     <h2 className="text-lg font-medium text-[var(--text-primary)] tracking-tight">
@@ -168,7 +168,7 @@ export default function LatticePortalPage() {
                     </h2>
                   </div>
 
-                  <div className="pt-4 border-t border-[var(--surface-lime-border)] flex items-center justify-between">
+                  <div className="pt-4 border-t border-[var(--surface-blush-border)] flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
                       Ingresar a Estética
                     </span>

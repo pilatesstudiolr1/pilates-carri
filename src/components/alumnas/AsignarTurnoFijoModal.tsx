@@ -207,48 +207,51 @@ export function AsignarTurnoFijoModal({
         {claseSeleccionada && (
           <div>
             <p className="text-xs font-semibold text-[var(--text-secondary)] mb-2 flex items-center gap-1.5">
-              <BedDouble className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Asignar Camilla (Reformer)
-              <span className="text-[var(--text-muted)] font-normal">— Opcional, pero recomendado para Reformer</span>
+              <BedDouble className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Asignar Reformer Disponible
+              <span className="text-[var(--text-muted)] font-normal">— Solo se muestran las camillas libres</span>
             </p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setSelectedCamilla('')}
-                className={`w-10 h-10 rounded-md text-xs font-bold border transition-all cursor-pointer ${
-                  selectedCamilla === ''
-                    ? 'border-[var(--color-wood)] bg-[var(--color-wood)]/20 text-[var(--color-wood)]'
-                    : 'border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
-                }`}
-              >
-                Sin
-              </button>
-              {Array.from({ length: maxCamillas }, (_, i) => i + 1).map((num) => {
-                const ocupada = camillaOcupadas.includes(num);
+            {(() => {
+              const camillasDisponibles = Array.from({ length: maxCamillas }, (_, i) => i + 1)
+                .filter((num) => !camillaOcupadas.includes(num));
+
+              if (camillasDisponibles.length === 0) {
                 return (
+                  <p className="text-xs text-rose-500 font-bold bg-rose-500/10 p-3 rounded-lg border border-rose-500/30">
+                    ⚠️ No hay reformers disponibles en este turno. Todos están ocupados.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
-                    key={num}
                     type="button"
-                    disabled={ocupada}
-                    onClick={() => setSelectedCamilla(num)}
-                    title={ocupada ? `Camilla ${num} ocupada` : `Camilla ${num}`}
-                    className={`w-10 h-10 rounded-md text-xs font-bold border transition-all cursor-pointer ${
-                      selectedCamilla === num
-                        ? 'border-[var(--color-wood)] bg-[var(--color-wood)] text-[var(--color-dark)]'
-                        : ocupada
-                        ? 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-danger)] cursor-not-allowed opacity-60'
-                        : 'border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--color-wood)] hover:text-[var(--text-primary)]'
+                    onClick={() => setSelectedCamilla('')}
+                    className={`px-3 h-10 rounded-md text-xs font-bold border transition-all cursor-pointer ${
+                      selectedCamilla === ''
+                        ? 'border-[var(--color-wood)] bg-[var(--color-wood)]/20 text-[var(--color-wood)]'
+                        : 'border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)]'
                     }`}
                   >
-                    {num}
+                    Sin camilla fija
                   </button>
-                );
-              })}
-            </div>
-            {camillaOcupadas.length > 0 && (
-              <p className="text-[10px] text-[var(--color-danger)] mt-1.5">
-                Camillas ocupadas en este turno: {camillaOcupadas.join(', ')}
-              </p>
-            )}
+                  {camillasDisponibles.map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setSelectedCamilla(num)}
+                      className={`px-3.5 h-10 rounded-md text-xs font-bold border transition-all cursor-pointer ${
+                        selectedCamilla === num
+                          ? 'border-[var(--color-wood)] bg-[var(--color-wood)] text-[var(--color-dark)] shadow-sm'
+                          : 'border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:border-[var(--color-wood)] hover:text-[var(--text-primary)]'
+                      }`}
+                    >
+                      Reformer {num}
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}
 

@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card } from '@/components/ui/Card';
-import { Profile, AlumnaStatus } from '@/types/database';
-import { createAlumna } from '@/lib/services/alumnas';
+import { Alumna, Profile, AlumnaStatus, MetodoPago } from '@/types/database';
+import { createAlumna, updateAlumna } from '@/lib/services/alumnas';
 import { getProfiles } from '@/lib/services/profesoras';
 import { getPlanes, PlanItem } from '@/lib/services/planes';
-import { addAlumnaToClase, getClases, createClase } from '@/lib/services/agenda';
+import { addAlumnaToClase, getClases, createClase, getClasesByAlumna } from '@/lib/services/agenda';
+import { registrarPago } from '@/lib/services/pagos';
 import { createClient } from '@/lib/supabase/client';
-import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble, DollarSign, Building2 } from 'lucide-react';
 
 import { useSede } from '@/hooks/useSede';
 
@@ -46,12 +47,15 @@ interface TurnoFijoItem {
 }
 
 interface NuevaAlumnaFormProps {
+  alumnaToEdit?: Alumna | null;
   onSuccess?: () => void;
+  onCancel?: () => void;
 }
 
-export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
+export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlumnaFormProps) {
   const { selectedSedeId, sedes } = useSede();
   const [alumnaSedeId, setAlumnaSedeId] = useState<string>(() => {
+    if (alumnaToEdit?.sede_id) return alumnaToEdit.sede_id;
     if (selectedSedeId && selectedSedeId !== 'ALL') return selectedSedeId;
     return '';
   });
@@ -98,6 +102,11 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   });
   const [status, setStatus] = useState<AlumnaStatus>('ACTIVE');
 
+  // Cobro Inicial de Inscripción ($9500)
+  const [cobrarInscripcion, setCobrarInscripcion] = useState(true);
+  const [montoInscripcion, setMontoInscripcion] = useState('9500');
+  const [metodoPagoInscripcion, setMetodoPagoInscripcion] = useState<MetodoPago>('efectivo');
+
   // Turnos fijos semanales
   const [turnosFijos, setTurnosFijos] = useState<TurnoFijoItem[]>([
     { id: 'tf-1', day_of_week: 1, start_time: '08:00', camilla: 1 },
@@ -119,6 +128,57 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   const [allClases, setAllClases] = useState<any[]>([]);
   const [occupiedMap, setOccupiedMap] = useState<Record<string, number[]>>({});
 
+  // Cargar datos de alumnaToEdit si estamos en modo edición
+  useEffect(() => {
+    if (alumnaToEdit) {
+      setFirstName(alumnaToEdit.first_name || '');
+      setLastName(alumnaToEdit.last_name || '');
+      setDni(alumnaToEdit.dni || '');
+      setPhone(alumnaToEdit.phone || '');
+      setEmail(alumnaToEdit.email || '');
+      setAddress(alumnaToEdit.address || '');
+      setDateOfBirth(alumnaToEdit.date_of_birth || '');
+      setEmergencyContact(alumnaToEdit.emergency_contact_name || '');
+      setEmergencyPhone(alumnaToEdit.emergency_contact_phone || '');
+      if (alumnaToEdit.sede_id) {
+        setAlumnaSedeId(alumnaToEdit.sede_id);
+      }
+      setSelectedPlanName(alumnaToEdit.plan || '');
+      setImporte(alumnaToEdit.plan_amount ? alumnaToEdit.plan_amount.toString() : '0');
+      setSelectedProfesoraId(alumnaToEdit.profesora_id || '');
+      setBillingStartDate(alumnaToEdit.billing_start_date || alumnaToEdit.entry_date || new Date().toISOString().split('T')[0]);
+      setBillingDueDate(alumnaToEdit.billing_due_date || '');
+      setStatus(alumnaToEdit.status || 'ACTIVE');
+      setCobrarInscripcion(alumnaToEdit.enrollment_paid || false);
+      setMontoInscripcion(alumnaToEdit.enrollment_amount ? alumnaToEdit.enrollment_amount.toString() : '9500');
+      setMetodoPagoInscripcion((alumnaToEdit.preferred_payment_method as MetodoPago) || 'efectivo');
+      setHasMedicalClearance(alumnaToEdit.medical_clearance || false);
+      setIsPregnant(alumnaToEdit.is_pregnant || false);
+      setInjuries(alumnaToEdit.injuries || '');
+      setDiseases(alumnaToEdit.diseases || '');
+      setSurgeries(alumnaToEdit.surgeries || '');
+      setHealthObservations(alumnaToEdit.health_observations || '');
+      setGeneralNotes(alumnaToEdit.observations || '');
+
+      // Cargar turnos asignados a esta alumna desde clase_alumnas
+      getClasesByAlumna(alumnaToEdit.id).then((res) => {
+        if (res.data && res.data.length > 0) {
+          const mapped = res.data.map((ca: any, idx: number) => ({
+            id: ca.id || `tf-edit-${idx}`,
+            day_of_week: ca.clase?.day_of_week || 1,
+            start_time: (ca.clase?.start_time || '08:00:00').substring(0, 5),
+            camilla: ca.camilla || 1,
+          }));
+          setTurnosFijos(mapped);
+        } else {
+          setTurnosFijos([
+            { id: `tf-${Date.now()}`, day_of_week: 1, start_time: '08:00', camilla: 1 },
+          ]);
+        }
+      });
+    }
+  }, [alumnaToEdit]);
+
   useEffect(() => {
     async function loadData() {
       const [profsRes, planesRes] = await Promise.all([
@@ -133,13 +193,13 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       setAllClases(clasesRes.data || []);
       await fetchAllOccupied(clasesRes.data || []);
 
-      if (planesRes.data.length > 0 && !selectedPlanName) {
+      if (planesRes.data.length > 0 && !selectedPlanName && !alumnaToEdit) {
         setSelectedPlanName(planesRes.data[0].name);
         setImporte(planesRes.data[0].price.toString());
       }
     }
     loadData();
-  }, [alumnaSedeId, selectedSedeId]);
+  }, [alumnaSedeId, selectedSedeId, alumnaToEdit]);
 
   const handleStartDateChange = (dateStr: string) => {
     setBillingStartDate(dateStr);
@@ -180,31 +240,20 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     }
   };
 
-  const handleAddTurnoFijo = () => {
-    setTurnosFijos((prev) => [
-      ...prev,
-      { id: `tf-${Date.now()}`, day_of_week: 1, start_time: '08:00', camilla: prev.length + 1 },
-    ]);
-  };
-
-  const handleRemoveTurnoFijo = (id: string) => {
-    setTurnosFijos((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const handleUpdateTurnoFijo = (id: string, field: keyof TurnoFijoItem, value: any) => {
-    setTurnosFijos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, [field]: value } : t))
-    );
-  };
-
-  // Fetch occupied camillas for all clases
+  // Fetch occupied camillas for all clases (excluyendo a la propia alumna si se edita)
   const fetchAllOccupied = async (clasesList: any[]) => {
     try {
       const supabase = createClient();
-      const { data } = await supabase
+      let q = supabase
         .from('clase_alumnas')
-        .select('clase_id, camilla')
+        .select('clase_id, camilla, alumna_id')
         .not('camilla', 'is', null);
+
+      if (alumnaToEdit?.id) {
+        q = q.neq('alumna_id', alumnaToEdit.id);
+      }
+
+      const { data } = await q;
 
       if (data) {
         const map: Record<string, number[]> = {};
@@ -227,6 +276,63 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     return occupiedMap[matchingClase.id] || [];
   };
 
+  const getAvailableCamillasForTurno = (dayOfWeek: number, startTime: string, currentCamilla?: number): number[] => {
+    const occ = getOccupiedCamillasForTurno(dayOfWeek, startTime);
+    const maxC = currentSedeObj?.max_camillas || 6;
+    const free = Array.from({ length: maxC }, (_, i) => i + 1).filter((num) => !occ.includes(num));
+    if (currentCamilla && !free.includes(currentCamilla) && currentCamilla <= maxC) {
+      free.push(currentCamilla);
+      free.sort((a, b) => a - b);
+    }
+    return free;
+  };
+
+  const handleAddTurnoFijo = () => {
+    const defaultDay = 1;
+    const defaultTime = '08:00';
+    const avail = getAvailableCamillasForTurno(defaultDay, defaultTime);
+    const firstFree = avail[0] || 1;
+    setTurnosFijos((prev) => [
+      ...prev,
+      { id: `tf-${Date.now()}`, day_of_week: defaultDay, start_time: defaultTime, camilla: firstFree },
+    ]);
+  };
+
+  const handleRemoveTurnoFijo = (id: string) => {
+    setTurnosFijos((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const handleUpdateTurnoFijo = (id: string, field: keyof TurnoFijoItem, value: any) => {
+    setTurnosFijos((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const updated = { ...t, [field]: value };
+        if (field === 'day_of_week' || field === 'start_time') {
+          const avail = getAvailableCamillasForTurno(updated.day_of_week, updated.start_time, updated.camilla);
+          if (!avail.includes(updated.camilla) && avail.length > 0) {
+            updated.camilla = avail[0];
+          }
+        }
+        return updated;
+      })
+    );
+  };
+
+  // Sincronizar camillas disponibles al cargar clases o cambiar sede
+  useEffect(() => {
+    if (allClases.length > 0 && currentSedeObj) {
+      setTurnosFijos((prev) =>
+        prev.map((t) => {
+          const avail = getAvailableCamillasForTurno(t.day_of_week, t.start_time);
+          if (!avail.includes(t.camilla) && avail.length > 0) {
+            return { ...t, camilla: avail[0] };
+          }
+          return t;
+        })
+      );
+    }
+  }, [allClases, occupiedMap, currentSedeObj]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -244,8 +350,9 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
 
     setLoading(true);
 
-    // 1. Crear registro de Alumna en Supabase
-    const { data: newAlumna, error: alumnaErr } = await createAlumna({
+    const inscripcionMontoNum = parseFloat(montoInscripcion) || 9500;
+
+    const payload = {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       dni: dni.trim() || null,
@@ -261,21 +368,66 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       plan_amount: parseFloat(importe) || 0,
       billing_start_date: billingStartDate || null,
       billing_due_date: billingDueDate || null,
+      enrollment_paid: cobrarInscripcion,
+      enrollment_amount: cobrarInscripcion ? inscripcionMontoNum : 0,
+      preferred_payment_method: cobrarInscripcion ? metodoPagoInscripcion : null,
       status,
       medical_clearance: hasMedicalClearance,
       diseases: diseases.trim() || null,
       surgeries: surgeries.trim() || null,
       health_observations: healthObservations.trim() || null,
       observations: generalNotes.trim() || null,
-    });
+    };
 
-    if (alumnaErr || !newAlumna) {
-      setErrorMsg(alumnaErr || 'Error al guardar la ficha de la alumna');
+    let targetAlumnaId = alumnaToEdit?.id;
+
+    if (alumnaToEdit) {
+      const { error: alumnaErr } = await updateAlumna(alumnaToEdit.id, payload);
+      if (alumnaErr) {
+        setErrorMsg(alumnaErr || 'Error al actualizar la ficha de la alumna');
+        setLoading(false);
+        return;
+      }
+    } else {
+      const { data: newAlumna, error: alumnaErr } = await createAlumna(payload);
+      if (alumnaErr || !newAlumna) {
+        setErrorMsg(alumnaErr || 'Error al guardar la ficha de la alumna');
+        setLoading(false);
+        return;
+      }
+      targetAlumnaId = newAlumna.id;
+    }
+
+    if (!targetAlumnaId) {
+      setErrorMsg('Error al identificar a la alumna');
       setLoading(false);
       return;
     }
 
-    // 2. Asignar Turnos Fijos en la Agenda
+    // 1.1 Registrar cobro de inscripción contable si está tildado y no estaba ya pagada
+    if (cobrarInscripcion && inscripcionMontoNum > 0 && (!alumnaToEdit || !alumnaToEdit.enrollment_paid)) {
+      try {
+        await registrarPago({
+          alumna_id: targetAlumnaId,
+          amount: inscripcionMontoNum,
+          payment_method: metodoPagoInscripcion,
+          payment_type: 'INSCRIPCION',
+          concept: 'Inscripción inicial',
+          sede_id: alumnaSedeId || undefined,
+          profesora_id: selectedProfesoraId || undefined,
+        });
+      } catch (pagoErr) {
+        console.error('Error al registrar cobro de inscripción:', pagoErr);
+      }
+    }
+
+    // 2. Asignar / Actualizar Turnos Fijos en la Agenda
+    const supabase = createClient();
+    if (alumnaToEdit) {
+      // Limpiar turnos anteriores asignados a esta alumna
+      await supabase.from('clase_alumnas').delete().eq('alumna_id', targetAlumnaId);
+    }
+
     const currentSedeObj = sedes.find(s => s.id === alumnaSedeId);
     const { data: clasesActuales } = await getClases({ sedeId: alumnaSedeId || undefined });
     const listaClases = clasesActuales || [];
@@ -302,27 +454,36 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       }
 
       if (targetClase) {
-        await addAlumnaToClase(targetClase.id, newAlumna.id, tf.camilla);
+        await addAlumnaToClase(targetClase.id, targetAlumnaId, tf.camilla);
       }
     }
 
     setLoading(false);
-    setSuccessMsg('Alumna guardada exitosamente y turnos fijos asignados.');
+    setSuccessMsg(alumnaToEdit ? 'Alumna y turnos actualizados exitosamente.' : 'Alumna guardada exitosamente y turnos fijos asignados.');
 
     setTimeout(() => {
       if (onSuccess) onSuccess();
-    }, 1500);
+    }, 1200);
   };
 
   return (
     <Card className="p-4 sm:p-6 md:p-8 flex flex-col gap-6 sm:gap-8 border border-[var(--border-default)] animate-fade-in text-[var(--text-primary)]">
-      <div>
-        <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)]">
-          Nueva alumna
-        </h2>
-        <p className="text-xs text-[var(--text-muted)] mt-1">
-          Completá la ficha y asignale sus turnos semanales.
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-default)] pb-4">
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-[var(--text-primary)]">
+            {alumnaToEdit ? `Editar Alumna: ${alumnaToEdit.first_name} ${alumnaToEdit.last_name || ''}` : 'Nueva alumna'}
+          </h2>
+          <p className="text-xs text-[var(--text-muted)] mt-1">
+            {alumnaToEdit
+              ? 'Modificá los datos personales, sede, plan, ficha médica y turnos fijos en la agenda.'
+              : 'Completá la ficha y asignale sus turnos semanales.'}
+          </p>
+        </div>
+        {alumnaToEdit && (
+          <span className="self-start sm:self-center px-3 py-1 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold">
+            Modo Edición
+          </span>
+        )}
       </div>
 
       {errorMsg && (
@@ -438,8 +599,9 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div>
-              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
-                Sede del Studio *
+              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1">
+                <Building2 className="h-3.5 w-3.5 text-[var(--color-wood)]" />
+                Sede *
               </label>
               <select
                 value={alumnaSedeId}
@@ -548,6 +710,57 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             </div>
           )}
 
+          {/* Inscripción y Cobro Inicial ($9500) */}
+          <div className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-default)] flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1.5">
+                  <DollarSign className="h-4 w-4 text-emerald-600" /> Cobro Inicial / Inscripción
+                </h4>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-bold cursor-pointer select-none bg-[var(--bg-secondary)] px-3 py-1.5 rounded-xl border border-[var(--border-default)]">
+                <input
+                  type="checkbox"
+                  checked={cobrarInscripcion}
+                  onChange={(e) => setCobrarInscripcion(e.target.checked)}
+                  className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                />
+                <span className={cobrarInscripcion ? 'text-emerald-700 dark:text-emerald-400 font-bold' : 'text-[var(--text-muted)]'}>
+                  {cobrarInscripcion ? 'Cobrar Inscripción' : 'Sin inscripción'}
+                </span>
+              </label>
+            </div>
+
+            {cobrarInscripcion && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[var(--border-default)]/60 animate-fade-in">
+                <Input
+                  label="Monto de Inscripción ($)"
+                  type="number"
+                  value={montoInscripcion}
+                  onChange={(e) => setMontoInscripcion(e.target.value)}
+                />
+
+                <div>
+                  <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
+                    Método de pago de inscripción *
+                  </label>
+                  <select
+                    value={metodoPagoInscripcion}
+                    onChange={(e) => setMetodoPagoInscripcion(e.target.value as MetodoPago)}
+                    className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold cursor-pointer"
+                  >
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia bancaria</option>
+                    <option value="mercado_pago">Mercado Pago</option>
+                    <option value="tarjeta">Tarjeta de débito/crédito</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Turnos Fijos Semanales */}
           <div className="p-4 rounded-2xl bg-[var(--bg-tertiary)]/50 border border-[var(--border-default)] flex flex-col gap-3 mt-2">
             <div className="flex items-center justify-between">
@@ -596,24 +809,32 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                   </select>
                 </div>
 
-                  <div>
-                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
-                    <select
-                      value={tf.camilla}
-                      onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
-                      className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
-                    >
-                      {Array.from({ length: currentSedeObj?.max_camillas || 6 }, (_, i) => i + 1).map((num) => {
-                        const occupied = getOccupiedCamillasForTurno(tf.day_of_week, tf.start_time);
-                        const isOccupied = occupied.includes(num);
-                        return (
-                          <option key={num} value={num} disabled={isOccupied}>
-                            Reformer {num}{isOccupied ? ' — Ocupado' : ' — Disponible'}
+                <div>
+                  <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
+                  {(() => {
+                    const availableCamillas = getAvailableCamillasForTurno(tf.day_of_week, tf.start_time);
+                    if (availableCamillas.length === 0) {
+                      return (
+                        <div className="w-full h-10 px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs border border-rose-500/30 flex items-center font-semibold">
+                          Sin reformers libres
+                        </div>
+                      );
+                    }
+                    return (
+                      <select
+                        value={tf.camilla}
+                        onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
+                        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-semibold cursor-pointer"
+                      >
+                        {availableCamillas.map((num) => (
+                          <option key={num} value={num}>
+                            Reformer {num}
                           </option>
-                        );
-                      })}
-                    </select>
-                  </div>
+                        ))}
+                      </select>
+                    );
+                  })()}
+                </div>
 
                 <div className="flex items-end justify-start sm:justify-end">
                   <button
@@ -728,8 +949,19 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
           </div>
         </div>
 
-        {/* Botón Final Submit */}
-        <div className="flex justify-end pt-4 border-t border-[var(--border-default)]">
+        {/* Botones de Acción */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border-default)]">
+          {onCancel && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={onCancel}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+          )}
           <Button
             type="submit"
             size="lg"
@@ -737,7 +969,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             icon={<CheckCircle2 className="h-5 w-5" />}
             className="w-full sm:w-auto px-8"
           >
-            Guardar alumna
+            {alumnaToEdit ? 'Guardar Cambios' : 'Guardar alumna'}
           </Button>
         </div>
       </form>

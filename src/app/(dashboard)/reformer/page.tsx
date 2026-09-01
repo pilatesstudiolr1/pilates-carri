@@ -293,14 +293,15 @@ export default function SimplifiedLatticeDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap">
-          <Button
-            size="sm"
-            variant="primary"
-            icon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => setIsAlumnaModalOpen(true)}
-          >
-            Nueva Alumna
-          </Button>
+          <Link href="/alumnas?tab=new">
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<Plus className="h-3.5 w-3.5" />}
+            >
+              Nueva Alumna
+            </Button>
+          </Link>
 
           <Button
             size="sm"
@@ -342,12 +343,6 @@ export default function SimplifiedLatticeDashboard() {
           >
             Movimiento Caja
           </Button>
-
-          <Link href="/whatsapp">
-            <Button size="sm" variant="ghost" icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-500" />}>
-              WhatsApp
-            </Button>
-          </Link>
         </div>
       </div>
 
