@@ -176,17 +176,17 @@ export interface Pago {
   amount: number;
   payment_method: MetodoPago;
   payment_date: string;
-  due_date: string;
-  status: EstadoPago;
+  due_date?: string;
+  status?: EstadoPago;
   payment_type: TipoPago;
   plan: string | null;
   concept?: string | null;
   period: string | null; // Formato YYYY-MM
-  commission_rate: number;
-  commission_amount: number;
+  commission_rate?: number;
+  commission_amount?: number;
   notes: string | null;
   profesora_id?: string | null;
-  recorded_by: string | null;
+  recorded_by?: string | null;
   sede_id: string | null;
   created_at: string;
 

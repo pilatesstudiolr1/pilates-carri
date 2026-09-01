@@ -11,6 +11,7 @@ import { Alumna, Pago, MetodoPago } from '@/types/database';
 import { getPagos, registrarPago, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { useUser } from '@/hooks/useUser';
+import { useSede } from '@/hooks/useSede';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import {
   CreditCard,
@@ -31,9 +32,44 @@ import {
   FileText,
 } from 'lucide-react';
 
+const getMesAbonadoStr = (dateStr?: string) => {
+  const d = dateStr ? new Date(`${dateStr}T12:00:00`) : new Date();
+  const meses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  return `${meses[d.getMonth()]} de ${d.getFullYear()}`;
+};
+
+const calculateNextDueDate = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const nextDate = new Date(y, m, d);
+  const nextY = nextDate.getFullYear();
+  const nextM = String(nextDate.getMonth() + 1).padStart(2, '0');
+  const nextD = String(nextDate.getDate()).padStart(2, '0');
+  return `${nextY}-${nextM}-${nextD}`;
+};
+
+const cleanAndFormatWhatsAppPhone = (phone?: string | null) => {
+  if (!phone) return null;
+  let clean = phone.replace(/\D/g, '');
+  if (!clean) return null;
+  if (clean.startsWith('0')) clean = clean.slice(1);
+  if (clean.startsWith('15')) clean = clean.slice(2);
+  if (clean.startsWith('54')) {
+    if (!clean.startsWith('549')) {
+      clean = `549${clean.slice(2)}`;
+    }
+  } else {
+    clean = `549${clean}`;
+  }
+  return clean;
+};
+
 export default function PagosPage() {
   const { confirm, alert: alertDialog } = useConfirm();
   const { profile } = useUser();
+  const { selectedSedeId, sedes } = useSede();
   const isAdmin = profile?.role === 'ADMIN';
 
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -50,21 +86,21 @@ export default function PagosPage() {
 
   // Formulario Registrar Pago
   const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
-  const [concepto, setConcepto] = useState('Mensualidad');
+  const [concepto, setConcepto] = useState('Cuota mensualidad');
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('transferencia');
   const [fechaPago, setFechaPago] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
-  const [mesAbonado, setMesAbonado] = useState('Agosto de 2026');
+  const [mesAbonado, setMesAbonado] = useState(getMesAbonadoStr());
   const [observaciones, setObservaciones] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
     const [pagosRes, alumnasRes] = await Promise.all([
-      getPagos(),
-      getAlumnas({ limit: 300 }),
+      getPagos({ sedeId: selectedSedeId }),
+      getAlumnas({ sedeId: selectedSedeId, limit: 500 }),
     ]);
 
     if (pagosRes.error) {
@@ -75,7 +111,7 @@ export default function PagosPage() {
 
     setAlumnas(alumnasRes.data || []);
     setLoading(false);
-  }, []);
+  }, [selectedSedeId]);
 
   useEffect(() => {
     fetchData();
@@ -84,10 +120,21 @@ export default function PagosPage() {
   // Al cambiar la alumna seleccionada, autocompletar el monto de su plan
   const handleAlumnaChange = (alumnaId: string) => {
     setSelectedAlumnaId(alumnaId);
+    setErrorMsg('');
     const alum = alumnas.find((a) => a.id === alumnaId);
-    if (alum && alum.plan_amount) {
-      setMonto(alum.plan_amount.toString());
+    if (alum) {
+      if (alum.plan_amount) {
+        setMonto(alum.plan_amount.toString());
+      }
+      if (alum.plan && (concepto === 'Cuota mensualidad' || concepto === 'Mensualidad')) {
+        setConcepto(`Cuota mensualidad (${alum.plan})`);
+      }
     }
+  };
+
+  const handleFechaPagoChange = (newDate: string) => {
+    setFechaPago(newDate);
+    setMesAbonado(getMesAbonadoStr(newDate));
   };
 
   const handleGuardarPago = async (e: React.FormEvent) => {
@@ -108,18 +155,20 @@ export default function PagosPage() {
 
     setSubmitting(true);
 
-    const nextDueDateObj = new Date(fechaPago);
-    nextDueDateObj.setMonth(nextDueDateObj.getMonth() + 1);
-    const nextDueDate = nextDueDateObj.toISOString().split('T')[0];
+    const nextDueDate = calculateNextDueDate(fechaPago);
+    const alum = alumnas.find((a) => a.id === selectedAlumnaId);
+    const activeSede = (selectedSedeId && selectedSedeId !== 'ALL') ? selectedSedeId : (alum?.sede_id || undefined);
 
     const { data: newPago, error } = await registrarPago({
       alumna_id: selectedAlumnaId,
       amount: amountNum,
       payment_method: metodoPago,
       due_date: nextDueDate,
-      concept: concepto,
-      billing_month: mesAbonado,
+      concept: concepto.trim() || 'Cuota mensualidad',
+      billing_month: mesAbonado.trim(),
       notes: observaciones.trim() || undefined,
+      sede_id: activeSede,
+      profesora_id: alum?.profesora_id || undefined,
     });
 
     setSubmitting(false);
@@ -130,9 +179,9 @@ export default function PagosPage() {
     }
 
     setSuccessMsg('Pago registrado e ingresado a caja exitosamente');
+    setTimeout(() => setSuccessMsg(''), 6000);
 
     // Asociar datos de la alumna para el modal de comprobante
-    const alum = alumnas.find((a) => a.id === selectedAlumnaId);
     const pagoConAlumna: Pago = {
       ...newPago,
       alumna: alum || undefined,
@@ -168,12 +217,55 @@ export default function PagosPage() {
     }
   };
 
-  const sendWhatsAppRecordatorio = (alumna: Alumna) => {
-    if (!alumna.phone) return;
-    const phoneClean = alumna.phone.replace(/\D/g, '');
-    const phoneFormatted = phoneClean.startsWith('54') ? phoneClean : `549${phoneClean}`;
+  const sendWhatsAppRecordatorio = async (alumna: Alumna) => {
+    const phoneFormatted = cleanAndFormatWhatsAppPhone(alumna.phone);
+    if (!phoneFormatted) {
+      await alertDialog({
+        title: 'Sin teléfono registrado',
+        message: `La alumna ${alumna.first_name} ${alumna.last_name || ''} no tiene un número de teléfono válido registrado.`,
+        variant: 'warning',
+      });
+      return;
+    }
     const textMsg = encodeURIComponent(
-      `Hola ${alumna.first_name}! Te recordamos que tu cuota mensual de Pilates por $${(alumna.plan_amount || 0).toLocaleString()} se encuentra vencida. Te pedimos regularizarla para mantener tu turno fijo. ¡Muchas gracias!`
+      `Hola ${alumna.first_name}! Te recordamos de Pilates Studio que tu cuota mensual por $${(alumna.plan_amount || 0).toLocaleString('es-AR')} se encuentra vencida. Te pedimos regularizarla para mantener tu turno fijo. ¡Muchas gracias!`
+    );
+    window.open(`https://wa.me/${phoneFormatted}?text=${textMsg}`, '_blank');
+  };
+
+  const sendWhatsAppComprobanteDirecto = async (pago: Pago) => {
+    const alumna = pago.alumna;
+    const phoneFormatted = cleanAndFormatWhatsAppPhone(alumna?.phone);
+    if (!phoneFormatted) {
+      setSelectedComprobantePago(pago);
+      setIsComprobanteModalOpen(true);
+      return;
+    }
+
+    const alumnaNombre = alumna ? `${alumna.first_name} ${alumna.last_name || ''}`.trim() : 'Alumna';
+    const montoFormateado = `$${(Number(pago.amount) || 0).toLocaleString('es-AR')} ARS`;
+    const metodoLabel =
+      pago.payment_method === 'transferencia'
+        ? 'Transferencia Bancaria'
+        : pago.payment_method === 'efectivo'
+        ? 'Efectivo en Caja'
+        : pago.payment_method === 'mercado_pago'
+        ? 'Mercado Pago'
+        : pago.payment_method === 'tarjeta'
+        ? 'Tarjeta de Débito / POS'
+        : (pago.payment_method || 'Pago General');
+
+    const textMsg = encodeURIComponent(
+      `🧾 *COMPROBANTE DE PAGO — PILATES STUDIO*\n` +
+      `-----------------------------------------\n` +
+      `👤 *Alumna:* ${alumnaNombre}\n` +
+      `📅 *Fecha:* ${pago.payment_date}\n` +
+      `📌 *Concepto:* ${pago.concept || 'Mensualidad Pilates'}\n` +
+      `💳 *Medio de Pago:* ${metodoLabel}\n` +
+      `💰 *Total Abonado:* ${montoFormateado}\n` +
+      `-----------------------------------------\n` +
+      `✅ *Estado:* Confirmado e Ingresado en Caja\n` +
+      `¡Muchas gracias por entrenar con nosotros!`
     );
     window.open(`https://wa.me/${phoneFormatted}?text=${textMsg}`, '_blank');
   };
@@ -278,11 +370,15 @@ export default function PagosPage() {
                 required
               >
                 <option value="">Seleccionar alumna...</option>
-                {alumnas.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.last_name ? `${a.last_name}, ` : ''}{a.first_name} &bull; DNI: {a.dni || 'Sin DNI'} &bull; Tel: {a.phone || 'Sin tel'}
-                  </option>
-                ))}
+                {alumnas.map((a) => {
+                  const sedeNombre = sedes.find((s) => s.id === a.sede_id)?.name;
+                  return (
+                    <option key={a.id} value={a.id}>
+                      {a.last_name ? `${a.last_name}, ` : ''}{a.first_name} &bull; DNI: {a.dni || 'Sin DNI'} &bull; Tel: {a.phone || 'Sin tel'}
+                      {selectedSedeId === 'ALL' && sedeNombre ? ` &bull; [${sedeNombre}]` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -338,7 +434,7 @@ export default function PagosPage() {
               <Input
                 type="date"
                 value={fechaPago}
-                onChange={(e) => setFechaPago(e.target.value)}
+                onChange={(e) => handleFechaPagoChange(e.target.value)}
               />
             </div>
 
@@ -347,7 +443,7 @@ export default function PagosPage() {
                 Mes Abonado
               </label>
               <Input
-                placeholder="Ej. Agosto de 2026"
+                placeholder={getMesAbonadoStr()}
                 value={mesAbonado}
                 onChange={(e) => setMesAbonado(e.target.value)}
               />
@@ -564,7 +660,12 @@ export default function PagosPage() {
                     </td>
 
                     <td className="py-3.5 px-3 text-[var(--text-secondary)] font-medium">
-                      {pago.concept || 'Mensualidad'}
+                      <div>{pago.concept || 'Mensualidad'}</div>
+                      {selectedSedeId === 'ALL' && pago.sede_id && (
+                        <span className="text-[10px] text-[var(--text-muted)] font-medium block mt-0.5">
+                          {sedes.find((s) => s.id === pago.sede_id)?.name || ''}
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-3 font-bold font-mono text-sm text-[var(--text-primary)]">
@@ -594,12 +695,9 @@ export default function PagosPage() {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedComprobantePago(pago);
-                            setIsComprobanteModalOpen(true);
-                          }}
+                          onClick={() => sendWhatsAppComprobanteDirecto(pago)}
                           className="p-1.5 rounded-[8px] bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] transition-colors cursor-pointer"
-                          title="Enviar por WhatsApp"
+                          title="Enviar Comprobante por WhatsApp"
                         >
                           <MessageCircle className="h-4 w-4" />
                         </button>
