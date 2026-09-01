@@ -139,11 +139,13 @@ export function ClaseFormModal({
               className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
             >
               <option value="">Sin profesora asignada</option>
-              {profesoras.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name} ({p.role})
-                </option>
-              ))}
+              {profesoras
+                .filter((p) => p.role === 'PROFESORA')
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
+                  </option>
+                ))}
             </select>
           </div>
         </div>

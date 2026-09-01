@@ -40,6 +40,8 @@ import {
   Check,
   Eye,
   EyeOff,
+  Copy,
+  Sparkles,
 } from 'lucide-react';
 
 const DIAS_OPCIONES = [
@@ -199,22 +201,62 @@ export default function ProfesorasPage() {
     }));
   };
 
+  const generarContrasena = () => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let pass = '';
+    for (let i = 0; i < 8; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPasswordText(pass);
+    setShowFormPassword(true);
+  };
+
+  const copyCredenciales = (prof: Profile) => {
+    const sedeObj = sedes.find((s) => s.id === prof.sede_id);
+    const sedeName = sedeObj ? sedeObj.name : 'Pilates Studio';
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://pilatesstudio.com';
+    const userIdent = prof.username || prof.email;
+    const pass = prof.password_text || '(definida por administración)';
+    const text = `¡Hola ${prof.first_name || prof.full_name}! 👋\n\nTus datos de acceso para el sistema de Pilates Studio son:\n🔗 Enlace: ${origin}/login\n👤 Usuario / Correo: ${userIdent}\n🔑 Contraseña: ${pass}\n🏢 Sede: ${sedeName}\n\n¡Bienvenida al equipo!`;
+
+    navigator.clipboard.writeText(text);
+    alertDialog({
+      title: 'Credenciales Copiadas',
+      message: `El mensaje de acceso de ${prof.full_name} se copió al portapapeles. Ya podés pegarlo en WhatsApp y enviárselo.`,
+      variant: 'success',
+    });
+  };
+
   const handleSaveProfesora = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-
-    if (!email.trim()) {
-      setErrorMsg('El Correo Electrónico es obligatorio para vincular la cuenta.');
-      return;
-    }
 
     if (!firstName.trim()) {
       setErrorMsg('El Nombre es obligatorio.');
       return;
     }
 
+    let cleanEmail = email.trim().toLowerCase();
+    const cleanUsername = username.trim().toLowerCase();
+
+    if (!cleanEmail && !cleanUsername) {
+      setErrorMsg('Debes ingresar al menos un Correo Electrónico o Nombre de Usuario.');
+      return;
+    }
+
+    if (!cleanEmail && cleanUsername) {
+      cleanEmail = `${cleanUsername}@pilateslr.com`;
+    }
+
+    const derivedUsername = cleanUsername || cleanEmail.split('@')[0];
+
+    if (!editingId && (!passwordText.trim() || passwordText.trim().length < 6)) {
+      setErrorMsg('Debes ingresar una contraseña de al menos 6 caracteres para el nuevo usuario.');
+      return;
+    }
+
     if (passwordText.trim() && passwordText.trim().length < 6) {
-      setErrorMsg('Si ingresas una contraseña, debe tener al menos 6 caracteres.');
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       return;
     }
 
@@ -226,16 +268,15 @@ export default function ProfesorasPage() {
     }
 
     setSubmitting(true);
-    const cleanEmail = email.trim().toLowerCase();
-    const derivedUsername = username.trim() ? username.trim().toLowerCase() : cleanEmail.split('@')[0];
 
-    const { error } = await createOrUpdateProfileByEmail({
+    const { data: savedProfile, error } = await createOrUpdateProfileByEmail({
       id: editingId || undefined,
       email: cleanEmail,
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       full_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
       username: derivedUsername,
+      password: passwordText.trim() || undefined,
       password_text: passwordText.trim() || null,
       phone: phone.trim() || null,
       dni: dni.trim() || null,
@@ -257,8 +298,17 @@ export default function ProfesorasPage() {
       return;
     }
 
+    const createdUserName = savedProfile?.full_name || firstName.trim();
     resetForm();
-    fetchProfiles();
+    await fetchProfiles();
+
+    await alertDialog({
+      title: editingId ? 'Usuario Actualizado' : '¡Usuario Creado Exitosamente!',
+      message: editingId
+        ? `Los datos de ${createdUserName} fueron guardados correctamente.`
+        : `El usuario para ${createdUserName} fue creado con éxito y sus credenciales están listas para usar.`,
+      variant: 'success',
+    });
   };
 
   const handleToggleStatus = async (profile: Profile) => {
@@ -335,9 +385,6 @@ export default function ProfesorasPage() {
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2.5">
             <ShieldCheck className="h-5 w-5 sm:h-6 sm:w-6 text-[var(--color-wood)]" /> Profesores y Usuarios
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-            Gestión integral de personal, credenciales de acceso a Supabase, comisiones y disponibilidad de horarios.
-          </p>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
@@ -435,9 +482,6 @@ export default function ProfesorasPage() {
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 {editingId ? 'Editar registro de usuario / profesora' : 'Registrar profesora / usuario'}
               </h2>
-              <p className="text-xs text-[var(--text-muted)]">
-                Alta integrada: credenciales Supabase Auth, perfil laboral, comisiones y horarios.
-              </p>
             </div>
           </div>
 
@@ -462,13 +506,13 @@ export default function ProfesorasPage() {
           {/* Bloque 1: Datos Personales y Credenciales de Acceso */}
           <div className="space-y-3">
             <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-wood)] flex items-center gap-1.5">
-              <User className="h-3.5 w-3.5" /> 1. Datos Personales &amp; Credenciales Supabase Auth
+              <User className="h-3.5 w-3.5" /> 1. Datos Personales y Credenciales de Acceso
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               <Input
                 label="Nombre *"
-                placeholder=""
+                placeholder="ej. Paola"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 icon={<User className="h-4 w-4" />}
@@ -477,35 +521,52 @@ export default function ProfesorasPage() {
 
               <Input
                 label="Apellido"
-                placeholder=""
+                placeholder="ej. Gómez"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 icon={<User className="h-4 w-4" />}
               />
 
               <Input
-                label="Correo electrónico registrado en Supabase *"
+                label="Nombre de usuario (para login)"
+                placeholder="ej. paola"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                icon={<User className="h-4 w-4" />}
+                hint="Permite ingresar en la app con este nombre"
+              />
+
+              <Input
+                label="Correo electrónico (Opcional)"
                 type="email"
-                placeholder="ej. profesora@gmail.com"
+                placeholder="ej. paola@pilateslr.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={!!editingId}
-                hint={editingId ? 'El correo electrónico de inicio de sesión no se puede modificar' : 'Ingresa el correo exacto creado en Supabase Auth'}
+                hint={editingId ? 'El correo de sesión no se puede modificar' : 'Si se deja vacío se genera con el usuario'}
                 icon={<AtSign className="h-4 w-4" />}
-                required
               />
 
               <div className="flex flex-col gap-1.5 w-full min-w-0">
-                <label className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)]">
-                  Contraseña (Opcional)
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)]">
+                    Contraseña {editingId ? '(Opcional)' : '*'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={generarContrasena}
+                    className="text-[11px] font-bold text-[var(--color-wood)] hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="h-3 w-3" /> Generar clave
+                  </button>
+                </div>
                 <div className="relative w-full">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
                     <Key className="h-4 w-4" />
                   </span>
                   <input
                     type={showFormPassword ? 'text' : 'password'}
-                    placeholder="Dejar en blanco para mantener la clave"
+                    placeholder={editingId ? 'Dejar en blanco para mantener' : 'Mínimo 6 caracteres'}
                     value={passwordText}
                     onChange={(e) => setPasswordText(e.target.value)}
                     className="w-full h-10 pl-10 pr-10 rounded-md text-sm bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
@@ -521,15 +582,8 @@ export default function ProfesorasPage() {
               </div>
 
               <Input
-                label="DNI"
-                placeholder=""
-                value={dni}
-                onChange={(e) => setDni(e.target.value)}
-              />
-
-              <Input
                 label="Teléfono / WhatsApp"
-                placeholder=""
+                placeholder="ej. 3804123456"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
@@ -921,6 +975,15 @@ export default function ProfesorasPage() {
                             className="px-2.5 py-1.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-200 dark:hover:bg-emerald-900 font-medium text-xs transition-colors flex items-center gap-1 cursor-pointer"
                           >
                             <MessageCircle className="h-3 w-3" /> WhatsApp
+                          </button>
+
+                          {/* Botón Copiar Acceso */}
+                          <button
+                            onClick={() => copyCredenciales(prof)}
+                            className="px-2.5 py-1.5 rounded-md bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900 font-medium text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                            title="Copiar mensaje con usuario y contraseña para enviar por WhatsApp"
+                          >
+                            <Copy className="h-3 w-3" /> Copiar Acceso
                           </button>
 
                           {/* Botón Desactivar / Activar */}

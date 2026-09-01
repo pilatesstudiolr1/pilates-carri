@@ -31,6 +31,7 @@ import {
   WalletCards,
   Layers,
   PiggyBank,
+  Clock,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -56,6 +57,7 @@ const iconMap: Record<string, LucideIcon> = {
   WalletCards,
   Layers,
   PiggyBank,
+  Clock,
 };
 
 interface MobileNavProps {
@@ -71,8 +73,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
   const filteredItems = useMemo(() => {
     if (userRole === 'PROFESORA') {
       return [
-        { label: 'Portal de Módulos', href: '/portal', icon: 'LayoutGrid', section: 'Navegación' },
-        { label: 'Mis Clases (Profesora)', href: '/profesora', icon: 'UserCheck', section: 'Principal' },
+        { label: 'Panel Docente', href: '/profesora', icon: 'LayoutGrid', section: 'Principal' },
       ];
     }
 
@@ -107,7 +108,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
     }
 
     return roleFiltered.filter((item) =>
-      ['/portal', '/reformer', '/agenda', '/alumnas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
+      ['/portal', '/reformer', '/agenda', '/agenda?view=disponibilidad', '/alumnas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
     );
   }, [userRole, pathname]);
 

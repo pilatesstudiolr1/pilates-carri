@@ -25,6 +25,8 @@ interface PagoFormModalProps {
   }) => Promise<boolean>;
   initialAlumna?: Alumna | null;
   defaultProfesoraId?: string;
+  defaultCommissionRate?: number;
+  disableCommissionEdit?: boolean;
   loading?: boolean;
 }
 
@@ -34,6 +36,8 @@ export function PagoFormModal({
   onSubmit,
   initialAlumna,
   defaultProfesoraId,
+  defaultCommissionRate,
+  disableCommissionEdit = false,
   loading = false,
 }: PagoFormModalProps) {
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
@@ -64,6 +68,11 @@ export function PagoFormModal({
       setNotes('');
       setDuracionTipo('1_MES');
       setConcept('Cuota mensualidad');
+      if (defaultCommissionRate != null) {
+        setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
+      } else {
+        setCommissionRate('40');
+      }
 
       if (initialAlumna) {
         setSelectedAlumna(initialAlumna);
@@ -172,12 +181,16 @@ export function PagoFormModal({
       return;
     }
 
+    const finalCommissionRate = disableCommissionEdit && defaultCommissionRate != null
+      ? defaultCommissionRate
+      : (parseFloat(commissionRate) || 40) / 100;
+
     const success = await onSubmit({
       alumna_id: selectedAlumna.id,
       amount: numericAmount,
       payment_method: paymentMethod,
       due_date: dueDate,
-      commission_rate: (parseFloat(commissionRate) || 40) / 100,
+      commission_rate: finalCommissionRate,
       concept: concept.trim() || 'Cuota mensualidad',
       period: new Date().toISOString().slice(0, 7),
       profesora_id: defaultProfesoraId || selectedAlumna.profesora_id || undefined,
@@ -345,16 +358,30 @@ export function PagoFormModal({
             required
           />
 
-          <Input
-            label="Comision Profesora (%)"
-            type="number"
-            min="0"
-            max="100"
-            value={commissionRate}
-            onChange={(e) => setCommissionRate(e.target.value)}
-            icon={<Percent className="h-4 w-4 text-[var(--color-wood)]" />}
-            hint="Ej. 40% comision por turno"
-          />
+          {disableCommissionEdit ? (
+            <div>
+              <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
+                <Percent className="h-4 w-4 text-emerald-600" /> Comisión Profesora (%)
+              </label>
+              <div className="h-10 px-3 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center justify-between text-sm font-bold text-[var(--text-primary)]">
+                <span>{commissionRate}%</span>
+                <span className="text-[11px] font-medium text-[var(--text-muted)]">
+                  Fijada por Administración
+                </span>
+              </div>
+            </div>
+          ) : (
+            <Input
+              label="Comisión Profesora (%)"
+              type="number"
+              min="0"
+              max="100"
+              value={commissionRate}
+              onChange={(e) => setCommissionRate(e.target.value)}
+              icon={<Percent className="h-4 w-4 text-[var(--color-wood)]" />}
+              hint="Ej. 40% comisión por turno"
+            />
+          )}
         </div>
 
         <Input

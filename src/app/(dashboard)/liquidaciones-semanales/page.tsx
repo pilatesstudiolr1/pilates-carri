@@ -76,13 +76,13 @@ export default function LiquidacionesSemanalesPage() {
   const loadProfesoras = useCallback(async () => {
     setLoading(true);
     const [profsRes, histRes, dispRes] = await Promise.all([
-      getProfiles({ role: 'ALL' }),
+      getProfiles({ role: 'PROFESORA', isActive: true }),
       getHistorialLiquidaciones(),
       getDisponibilidadCamillas(),
     ]);
 
     if (profsRes.data && profsRes.data.length > 0) {
-      setProfesoras(profsRes.data);
+      setProfesoras(profsRes.data.filter((p) => p.role === 'PROFESORA'));
     }
     setHistorial(histRes.data || []);
     setDisponibilidad(dispRes.data || []);
@@ -277,8 +277,69 @@ export default function LiquidacionesSemanalesPage() {
 
       {activeTab === 'NUEVA' && (
         <>
-          {/* Panel de Selección: Todo el Estudio vs Profesora Particular */}
-          <Card className="p-6 border border-[var(--border-default)] shadow-xs">
+          {/* Panel de Selección: Todo el Estudio vs Profesora Particular + Presets de Período */}
+          <Card className="p-6 border border-[var(--border-default)] shadow-xs space-y-4">
+            {/* Presets Rápidos de Período (Cierre Mensual 1 al 31 vs Semana Actual) */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-secondary)]">
+                  Período de Cierre:
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      const y = d.getFullYear();
+                      const m = d.getMonth();
+                      const first = new Date(y, m, 1).toISOString().split('T')[0];
+                      const last = new Date(y, m + 1, 0).toISOString().split('T')[0];
+                      setStartDate(first);
+                      setEndDate(last);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)] hover:text-[var(--color-dark)] text-xs font-bold border border-[var(--border-default)] transition-colors cursor-pointer"
+                  >
+                    Mes Actual (1 al 30/31)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      const day = d.getDay();
+                      const diffStart = d.getDate() - day + (day === 0 ? -6 : 1);
+                      const diffEnd = d.getDate() - day + (day === 0 ? 0 : 7);
+                      setStartDate(new Date(d.setDate(diffStart)).toISOString().split('T')[0]);
+                      setEndDate(new Date(d.setDate(diffEnd)).toISOString().split('T')[0]);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)] hover:text-[var(--color-dark)] text-xs font-bold border border-[var(--border-default)] transition-colors cursor-pointer"
+                  >
+                    Semana Actual
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date();
+                      const y = d.getFullYear();
+                      const m = d.getMonth() - 1;
+                      const first = new Date(y, m, 1).toISOString().split('T')[0];
+                      const last = new Date(y, m + 1, 0).toISOString().split('T')[0];
+                      setStartDate(first);
+                      setEndDate(last);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)] hover:text-[var(--color-dark)] text-xs font-bold border border-[var(--border-default)] transition-colors cursor-pointer"
+                  >
+                    Mes Anterior
+                  </button>
+                </div>
+              </div>
+
+              <span className="text-[11px] text-[var(--text-muted)] font-medium">
+                Calculado sobre cobros ingresados entre {startDate} y {endDate}
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
               <div>
                 <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
@@ -287,7 +348,7 @@ export default function LiquidacionesSemanalesPage() {
                 <select
                   value={selectedProfesoraId}
                   onChange={(e) => setSelectedProfesoraId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
+                  className="w-full h-10 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-blue-500 text-xs font-semibold cursor-pointer"
                 >
                   <option value="ALL">Todo el Estudio (Global - Consolidado General)</option>
                   <optgroup label="Profesora Individual">
@@ -301,14 +362,14 @@ export default function LiquidacionesSemanalesPage() {
               </div>
 
               <Input
-                label="Inicio de Semana *"
+                label="Inicio de Período *"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
               />
 
               <Input
-                label="Fin de Semana *"
+                label="Fin de Período *"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}

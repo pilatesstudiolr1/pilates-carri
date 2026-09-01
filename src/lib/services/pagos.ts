@@ -5,6 +5,7 @@ export async function getPagos(options?: {
   status?: EstadoPago | 'ALL';
   alumnaId?: string;
   sedeId?: string;
+  profesoraId?: string;
 }): Promise<{ data: Pago[]; error: string | null }> {
   try {
     const supabase = createClient();
@@ -19,6 +20,10 @@ export async function getPagos(options?: {
 
     if (options?.alumnaId) {
       query = query.eq('alumna_id', options.alumnaId);
+    }
+
+    if (options?.profesoraId && options.profesoraId !== 'ALL') {
+      query = query.eq('profesora_id', options.profesoraId);
     }
 
     const { data, error } = await query;
@@ -60,6 +65,8 @@ export async function registrarPago(pagoData: {
         notes: pagoData.notes || null,
         sede_id: pagoData.sede_id || null,
         profesora_id: pagoData.profesora_id || null,
+        commission_rate: pagoData.commission_rate != null ? pagoData.commission_rate : 0.40,
+        commission_amount: (pagoData.amount || 0) * (pagoData.commission_rate != null ? pagoData.commission_rate : 0.40),
       })
       .select()
       .single();

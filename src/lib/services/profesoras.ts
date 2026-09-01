@@ -79,6 +79,7 @@ export async function createOrUpdateProfileByEmail(profileData: {
   hire_date?: string | null;
   observations?: string | null;
   username?: string | null;
+  password?: string | null;
   password_text?: string | null;
   work_days?: string[];
   work_hours?: string[];

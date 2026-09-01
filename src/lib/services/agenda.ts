@@ -21,6 +21,10 @@ export async function getClases(options?: {
       query = query.eq('day_of_week', options.dayOfWeek);
     }
 
+    if (options?.profesoraId && options.profesoraId !== 'ALL') {
+      query = query.eq('profesora_id', options.profesoraId);
+    }
+
     query = query.order('start_time', { ascending: true });
 
     const { data, error } = await query;
@@ -30,7 +34,7 @@ export async function getClases(options?: {
     const formattedClases: Clase[] = (data || []).map((item: any) => {
       let filteredAlumnas = item.clase_alumnas || [];
 
-      // Si se filtra por profesora, mostrar las alumnas vinculadas a esa profesora (o si la clase está asignada a ella)
+      // Si se filtra por profesora, mostrar las alumnas vinculadas a esa profesora
       if (options?.profesoraId && options.profesoraId !== 'ALL') {
         filteredAlumnas = filteredAlumnas.filter(
           (ca: any) =>
@@ -74,6 +78,11 @@ export async function getClasesConAlumnas(options?: {
     if (options?.dayOfWeek) {
       query = query.eq('day_of_week', options.dayOfWeek);
     }
+
+    if (options?.profesoraId && options.profesoraId !== 'ALL') {
+      query = query.eq('profesora_id', options.profesoraId);
+    }
+
     query = query.order('day_of_week').order('start_time');
 
     const { data, error } = await query;

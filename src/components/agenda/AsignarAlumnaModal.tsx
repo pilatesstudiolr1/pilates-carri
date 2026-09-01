@@ -6,7 +6,18 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Alumna, Clase } from '@/types/database';
 import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
-import { Search, UserPlus, AlertCircle, User, Phone, CheckCircle2, UserCheck, Clock, BedDouble, Calendar } from 'lucide-react';
+import {
+  Search,
+  UserPlus,
+  AlertCircle,
+  User,
+  Phone,
+  CheckCircle2,
+  UserCheck,
+  Clock,
+  BedDouble,
+  Calendar,
+} from 'lucide-react';
 
 interface AsignarAlumnaModalProps {
   open: boolean;
@@ -36,6 +47,9 @@ export function AsignarAlumnaModal({
   const [fetching, setFetching] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Camilla elegida
+  const [camillaSeleccionada, setCamillaSeleccionada] = useState<number>(presetCamilla || 1);
+
   // Campos manuales
   const [manualFirstName, setManualFirstName] = useState('');
   const [manualLastName, setManualLastName] = useState('');
@@ -43,6 +57,28 @@ export function AsignarAlumnaModal({
 
   // Observaciones
   const [observaciones, setObservaciones] = useState('');
+
+  // Calcular camillas libres
+  const maxCap = clase?.max_capacity || 6;
+  const inscripciones = clase?.alumnas || [];
+
+  const ocupadasMap = new Map<number, string>();
+  if (Array.isArray(inscripciones)) {
+    inscripciones.forEach((item: any, idx: number) => {
+      const cNum = item.camilla || idx + 1;
+      if (cNum >= 1 && cNum <= maxCap) {
+        const nombre = item.alumna ? `${item.alumna.first_name} ${item.alumna.last_name || ''}`.trim() : 'Ocupado';
+        ocupadasMap.set(cNum, nombre);
+      }
+    });
+  }
+
+  const camillasLibres: number[] = [];
+  for (let i = 1; i <= maxCap; i++) {
+    if (!ocupadasMap.has(i)) {
+      camillasLibres.push(i);
+    }
+  }
 
   useEffect(() => {
     if (open) {
@@ -56,9 +92,17 @@ export function AsignarAlumnaModal({
       setManualPhone('');
       setObservaciones('');
 
+      if (camillasLibres.includes(presetCamilla)) {
+        setCamillaSeleccionada(presetCamilla);
+      } else if (camillasLibres.length > 0) {
+        setCamillaSeleccionada(camillasLibres[0]);
+      } else {
+        setCamillaSeleccionada(presetCamilla || 1);
+      }
+
       fetchAlumnas();
     }
-  }, [open, clase]);
+  }, [open, clase, presetCamilla]);
 
   const fetchAlumnas = async (query = '') => {
     setFetching(true);
@@ -111,7 +155,7 @@ export function AsignarAlumnaModal({
       return;
     }
 
-    const success = await onAssign(clase.id, finalAlumnaId, presetCamilla);
+    const success = await onAssign(clase.id, finalAlumnaId, camillaSeleccionada);
     if (success) {
       onClose();
     }
@@ -143,9 +187,48 @@ export function AsignarAlumnaModal({
               <Clock className="h-3.5 w-3.5 text-[var(--color-wood)]" /> {presetTime} hs
             </span>
             <span className="flex items-center gap-1.5 bg-[var(--bg-secondary)] px-2.5 py-1 rounded-lg border border-[var(--border-default)]">
-              <BedDouble className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Reformer {presetCamilla}
+              <BedDouble className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Reformer {camillaSeleccionada}
             </span>
           </div>
+        </div>
+
+        {/* Selector de Reformers Libres */}
+        <div className="p-3.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[var(--text-secondary)] flex items-center gap-1.5 uppercase tracking-wider">
+              <BedDouble className="h-3.5 w-3.5 text-emerald-600" />
+              Camilla / Reformer Disponible:
+            </span>
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              {camillasLibres.length} de {maxCap} lugares libres
+            </span>
+          </div>
+
+          {camillasLibres.length === 0 ? (
+            <p className="text-xs text-rose-600 font-bold">
+              ⚠️ No hay reformers disponibles en este horario.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {camillasLibres.map((cNum) => {
+                const isSelected = camillaSeleccionada === cNum;
+                return (
+                  <button
+                    key={cNum}
+                    type="button"
+                    onClick={() => setCamillaSeleccionada(cNum)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                      isSelected
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-primary)] border-[var(--border-default)] hover:border-emerald-500'
+                    }`}
+                  >
+                    Reformer {cNum} (Libre)
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {errorMsg && (
@@ -192,7 +275,7 @@ export function AsignarAlumnaModal({
             />
 
             {/* Listado Elegante de Alumnas */}
-            <div className="max-h-72 overflow-y-auto border border-[var(--border-default)] rounded-2xl divide-y divide-[var(--border-default)] bg-[var(--bg-tertiary)]/30 custom-scrollbar">
+            <div className="max-h-64 overflow-y-auto border border-[var(--border-default)] rounded-2xl divide-y divide-[var(--border-default)] bg-[var(--bg-tertiary)]/30 custom-scrollbar">
               {fetching ? (
                 <div className="p-8 text-center text-xs text-[var(--text-muted)] flex flex-col items-center justify-center gap-2">
                   <span className="w-5 h-5 rounded-full border-2 border-[var(--color-wood)] border-t-transparent animate-spin" />

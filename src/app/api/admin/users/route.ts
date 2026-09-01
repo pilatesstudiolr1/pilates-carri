@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const {
       email,
-      password,
+      password: rawPassword,
+      password_text,
       full_name,
       first_name,
       last_name,
@@ -51,37 +52,51 @@ export async function POST(req: Request) {
       work_hours = [],
     } = body;
 
-    if (!email || !email.trim()) {
-      return NextResponse.json({ error: 'El correo electrónico es requerido.' }, { status: 400 });
+    const effectivePassword = (rawPassword || password_text || '').trim();
+
+    let rawEmail = (email || '').trim().toLowerCase();
+    let rawUsername = (username || '').trim().toLowerCase();
+
+    if (!rawEmail && rawUsername) {
+      rawEmail = `${rawUsername}@pilateslr.com`;
+    } else if (rawEmail && !rawEmail.includes('@')) {
+      if (!rawUsername) rawUsername = rawEmail;
+      rawEmail = `${rawUsername}@pilateslr.com`;
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    const computedFullName = full_name || `${first_name || ''} ${last_name || ''}`.trim() || cleanEmail;
+    if (!rawEmail) {
+      return NextResponse.json({ error: 'El correo electrónico o nombre de usuario es requerido.' }, { status: 400 });
+    }
+
+    if (!rawUsername) {
+      rawUsername = rawEmail.split('@')[0];
+    }
+
+    const computedFullName = full_name || `${first_name || ''} ${last_name || ''}`.trim() || rawUsername;
     const adminClient = getAdminClient();
     const client = adminClient || getAnonClient();
 
     let userId: string | null = null;
 
-    // Buscar si el usuario ya existe en Supabase Auth (creado manualmente o previamente)
+    // Sincronizar o crear en Supabase Auth
     if (adminClient) {
       try {
         const { data: listData } = await adminClient.auth.admin.listUsers();
-        const existingAuthUser = listData?.users?.find((u) => u.email?.toLowerCase() === cleanEmail);
+        const existingAuthUser = listData?.users?.find((u) => u.email?.toLowerCase() === rawEmail);
 
         if (existingAuthUser) {
           userId = existingAuthUser.id;
-          // Actualizar contraseña si se proporcionó una nueva
-          if (password && password.trim().length >= 6) {
+          if (effectivePassword && effectivePassword.length >= 6) {
             await adminClient.auth.admin.updateUserById(userId, {
-              password: password.trim(),
+              password: effectivePassword,
               email_confirm: true,
+              user_metadata: { full_name: computedFullName, role },
             });
           }
-        } else if (password && password.trim().length >= 6) {
-          // Crear en Auth si no existía y se ingresó contraseña
+        } else if (effectivePassword && effectivePassword.length >= 6) {
           const { data: authData, error: authErr } = await adminClient.auth.admin.createUser({
-            email: cleanEmail,
-            password: password.trim(),
+            email: rawEmail,
+            password: effectivePassword,
             email_confirm: true,
             user_metadata: {
               full_name: computedFullName,
@@ -97,12 +112,11 @@ export async function POST(req: Request) {
       } catch (e) {
         console.warn('Excepción al consultar auth.users:', e);
       }
-    } else if (password && password.trim().length >= 6) {
-      // Fallback sin service role key
+    } else if (effectivePassword && effectivePassword.length >= 6) {
       const serverAnon = getAnonClient();
       const { data: authData } = await serverAnon.auth.signUp({
-        email: cleanEmail,
-        password: password.trim(),
+        email: rawEmail,
+        password: effectivePassword,
         options: { data: { full_name: computedFullName, role } },
       });
       if (authData?.user?.id) {
@@ -114,14 +128,13 @@ export async function POST(req: Request) {
     const { data: existingProfile } = await client
       .from('profiles')
       .select('id')
-      .eq('email', cleanEmail)
+      .eq('email', rawEmail)
       .maybeSingle();
 
     if (existingProfile) {
       if (!userId) {
         userId = existingProfile.id;
       } else if (existingProfile.id !== userId) {
-        // Limpiar posible ID viejo o descalzado para usar el ID de auth.users
         await client.from('profiles').delete().eq('id', existingProfile.id);
       }
     }
@@ -132,15 +145,15 @@ export async function POST(req: Request) {
 
     const profilePayload = {
       id: userId,
-      email: cleanEmail,
+      email: rawEmail,
       full_name: computedFullName,
       first_name: first_name || null,
       last_name: last_name || null,
       role,
       phone: phone || null,
       dni: dni || null,
-      username: username || cleanEmail.split('@')[0],
-      password_text: password || null,
+      username: rawUsername,
+      password_text: effectivePassword || null,
       sede_id: sede_id || null,
       turno,
       hire_date: hire_date || new Date().toISOString().split('T')[0],
@@ -174,7 +187,8 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { id, password, email, full_name, role, ...updateFields } = body;
+    const { id, password: rawPassword, password_text, email, full_name, role, ...updateFields } = body;
+    const effectivePassword = (rawPassword || password_text || '').trim();
 
     if (!id && !email) {
       return NextResponse.json({ error: 'El ID o email de usuario es requerido.' }, { status: 400 });
@@ -195,10 +209,11 @@ export async function PUT(req: Request) {
 
           if (existingAuthUser) {
             currentId = existingAuthUser.id;
-            if (password && password.trim().length >= 6) {
+            if (effectivePassword && effectivePassword.length >= 6) {
               await adminClient.auth.admin.updateUserById(currentId, {
-                password: password.trim(),
+                password: effectivePassword,
                 email_confirm: true,
+                user_metadata: full_name ? { full_name, role } : undefined,
               });
             }
           }
@@ -208,8 +223,8 @@ export async function PUT(req: Request) {
       }
     }
 
-    if (password && password.trim().length >= 6) {
-      updateFields.password_text = password.trim();
+    if (effectivePassword && effectivePassword.length >= 6) {
+      updateFields.password_text = effectivePassword;
     }
 
     if (currentId) updateFields.id = currentId;

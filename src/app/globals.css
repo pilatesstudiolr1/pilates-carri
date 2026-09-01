@@ -45,6 +45,9 @@
   --badge-meadow-text: #001f1f;
   --badge-meadow-border: #001f1f;
 
+  /* Color Acento Madera / Bronce Pilates */
+  --color-wood: #b48450;
+
   /* Superficies Pastel (Specimen Trays) */
   --color-mint-surface: #e4f7f9;
   --surface-mint-border: rgba(0, 61, 61, 0.12);
@@ -147,6 +150,9 @@
   --badge-meadow-bg: rgba(205, 250, 206, 0.15);
   --badge-meadow-text: #a3f0a5;
   --badge-meadow-border: rgba(205, 250, 206, 0.35);
+
+  /* Color Acento Madera / Bronce Pilates Dark */
+  --color-wood: #d4a775;
 
   /* Superficies Pastel Dark */
   --color-mint-surface: #112326;

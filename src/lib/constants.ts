@@ -235,6 +235,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     section: 'Principal',
   },
   {
+    label: 'Turnos Disponibles',
+    href: '/agenda?view=disponibilidad',
+    icon: 'Clock',
+    roles: ['ADMIN'],
+    section: 'Principal',
+  },
+  {
     label: 'Alumnas',
     href: '/alumnas',
     icon: 'Users',

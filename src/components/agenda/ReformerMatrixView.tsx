@@ -8,6 +8,12 @@ import {
   Plus,
   Clock,
   RotateCcw,
+  DollarSign,
+  Phone,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  User,
 } from 'lucide-react';
 
 const DIAS = [
@@ -34,6 +40,8 @@ const HORARIOS_ESTANDAR = [
   '21:00',
 ];
 
+import { useSede } from '@/hooks/useSede';
+
 interface ReformerMatrixViewProps {
   clases: Clase[];
   selectedDay: number;
@@ -41,8 +49,25 @@ interface ReformerMatrixViewProps {
   onSelectClase: (clase: Clase) => void;
   onSelectEmptySlot?: (dayOfWeek: number, startTime: string, camilla?: number) => void;
   onOpenAssignModal?: (clase: Clase, camilla?: number) => void;
-  onSelectOccupiedSlot?: (dayOfWeek: number, startTime: string, camilla: number, alumnaItem: any, clase: Clase | null) => void;
+  onSelectOccupiedSlot?: (
+    dayOfWeek: number,
+    startTime: string,
+    camilla: number,
+    alumnaItem: any,
+    clase: Clase | null
+  ) => void;
+  onCobrar?: (alumna: any) => void;
   asistencias?: Record<string, string>; // clase_alumna_id -> status
+  maxCamillas?: number;
+}
+
+function formatFechaCorta(fechaStr?: string | null): string {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}`;
+  }
+  return fechaStr;
 }
 
 export function ReformerMatrixView({
@@ -53,8 +78,14 @@ export function ReformerMatrixView({
   onSelectEmptySlot,
   onOpenAssignModal,
   onSelectOccupiedSlot,
+  onCobrar,
   asistencias = {},
+  maxCamillas,
 }: ReformerMatrixViewProps) {
+  const { selectedSede } = useSede();
+  const effectiveMaxCamillas = maxCamillas || (selectedSede?.max_camillas ? selectedSede.max_camillas : 6);
+  const camillasList = Array.from({ length: effectiveMaxCamillas }, (_, i) => i + 1);
+
   const [fechaAsistencia, setFechaAsistencia] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -62,27 +93,26 @@ export function ReformerMatrixView({
   // Filtrar clases del día seleccionado
   const clasesDelDia = clases.filter((c) => c.day_of_week === selectedDay);
 
-  // Mapear matriz por horario y reformer (1 a 6)
+  // Mapear matriz por horario y reformer dinámico
   const matrizHorarios = HORARIOS_ESTANDAR.map((hora) => {
-    const claseEnHora = clasesDelDia.find((c) => c.start_time.startsWith(hora));
+    const claseEnHora = clasesDelDia.find(
+      (c) => c.start_time.startsWith(hora) || c.start_time.slice(0, 5) === hora
+    );
 
-    const camillasMap: Record<number, { alumna: any; caId: string } | null> = {
-      1: null,
-      2: null,
-      3: null,
-      4: null,
-      5: null,
-      6: null,
-    };
+    const camillasMap: Record<number, { alumna: any; caId: string; status?: string } | null> = {};
+    camillasList.forEach((num) => {
+      camillasMap[num] = null;
+    });
 
     if (claseEnHora && claseEnHora.alumnas) {
       if (Array.isArray(claseEnHora.alumnas)) {
         claseEnHora.alumnas.forEach((item: any, idx: number) => {
           const camillaNum = item.camilla || idx + 1;
-          if (camillaNum >= 1 && camillaNum <= 6) {
+          if (camillaNum >= 1 && camillaNum <= effectiveMaxCamillas) {
             camillasMap[camillaNum] = {
               alumna: item.alumna || item,
               caId: item.id || `ca-${idx}`,
+              status: item.status,
             };
           }
         });
@@ -99,7 +129,7 @@ export function ReformerMatrixView({
     };
   });
 
-  // Métricas EXACTAS del día y del filtro actual de profesora
+  // Métricas del día
   let totalLugaresOcupados = 0;
   let presentesCount = 0;
   let ausentesCount = 0;
@@ -117,12 +147,13 @@ export function ReformerMatrixView({
     });
   });
 
-  const totalCapacidadDia = HORARIOS_ESTANDAR.length * 6; // 12 horarios x 6 reformers = 72
+  const totalCapacidadDia = HORARIOS_ESTANDAR.length * effectiveMaxCamillas;
   const nombreDiaActual = DIAS.find((d) => d.value === selectedDay)?.label || 'Lunes';
+  const hoyStr = new Date().toISOString().split('T')[0];
 
   return (
     <div className="flex flex-col gap-6 text-[var(--text-primary)] w-full">
-      {/* 1. SELECTOR DE DÍAS LATTICE + FECHA ASISTENCIA */}
+      {/* 1. SELECTOR DE DÍAS + FECHA ASISTENCIA */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Botones de Días */}
         <div className="flex items-center gap-2 flex-wrap">
@@ -157,29 +188,35 @@ export function ReformerMatrixView({
         </div>
       </div>
 
-      {/* 2. REFERENCIAS DE ESTADO (Color Legend Nítido y de Alto Contraste) */}
+      {/* 2. REFERENCIAS DE ESTADO */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
         <span className="text-xs font-extrabold uppercase tracking-wider text-[var(--text-primary)]">
           Referencias de Estado:
         </span>
 
         <div className="flex items-center gap-3 sm:gap-4 flex-wrap text-xs">
+          {/* Violeta: Pendiente de inicio */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#f5f3ff] dark:bg-[#231c3b] text-[#6b21a8] dark:text-[#d8b4fe] border border-[#c084fc] font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#9333ea] dark:bg-[#c084fc] shrink-0" />
+            <span>Pendiente Inicio</span>
+          </div>
+
           {/* Verde: Disponible */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#f4fdf8] dark:bg-[#0c1f17] text-[#166534] dark:text-[#86efac] border border-[#22c55e] font-bold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-[#16a34a] dark:bg-[#4ade80] shrink-0" />
-            <span>DISPONIBLE (Libre)</span>
-          </div>
-
-          {/* Rojo: Ocupado */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#fff5f5] dark:bg-[#200f13] text-[#991b1b] dark:text-[#fca5a5] border border-[#f87171] font-bold shadow-2xs">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] dark:bg-[#f87171] shrink-0" />
-            <span>OCUPADO (Inscripta)</span>
+            <span>Disponible</span>
           </div>
 
           {/* Amarillo: Presente */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#fefce8] dark:bg-[#261f0b] text-[#854d0e] dark:text-[#fde047] border border-[#eab308] font-bold shadow-2xs">
             <span className="w-2.5 h-2.5 rounded-full bg-[#ca8a04] dark:bg-[#facc15] shrink-0" />
-            <span>PRESENTE (Asistió)</span>
+            <span>Presente</span>
+          </div>
+
+          {/* Rojo: Ausente */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-[10px] bg-[#fff5f5] dark:bg-[#200f13] text-[#991b1b] dark:text-[#fca5a5] border border-[#f87171] font-bold shadow-2xs">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#dc2626] dark:bg-[#f87171] shrink-0" />
+            <span>Ausente</span>
           </div>
 
           {/* Recupera */}
@@ -234,42 +271,55 @@ export function ReformerMatrixView({
         </div>
       </div>
 
-      {/* 4. MATRIZ DE TURNOS ORDENADA (100% Ancho sin scroll horizontal) */}
+      {/* 4. MATRIZ DE TURNOS CON ENCABEZADOS DE COLUMNA (Estilo Captura 2) */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight">
             Turnos Reformer &bull; {nombreDiaActual}
           </h2>
           <span className="text-xs text-[var(--text-secondary)]">
-            Hacé clic en cualquier camilla para agendar o gestionar asistencia
+            Hacé clic en cualquier alumna para ver opciones o en [Cobrar] para registrar pago
           </span>
+        </div>
+
+        {/* Barra de Encabezados de Columnas (Hora + Reformer 1 a N) */}
+        <div className={`hidden lg:grid ${effectiveMaxCamillas === 4 ? 'grid-cols-[100px_repeat(4,1fr)]' : 'grid-cols-[100px_repeat(6,1fr)]'} gap-2.5 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl text-xs font-black uppercase tracking-wider text-[var(--text-secondary)] text-center`}>
+          <div className="text-left pl-2">Hora</div>
+          {camillasList.map((num) => (
+            <div key={num}>Reformer {num}</div>
+          ))}
         </div>
 
         {matrizHorarios.map((row) => (
           <div
             key={row.hora}
-            className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 shadow-sm space-y-3 transition-colors hover:border-[var(--border-hover)]"
+            className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 sm:p-4 shadow-sm space-y-3 transition-colors hover:border-[var(--border-hover)]"
           >
-            {/* Header del Horario */}
-            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2.5">
+            {/* Header del Horario para Mobile */}
+            <div className="flex lg:hidden items-center justify-between border-b border-[var(--border-default)] pb-2.5">
               <div className="flex items-center gap-2.5">
                 <span className="px-3.5 py-1 rounded-[22px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-xs font-mono font-bold">
                   {row.hora} hs
                 </span>
-                {row.clase?.name && (
-                  <span className="text-xs font-semibold text-[var(--text-secondary)] hidden sm:inline">
-                    {row.clase.name}
+                {row.clase?.profesora ? (
+                  <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <User className="h-3 w-3" />
+                    Profe {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-[var(--text-muted)] italic">
+                    Sin profe asignada
                   </span>
                 )}
               </div>
 
               <div className="flex items-center gap-2 text-xs">
                 <span className="font-bold text-[var(--text-primary)]">
-                  {row.ocupadosHora} / 6 ocupados
+                  {row.ocupadosHora} / {effectiveMaxCamillas} ocupados
                 </span>
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    row.ocupadosHora === 6
+                    row.ocupadosHora >= effectiveMaxCamillas
                       ? 'bg-[#ef4444]'
                       : row.ocupadosHora > 0
                       ? 'bg-[#f59e0b]'
@@ -279,23 +329,53 @@ export function ReformerMatrixView({
               </div>
             </div>
 
-            {/* Grid de 6 Reformers (Auto-ajustable al 100% de ancho sin scroll horizontal) */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-              {[1, 2, 3, 4, 5, 6].map((refNum) => {
+            {/* Fila Grid de Horario + Reformers */}
+            <div className={`grid grid-cols-2 sm:grid-cols-3 ${effectiveMaxCamillas === 4 ? 'lg:grid-cols-[100px_repeat(4,1fr)]' : 'lg:grid-cols-[100px_repeat(6,1fr)]'} gap-2.5 items-stretch`}>
+              {/* Bloque Hora en desktop */}
+              <div className="hidden lg:flex flex-col justify-center items-start pl-2">
+                <span className="px-3 py-1.5 rounded-xl bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-sm font-mono font-black shadow-2xs">
+                  {row.hora}
+                </span>
+                <span className="text-[10px] text-[var(--text-muted)] font-semibold mt-1">
+                  {row.ocupadosHora}/{effectiveMaxCamillas} ocupados
+                </span>
+                {row.clase?.profesora ? (
+                  <span
+                    className="text-[10px] font-extrabold text-[var(--color-wood)] truncate max-w-[90px] mt-0.5 flex items-center gap-0.5"
+                    title={`Profesora: ${row.clase.profesora.full_name || row.clase.profesora.first_name}`}
+                  >
+                    <User className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                    {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-[var(--text-muted)] italic mt-0.5">
+                    Sin profe
+                  </span>
+                )}
+              </div>
+
+              {camillasList.map((refNum) => {
                 const item = row.camillasMap[refNum];
 
-                // CASO 1: LUGAR OCUPADO POR ALUMNA
+                // CASO 1: LUGAR OCUPADO POR ALUMNA (ESTILO CAPTURA 2)
                 if (item && item.alumna) {
+                  const alumna = item.alumna;
                   const alumnaNombre =
-                    `${item.alumna.first_name || ''} ${item.alumna.last_name || ''}`.trim() || 'Alumna';
-                  const status = asistencias[item.caId];
+                    `${alumna.first_name || ''} ${alumna.last_name || ''}`.trim() || 'Alumna';
+                  const phone = alumna.phone || '';
+                  const statusAsistencia = asistencias[item.caId];
 
-                  // Sub-caso 1A: PRESENTE -> Amarillo Cálido, Nítido y Legible
-                  if (status === 'PRESENT') {
+                  // Evaluar si es pendiente de inicio (fecha futura)
+                  const isPendienteInicio =
+                    (alumna.start_date && alumna.start_date > hoyStr) ||
+                    alumna.status === 'PENDING' ||
+                    item.status === 'PENDING';
+
+                  // Estilo violeta para pendiente de inicio
+                  if (isPendienteInicio) {
                     return (
-                      <button
+                      <div
                         key={refNum}
-                        type="button"
                         onClick={() => {
                           if (onSelectOccupiedSlot) {
                             onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
@@ -303,32 +383,70 @@ export function ReformerMatrixView({
                             onSelectClase(row.clase);
                           }
                         }}
-                        className="p-3 rounded-[12px] bg-[#fefce8] dark:bg-[#261f0b] border-2 border-[#eab308] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[82px] text-left shadow-2xs group"
+                        className="p-3 rounded-xl bg-[#f5f3ff] dark:bg-[#231c3b] border-2 border-[#c084fc] hover:border-[#a855f7] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
                       >
                         <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#854d0e] dark:text-[#fde047]">
-                            <span>REF {refNum}</span>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#6b21a8] dark:text-[#d8b4fe] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
+                            <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                          </div>
+
+                          {/* Nombre en negrita */}
+                          <span className="font-extrabold text-[13px] text-[#4c1d95] dark:text-[#f3e8ff] leading-tight block">
+                            {alumnaNombre}
+                          </span>
+
+                          {/* Badge Violeta Pendiente de Inicio */}
+                          <div className="mt-1.5 inline-block px-2 py-0.5 rounded-md bg-[#ede9fe] dark:bg-[#4c1d95] text-[#5b21b6] dark:text-[#ddd6fe] text-[10px] font-bold">
+                            Pendiente de inicio {alumna.start_date ? `– Comienza ${formatFechaCorta(alumna.start_date)}` : ''}
+                          </div>
+                        </div>
+
+                        {/* Teléfono */}
+                        <div className="mt-2 text-[11px] font-medium text-[#6b21a8] dark:text-[#c4b5fd] truncate">
+                          {phone || 'Sin teléfono'}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Estilo Presente (Amarillo)
+                  if (statusAsistencia === 'PRESENT') {
+                    return (
+                      <div
+                        key={refNum}
+                        onClick={() => {
+                          if (onSelectOccupiedSlot) {
+                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                          } else if (row.clase) {
+                            onSelectClase(row.clase);
+                          }
+                        }}
+                        className="p-3 rounded-xl bg-[#fefce8] dark:bg-[#261f0b] border-2 border-[#eab308] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#854d0e] dark:text-[#fde047] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
                             <span className="px-1.5 py-0.5 rounded bg-[#fef08a] dark:bg-[#4d3e10] text-[#854d0e] dark:text-[#fde047] text-[9px] font-bold">
                               ✓ Presente
                             </span>
                           </div>
-                          <span className="font-extrabold text-[13px] capitalize truncate block mt-1.5 text-[#1e1b18] dark:text-[#ffffff] leading-tight">
-                            {alumnaNombre.toLowerCase()}
+                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                            {alumnaNombre}
                           </span>
                         </div>
-                        <div className="text-[10px] text-[#854d0e] dark:text-[#fde047] font-semibold mt-1 truncate">
-                          {item.alumna.phone ? `Tel: ${item.alumna.phone.slice(-6)}` : 'Asistencia OK'}
+                        <div className="mt-2 text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
+                          {phone || 'Asistencia confirmada'}
                         </div>
-                      </button>
+                      </div>
                     );
                   }
 
-                  // Sub-caso 1B: AUSENTE -> Rojo Grisáceo Sobrio
-                  if (status === 'ABSENT') {
+                  // Estilo Ausente (Rojo)
+                  if (statusAsistencia === 'ABSENT') {
                     return (
-                      <button
+                      <div
                         key={refNum}
-                        type="button"
                         onClick={() => {
                           if (onSelectOccupiedSlot) {
                             onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
@@ -336,64 +454,30 @@ export function ReformerMatrixView({
                             onSelectClase(row.clase);
                           }
                         }}
-                        className="p-3 rounded-[12px] bg-[#fff1f2] dark:bg-[#271015] border-2 border-[#f43f5e] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[82px] text-left shadow-2xs group"
+                        className="p-3 rounded-xl bg-[#fff1f2] dark:bg-[#271015] border-2 border-[#f43f5e] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
                       >
                         <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#9f1239] dark:text-[#fda4af]">
-                            <span>REF {refNum}</span>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#9f1239] dark:text-[#fda4af] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
                             <span className="px-1.5 py-0.5 rounded bg-[#fecdd3] dark:bg-[#4c0519] text-[#9f1239] dark:text-[#fda4af] text-[9px] font-bold">
                               ✗ Ausente
                             </span>
                           </div>
-                          <span className="font-extrabold text-[13px] capitalize truncate block mt-1.5 text-[#1e1b18] dark:text-[#ffffff] leading-tight">
-                            {alumnaNombre.toLowerCase()}
+                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                            {alumnaNombre}
                           </span>
                         </div>
-                        <div className="text-[10px] text-[#9f1239] dark:text-[#fda4af] font-semibold mt-1 truncate">
-                          Falta
+                        <div className="mt-2 text-[11px] font-medium text-[#9f1239] dark:text-[#fda4af] truncate">
+                          {phone || 'Falta registrada'}
                         </div>
-                      </button>
+                      </div>
                     );
                   }
 
-                  // Sub-caso 1C: RECUPERA -> Azul Índigo Limpio
-                  if (status === 'RECOVERY') {
-                    return (
-                      <button
-                        key={refNum}
-                        type="button"
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-[12px] bg-[#eef2ff] dark:bg-[#13122b] border-2 border-[#6366f1] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[82px] text-left shadow-2xs group"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#3730a3] dark:text-[#c7d2fe]">
-                            <span>REF {refNum}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-[#e0e7ff] dark:bg-[#312e81] text-[#3730a3] dark:text-[#c7d2fe] text-[9px] font-bold">
-                              ↻ Recupera
-                            </span>
-                          </div>
-                          <span className="font-extrabold text-[13px] capitalize truncate block mt-1.5 text-[#1e1b18] dark:text-[#ffffff] leading-tight">
-                            {alumnaNombre.toLowerCase()}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-[#3730a3] dark:text-[#c7d2fe] font-semibold mt-1 truncate">
-                          Recuperatorio
-                        </div>
-                      </button>
-                    );
-                  }
-
-                  // Sub-caso 1D: OCUPADO ESTÁNDAR -> Rojo Claro Nítido con Texto Oscuro Ultra Legible
+                  // Estilo Estándar / Sin Marcar con Botón Cobrar (Idéntico a Captura 2)
                   return (
-                    <button
+                    <div
                       key={refNum}
-                      type="button"
                       onClick={() => {
                         if (onSelectOccupiedSlot) {
                           onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
@@ -401,27 +485,52 @@ export function ReformerMatrixView({
                           onSelectClase(row.clase);
                         }
                       }}
-                      className="p-3 rounded-[12px] bg-[#fff5f5] dark:bg-[#200f13] border-2 border-[#f87171] hover:border-[#ef4444] transition-all cursor-pointer flex flex-col justify-between min-h-[82px] text-left shadow-2xs group"
+                      className="p-3 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--border-default)] hover:border-[var(--color-wood)] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
                     >
                       <div>
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#991b1b] dark:text-[#fca5a5]">
-                          <span>REF {refNum}</span>
-                          <span className="px-1.5 py-0.5 rounded bg-[#fee2e2] dark:bg-[#4c1d24] text-[#991b1b] dark:text-[#fca5a5] text-[9px] font-bold">
-                            OCUPADO
-                          </span>
+                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] mb-1">
+                          <span className="lg:hidden">REF {refNum}</span>
+                          <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
                         </div>
-                        <span className="font-extrabold text-[13px] capitalize truncate block mt-1.5 text-[#1e1b18] dark:text-[#ffffff] leading-tight">
-                          {alumnaNombre.toLowerCase()}
+
+                        {/* Nombre de la Alumna en negrita */}
+                        <span className="font-bold text-[13px] text-[var(--text-primary)] leading-tight block">
+                          {alumnaNombre}
+                        </span>
+
+                        {/* Subtítulo: Sin marcar */}
+                        <span className="text-[11px] text-[var(--text-muted)] block mt-0.5 font-medium">
+                          Sin marcar
                         </span>
                       </div>
-                      <div className="text-[10px] text-[#991b1b] dark:text-[#fca5a5] font-semibold mt-1 truncate">
-                        {item.alumna.phone ? `Tel: ${item.alumna.phone.slice(-6)}` : 'Sin marcar'}
+
+                      <div className="mt-2 space-y-1.5">
+                        {/* Teléfono */}
+                        <span className="text-[11px] text-[var(--text-secondary)] font-mono block truncate">
+                          {phone || 'Sin tel'}
+                        </span>
+
+                        {/* Botón directo Cobrar (Idéntico a la Captura 2) */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onCobrar) {
+                              onCobrar(alumna);
+                            } else if (onSelectOccupiedSlot) {
+                              onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                            }
+                          }}
+                          className="w-full py-1 px-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
+                        >
+                          <span>💵 Cobrar</span>
+                        </button>
                       </div>
-                    </button>
+                    </div>
                   );
                 }
 
-                // CASO 2: LUGAR DISPONIBLE (VERDE BLANCO, ULTRA NÍTIDO, EN GRANDE "DISPONIBLE")
+                // CASO 2: LUGAR DISPONIBLE
                 return (
                   <button
                     key={refNum}
@@ -433,7 +542,7 @@ export function ReformerMatrixView({
                         onSelectEmptySlot(selectedDay, row.hora, refNum);
                       }
                     }}
-                    className="p-3 rounded-[12px] bg-[#f4fdf8] dark:bg-[#0c1f17] hover:bg-[#e8fbf0] dark:hover:bg-[#122e23] border-2 border-dashed border-[#16a34a] dark:border-[#22c55e] transition-all cursor-pointer flex flex-col justify-between items-center text-center min-h-[82px] shadow-2xs group"
+                    className="p-3 rounded-xl bg-[#f4fdf8] dark:bg-[#0c1f17] hover:bg-[#e8fbf0] dark:hover:bg-[#122e23] border-2 border-dashed border-[#16a34a] dark:border-[#22c55e] transition-all cursor-pointer flex flex-col justify-between items-center text-center min-h-[110px] shadow-2xs group"
                   >
                     <div className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#166534] dark:text-[#86efac]">
                       <span>REF {refNum}</span>

@@ -12,7 +12,8 @@ import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
 import { getPagos, registrarPago } from '@/lib/services/pagos';
 import { getMovimientos, registrarMovimiento } from '@/lib/services/caja';
 import { getClasesConAlumnas, addAlumnaToClase, createClase } from '@/lib/services/agenda';
-import { Alumna, Pago, CajaMovimiento, Clase, MetodoPago, AlumnaInsert } from '@/types/database';
+import { getProfiles } from '@/lib/services/profesoras';
+import { Alumna, Pago, CajaMovimiento, Clase, MetodoPago, AlumnaInsert, Profile } from '@/types/database';
 
 import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
@@ -57,6 +58,7 @@ export default function SimplifiedLatticeDashboard() {
   const [pagosReformer, setPagosReformer] = useState<Pago[]>([]);
   const [movimientosStudio, setMovimientosStudio] = useState<CajaMovimiento[]>([]);
   const [clasesReformerHoy, setClasesReformerHoy] = useState<Clase[]>([]);
+  const [profesoras, setProfesoras] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modales de Acción Rápida (Action Hub)
@@ -80,17 +82,19 @@ export default function SimplifiedLatticeDashboard() {
     setLoading(true);
     const hoyNum = getDayOfWeekToday();
 
-    const [alumnasRes, pagosRes, movRes, clasesRes] = await Promise.all([
+    const [alumnasRes, pagosRes, movRes, clasesRes, profsRes] = await Promise.all([
       getAlumnas({ limit: 500, sedeId: selectedSedeId }),
       getPagos({ status: 'ALL', sedeId: selectedSedeId }),
       getMovimientos({ sedeId: selectedSedeId }),
       getClasesConAlumnas({ dayOfWeek: hoyNum, sedeId: selectedSedeId }),
+      getProfiles({ role: 'PROFESORA', isActive: true }),
     ]);
 
     setAlumnasReformer(alumnasRes.data || []);
     setPagosReformer(pagosRes.data || []);
     setMovimientosStudio(movRes.data || []);
     setClasesReformerHoy(clasesRes.data || []);
+    setProfesoras((profsRes.data || []).filter((p) => p.role === 'PROFESORA'));
     setLoading(false);
   }, [selectedSedeId]);
 
@@ -180,6 +184,7 @@ export default function SimplifiedLatticeDashboard() {
     startTime: string;
     observaciones?: string;
     asistenciaStatus?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED';
+    profesoraId?: string | null;
   }) => {
     let targetClaseId = data.claseId;
     if (!targetClaseId) {
@@ -193,13 +198,18 @@ export default function SimplifiedLatticeDashboard() {
           start_time: `${data.startTime}:00`.slice(0, 8),
           end_time: `${(parseInt(data.startTime.slice(0, 2)) + 1).toString().padStart(2, '0')}:00:00`,
           max_capacity: 6,
-          profesora_id: null,
+          profesora_id: data.profesoraId || null,
           sede_id: selectedSedeId !== 'ALL' ? selectedSedeId : null,
         });
         if (newClaseRes.data) {
           targetClaseId = newClaseRes.data.id;
         }
       }
+    }
+
+    if (targetClaseId && data.profesoraId) {
+      const supabase = (await import('@/lib/supabase/client')).createClient();
+      await supabase.from('clases').update({ profesora_id: data.profesoraId }).eq('id', targetClaseId);
     }
 
     if (targetClaseId && data.alumnaId) {
@@ -300,6 +310,17 @@ export default function SimplifiedLatticeDashboard() {
           >
             Agendar Turno
           </Button>
+
+          <Link href="/agenda?view=disponibilidad">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-emerald-600/50 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-bold"
+              icon={<Clock className="h-3.5 w-3.5 text-emerald-600" />}
+            >
+              Ver Turnos Disponibles
+            </Button>
+          </Link>
 
           <Button
             size="sm"
@@ -757,6 +778,8 @@ export default function SimplifiedLatticeDashboard() {
         dayName={getNombreDiaHoy()}
         presetTime="08:00"
         presetCamilla={1}
+        profesoras={profesoras}
+        profesoraFilter="ALL"
         onSave={handleSaveTurno}
       />
 

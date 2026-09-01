@@ -65,7 +65,7 @@ export async function calcularLiquidacionSemanal(
 ): Promise<{ data: LiquidacionSemanal | null; error: string | null }> {
   try {
     const [profsRes, pagosRes] = await Promise.all([
-      getProfiles({ role: 'ALL' }),
+      getProfiles({ role: 'PROFESORA', isActive: true }),
       getPagos({ status: 'PAID' }),
     ]);
 
@@ -73,11 +73,12 @@ export async function calcularLiquidacionSemanal(
     const profesoraNombre = profe?.full_name || 'Profesora';
     const commissionRate = profe?.commission_rate ?? 0.40;
 
-    // Filtrar cobros efectivamente ingresados en la semana para esa profesora
+    // Filtrar cobros efectivamente ingresados en el período para esa profesora estrictamente
     const pagosFiltrados = pagosRes.data.filter((p) => {
-      const pDate = p.created_at ? p.created_at.split('T')[0] : '';
+      const pDate = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : '');
       const matchDate = pDate >= startDate && pDate <= endDate;
-      const matchProfe = (p.alumna as any)?.profesora_id === profesoraId || true;
+      const profeIdAsignada = p.profesora_id || (p.alumna as any)?.profesora_id;
+      const matchProfe = profeIdAsignada === profesoraId;
       return matchDate && matchProfe;
     });
 
@@ -87,12 +88,12 @@ export async function calcularLiquidacionSemanal(
       return {
         id: `det-${p.id}`,
         pago_id: p.id,
-        alumna_nombre: p.alumna ? `${p.alumna.first_name} ${p.alumna.last_name}` : 'Alumna',
-        payment_date: p.created_at ? p.created_at.split('T')[0] : startDate,
-        plan_name: p.notes || 'Mensualidad',
+        alumna_nombre: p.alumna ? `${p.alumna.first_name} ${p.alumna.last_name || ''}`.trim() : 'Alumna',
+        payment_date: p.payment_date || (p.created_at ? p.created_at.split('T')[0] : startDate),
+        plan_name: p.concept || p.plan || p.notes || 'Mensualidad',
         amount_paid: amountPaid,
         teacher_commission: teacherComm,
-        sede_name: 'Sede Principal',
+        sede_name: (p.alumna as any)?.sede?.name || 'Sede Principal',
       };
     });
 
@@ -145,7 +146,7 @@ export interface DisponibilidadCamillaItem {
   ocupadas_count: number;
   libres_count: number;
   camillas_libres: number[];
-  camillas_ocupadas: { camilla: number; alumna_nombre: string }[];
+  camillas_ocupadas: { camilla: number; alumna_nombre: string; alumna_id?: string; phone?: string; status?: string }[];
 }
 
 const DIAS_MAPA: Record<number, string> = {
@@ -163,13 +164,13 @@ export async function calcularLiquidacionGlobal(
 ): Promise<{ data: LiquidacionGlobalResumen | null; error: string | null }> {
   try {
     const [profsRes, pagosRes] = await Promise.all([
-      getProfiles({ role: 'ALL' }),
+      getProfiles({ role: 'PROFESORA', isActive: true }),
       getPagos({ status: 'PAID' }),
     ]);
 
-    const todasProfesoras = profsRes.data.filter((p) => p.role === 'PROFESORA' || p.role === 'ADMIN');
+    const todasProfesoras = profsRes.data.filter((p) => p.role === 'PROFESORA');
     const todosLosPagos = pagosRes.data.filter((p) => {
-      const pDate = p.created_at ? p.created_at.split('T')[0] : (p.payment_date || '');
+      const pDate = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : '');
       return pDate >= startDate && pDate <= endDate;
     });
 
@@ -183,8 +184,10 @@ export async function calcularLiquidacionGlobal(
     for (const profe of todasProfesoras) {
       const commissionRate = profe.commission_rate ?? 0.40;
       
+      // Cada pago se atribuye estrictamente a la profesora asignada (pago.profesora_id o alumna.profesora_id)
       const pagosDeEstaProfe = todosLosPagos.filter((p) => {
-        return p.profesora_id === profe.id || (p.alumna as any)?.profesora_id === profe.id;
+        const asignadaId = p.profesora_id || (p.alumna as any)?.profesora_id;
+        return asignadaId === profe.id;
       });
 
       const detalles: LiquidacionDetalle[] = pagosDeEstaProfe.map((p) => {
@@ -227,9 +230,10 @@ export async function calcularLiquidacionGlobal(
       });
     }
 
-    // Pagos sin profesora asignada (100% ingreso del estudio)
+    // Pagos sin profesora asignada (100% ingreso directo del estudio)
     const pagosSinProfe = todosLosPagos.filter((p) => {
-      return !todasProfesoras.some((pr) => pr.id === p.profesora_id || pr.id === (p.alumna as any)?.profesora_id);
+      const asignadaId = p.profesora_id || (p.alumna as any)?.profesora_id;
+      return !todasProfesoras.some((pr) => pr.id === asignadaId);
     });
 
     for (const p of pagosSinProfe) {
@@ -275,7 +279,7 @@ export async function getDisponibilidadCamillas(options?: {
     const supabase = createClient();
     let query = supabase
       .from('clases')
-      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name))')
+      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, phone, status, start_date))')
       .eq('is_active', true);
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -296,23 +300,32 @@ export async function getDisponibilidadCamillas(options?: {
     const items: DisponibilidadCamillaItem[] = (data || []).map((c: any) => {
       const maxCap = c.max_capacity || (c.sede?.max_camillas || 6);
       const inscripciones = c.clase_alumnas || [];
-      const ocupadasCamillasMap = new Map<number, string>();
+      const ocupadasCamillasMap = new Map<number, { nombre: string; id?: string; phone?: string; status?: string }>();
 
       inscripciones.forEach((ca: any) => {
         if (ca.camilla != null) {
           const nombre = ca.alumna ? `${ca.alumna.first_name} ${ca.alumna.last_name || ''}`.trim() : 'Inscripta';
-          ocupadasCamillasMap.set(ca.camilla, nombre);
+          ocupadasCamillasMap.set(ca.camilla, {
+            nombre,
+            id: ca.alumna_id,
+            phone: ca.alumna?.phone,
+            status: ca.status || ca.alumna?.status,
+          });
         }
       });
 
       const camillasLibres: number[] = [];
-      const camillasOcupadas: { camilla: number; alumna_nombre: string }[] = [];
+      const camillasOcupadas: { camilla: number; alumna_nombre: string; alumna_id?: string; phone?: string; status?: string }[] = [];
 
       for (let i = 1; i <= maxCap; i++) {
         if (ocupadasCamillasMap.has(i)) {
+          const slot = ocupadasCamillasMap.get(i)!;
           camillasOcupadas.push({
             camilla: i,
-            alumna_nombre: ocupadasCamillasMap.get(i)!,
+            alumna_nombre: slot.nombre,
+            alumna_id: slot.id,
+            phone: slot.phone,
+            status: slot.status,
           });
         } else {
           camillasLibres.push(i);

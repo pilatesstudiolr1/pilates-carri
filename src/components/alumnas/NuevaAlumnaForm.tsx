@@ -12,6 +12,8 @@ import { addAlumnaToClase, getClases, createClase } from '@/lib/services/agenda'
 import { createClient } from '@/lib/supabase/client';
 import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble } from 'lucide-react';
 
+import { useSede } from '@/hooks/useSede';
+
 const DIAS = [
   { value: 1, label: 'Lunes' },
   { value: 2, label: 'Martes' },
@@ -48,6 +50,24 @@ interface NuevaAlumnaFormProps {
 }
 
 export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
+  const { selectedSedeId, sedes } = useSede();
+  const [alumnaSedeId, setAlumnaSedeId] = useState<string>(() => {
+    if (selectedSedeId && selectedSedeId !== 'ALL') return selectedSedeId;
+    return '';
+  });
+
+  useEffect(() => {
+    if (!alumnaSedeId && sedes.length > 0) {
+      if (selectedSedeId && selectedSedeId !== 'ALL') {
+        setAlumnaSedeId(selectedSedeId);
+      } else {
+        setAlumnaSedeId(sedes[0].id);
+      }
+    }
+  }, [sedes, selectedSedeId, alumnaSedeId]);
+
+  const currentSedeObj = sedes.find((s) => s.id === alumnaSedeId);
+
   // Datos Personales
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -102,24 +122,24 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
   useEffect(() => {
     async function loadData() {
       const [profsRes, planesRes] = await Promise.all([
-        getProfiles({ role: 'ALL' }),
+        getProfiles({ role: 'PROFESORA', isActive: true }),
         getPlanes({ onlyActive: true }),
       ]);
-      setProfesoras(profsRes.data);
+      setProfesoras((profsRes.data || []).filter((p) => p.role === 'PROFESORA'));
       setPlanes(planesRes.data);
 
-      // Load all clases for availability check
-      const clasesRes = await getClases();
+      const effectiveSede = alumnaSedeId || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined);
+      const clasesRes = await getClases({ sedeId: effectiveSede });
       setAllClases(clasesRes.data || []);
       await fetchAllOccupied(clasesRes.data || []);
 
-      if (planesRes.data.length > 0) {
+      if (planesRes.data.length > 0 && !selectedPlanName) {
         setSelectedPlanName(planesRes.data[0].name);
         setImporte(planesRes.data[0].price.toString());
       }
     }
     loadData();
-  }, []);
+  }, [alumnaSedeId, selectedSedeId]);
 
   const handleStartDateChange = (dateStr: string) => {
     setBillingStartDate(dateStr);
@@ -236,6 +256,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
       emergency_contact_name: emergencyContact.trim() || null,
       emergency_contact_phone: emergencyPhone.trim() || null,
       profesora_id: selectedProfesoraId || null,
+      sede_id: alumnaSedeId || null,
       plan: selectedPlanName || null,
       plan_amount: parseFloat(importe) || 0,
       billing_start_date: billingStartDate || null,
@@ -255,10 +276,12 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
     }
 
     // 2. Asignar Turnos Fijos en la Agenda
-    const { data: clasesActuales } = await getClases();
+    const currentSedeObj = sedes.find(s => s.id === alumnaSedeId);
+    const { data: clasesActuales } = await getClases({ sedeId: alumnaSedeId || undefined });
+    const listaClases = clasesActuales || [];
 
     for (const tf of turnosFijos) {
-      let targetClase = clasesActuales.find(
+      let targetClase = listaClases.find(
         (c) => c.day_of_week === tf.day_of_week && c.start_time.startsWith(tf.start_time)
       );
 
@@ -272,7 +295,8 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
           day_of_week: tf.day_of_week,
           start_time: `${tf.start_time}:00`,
           end_time: `${endTime}:00`,
-          max_capacity: 6,
+          max_capacity: currentSedeObj?.max_camillas || 6,
+          sede_id: alumnaSedeId || null,
         });
         targetClase = createdClase || undefined;
       }
@@ -412,7 +436,24 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
             <Shield className="h-4 w-4 text-[var(--color-wood)]" /> Plan y asistencia
           </h3>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div>
+              <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
+                Sede del Studio *
+              </label>
+              <select
+                value={alumnaSedeId}
+                onChange={(e) => setAlumnaSedeId(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
+              >
+                {sedes.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.max_camillas} camillas)
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5">
                 Plan de clases *
@@ -451,11 +492,13 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                 className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
               >
                 <option value="">Seleccionar profesora</option>
-                {profesoras.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name}
-                  </option>
-                ))}
+                {profesoras
+                  .filter((p) => p.role === 'PROFESORA')
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
+                    </option>
+                  ))}
               </select>
             </div>
           </div>
@@ -560,7 +603,7 @@ export function NuevaAlumnaForm({ onSuccess }: NuevaAlumnaFormProps) {
                       onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
                       className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
                     >
-                      {[1, 2, 3, 4, 5, 6].map((num) => {
+                      {Array.from({ length: currentSedeObj?.max_camillas || 6 }, (_, i) => i + 1).map((num) => {
                         const occupied = getOccupiedCamillasForTurno(tf.day_of_week, tf.start_time);
                         const isOccupied = occupied.includes(num);
                         return (

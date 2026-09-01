@@ -105,8 +105,8 @@ export function ProfesorFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={profileToEdit ? 'Editar Perfil y Rol de Usuario' : 'Asignar Rol a Cuenta por Email'}
-      description="Vincula el correo registrado en Supabase Auth y asigna su rol (Admin o Profesora)"
+      title={profileToEdit ? 'Editar Perfil y Rol de Usuario' : 'Asignar Rol de Usuario'}
+      description="Configura los datos del usuario y su rol en el sistema (Admin o Profesora)"
       size="lg"
     >
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -118,9 +118,9 @@ export function ProfesorFormModal({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
-            label="Correo Electronico Registrado en Supabase *"
+            label="Correo Electrónico *"
             type="email"
-            placeholder="ej. profesora@gmail.com u admin@gmail.com"
+            placeholder="ej. profesora@pilateslr.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={!!profileToEdit}

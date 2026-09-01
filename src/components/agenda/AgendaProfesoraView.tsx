@@ -82,11 +82,11 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
           sedeId: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
           profesoraId: filtroSoloMisClases && profile?.id ? profile.id : undefined,
         }),
-        getProfiles({ role: 'ALL' }),
+        getProfiles({ role: 'PROFESORA', isActive: true }),
       ]);
 
       setClases(clasesRes.data || []);
-      setProfesoras(profsRes.data || []);
+      setProfesoras((profsRes.data || []).filter((p) => p.role === 'PROFESORA'));
     } catch (err) {
       console.error('Error cargando agenda de profesora:', err);
     } finally {
