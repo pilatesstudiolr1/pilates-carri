@@ -74,6 +74,7 @@ export const HORARIOS_TARDE_NOCHE = [
   '19:00',
   '20:00',
   '21:00',
+  '22:00',
 ] as const;
 
 export const HORARIOS_COMPLETOS = [

@@ -37,6 +37,7 @@ const HORARIOS_ESTANDAR = [
   '19:00',
   '20:00',
   '21:00',
+  '22:00',
 ];
 
 interface TurnoFijoItem {

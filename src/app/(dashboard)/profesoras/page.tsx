@@ -54,7 +54,7 @@ const DIAS_OPCIONES = [
 ];
 
 const HORARIOS_MANANA = ['07:00', '08:00', '09:00', '10:00', '11:00'];
-const HORARIOS_TARDE = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+const HORARIOS_TARDE = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'];
 
 export default function ProfesorasPage() {
   const { confirm, alert: alertDialog } = useConfirm();
