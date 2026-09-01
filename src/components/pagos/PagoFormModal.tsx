@@ -259,7 +259,7 @@ export function PagoFormModal({
                 </p>
                 <p className="text-[var(--text-muted)]">
                   DNI: {selectedAlumna.dni}
-                  {selectedAlumna.plan && <span className="ml-2">&bull; Plan: {selectedAlumna.plan}</span>}
+                  {selectedAlumna.plan && <span className="ml-2">• Plan: {selectedAlumna.plan}</span>}
                 </p>
               </div>
               <button
@@ -301,8 +301,8 @@ export function PagoFormModal({
                         {a.last_name}, {a.first_name}
                       </p>
                       <p className="text-[var(--text-muted)]">
-                        DNI: {a.dni} &bull; Tel: {a.phone}
-                        {a.plan && <span className="ml-1">&bull; {a.plan}</span>}
+                        DNI: {a.dni} • Tel: {a.phone}
+                        {a.plan && <span className="ml-1">• {a.plan}</span>}
                       </p>
                     </button>
                   ))}

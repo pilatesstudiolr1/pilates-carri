@@ -374,8 +374,8 @@ export default function PagosPage() {
                   const sedeNombre = sedes.find((s) => s.id === a.sede_id)?.name;
                   return (
                     <option key={a.id} value={a.id}>
-                      {a.last_name ? `${a.last_name}, ` : ''}{a.first_name} &bull; DNI: {a.dni || 'Sin DNI'} &bull; Tel: {a.phone || 'Sin tel'}
-                      {selectedSedeId === 'ALL' && sedeNombre ? ` &bull; [${sedeNombre}]` : ''}
+                      {a.last_name ? `${a.last_name}, ` : ''}{a.first_name} • DNI: {a.dni || 'Sin DNI'} • Tel: {a.phone || 'Sin tel'}
+                      {selectedSedeId === 'ALL' && sedeNombre ? ` • [${sedeNombre}]` : ''}
                     </option>
                   );
                 })}
@@ -582,7 +582,7 @@ export default function PagosPage() {
                       {alum.first_name} {alum.last_name}
                     </h3>
                     <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                      Venció el <span className="font-bold text-rose-600 dark:text-rose-400">{alum.billing_due_date}</span> &bull; Plan: {alum.plan || 'Estándar'} &mdash; <strong className="text-[var(--text-primary)] font-mono">${(alum.plan_amount || 0).toLocaleString('es-AR')}</strong>
+                      Venció el <span className="font-bold text-rose-600 dark:text-rose-400">{alum.billing_due_date}</span> • Plan: {alum.plan || 'Estándar'} — <strong className="text-[var(--text-primary)] font-mono">${(alum.plan_amount || 0).toLocaleString('es-AR')}</strong>
                     </p>
                   </div>
                 </div>
