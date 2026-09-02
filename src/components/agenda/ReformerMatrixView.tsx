@@ -446,32 +446,29 @@ export function ReformerMatrixView({
                           <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#7e22ce] dark:text-[#d8b4fe] mb-1">
                             <span className="lg:hidden">REF {refNum}</span>
                             <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
-                            {statusAsistencia === 'PRESENT' ? (
+                            {statusAsistencia === 'PRESENT' && (
                               <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-950 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
                                 ✓ Presente
                               </span>
-                            ) : statusAsistencia === 'ABSENT' ? (
+                            )}
+                            {statusAsistencia === 'ABSENT' && (
                               <span className="px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-950 text-rose-900 dark:text-rose-200 text-[9px] font-bold">
                                 ✗ Ausente
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
-                                🟣 Reserva / Prueba
                               </span>
                             )}
                           </div>
 
+                          {/* Nombre de la Alumna en negrita */}
                           <span className="font-extrabold text-[13px] text-[#581c87] dark:text-[#f3e8ff] leading-tight block">
                             {alumnaNombre}
                           </span>
 
-                          <span className="text-[10px] text-[#7e22ce] dark:text-[#d8b4fe] block mt-1 font-semibold">
-                            {alumna.status === 'SUSPENDED'
-                              ? '⏸️ Suspendida (Tomó su clase)'
-                              : alumna.enrollment_paid
-                              ? 'Inscripción abonada'
-                              : 'Clase de prueba / Reserva'}
-                          </span>
+                          {/* Subtítulo estándar */}
+                          {!statusAsistencia && (
+                            <span className="text-[11px] text-[#7e22ce] dark:text-[#d8b4fe] block mt-0.5 font-medium">
+                              Sin marcar
+                            </span>
+                          )}
                         </div>
 
                         <div className="mt-2 space-y-1.5">

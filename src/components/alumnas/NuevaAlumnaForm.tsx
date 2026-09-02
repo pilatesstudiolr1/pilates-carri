@@ -703,11 +703,6 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
                   </option>
                 ))}
               </select>
-              {selectedPlanName === 'Solo Inscripción / Clase de prueba' && (
-                <p className="text-[11px] text-purple-700 dark:text-purple-300 font-medium mt-1">
-                  🟣 Sin cobro de plan ($0). Sirve para reservar lugar o clase de prueba individual. Al marcar asistencia en la agenda quedará suspendida automáticamente hasta asignarle un plan mensual.
-                </p>
-              )}
             </div>
 
             <Input
