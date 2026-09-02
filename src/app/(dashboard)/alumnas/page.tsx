@@ -14,6 +14,7 @@ import { getAlumnas, updateAlumna, createAlumna, deleteAlumna } from '@/lib/serv
 import { addAlumnaToClase } from '@/lib/services/agenda';
 import { registrarPago } from '@/lib/services/pagos';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useUser } from '@/hooks/useUser';
 import {
   Users,
   Plus,
@@ -69,6 +70,9 @@ function AlumnasPageContent() {
   const tabParam = searchParams.get('tab');
 
   const { confirm, alert: alertDialog } = useConfirm();
+  const { profile } = useUser();
+  const isProfesora = profile?.role === 'PROFESORA';
+
   const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>(() => {
     return tabParam === 'new' ? 'NEW' : 'LIST';
   });
@@ -86,12 +90,14 @@ function AlumnasPageContent() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
+  const [alumnaToEdit, setAlumnaToEdit] = useState<Alumna | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (tabParam === 'new') {
-      setSelectedAlumna(null);
       setActiveTab('NEW');
+    } else {
+      setActiveTab('LIST');
     }
   }, [tabParam]);
 
@@ -102,6 +108,7 @@ function AlumnasPageContent() {
       search: search || undefined,
       status: statusFilter,
       vencimientoFilter,
+      profesoraId: isProfesora && profile?.id ? profile.id : undefined,
       limit: ITEMS_PER_PAGE,
       offset: (currentPage - 1) * ITEMS_PER_PAGE,
     });
@@ -109,7 +116,7 @@ function AlumnasPageContent() {
     setAlumnas(refRes.data || []);
     setTotalCount(refRes.count || 0);
     setLoading(false);
-  }, [search, statusFilter, vencimientoFilter, currentPage]);
+  }, [search, statusFilter, vencimientoFilter, currentPage, isProfesora, profile?.id]);
 
   useEffect(() => {
     fetchAlumnas();

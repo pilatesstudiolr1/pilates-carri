@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Alumna, MetodoPago } from '@/types/database';
+import { Alumna, MetodoPago, TipoPago } from '@/types/database';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { METODOS_PAGO } from '@/lib/constants';
 import { formatFechaArg, buildAvisoPagoWhatsAppMessage, openWhatsAppMessage } from '@/lib/utils';
@@ -17,6 +17,7 @@ interface PagoFormModalProps {
     alumna_id: string;
     amount: number;
     payment_method: MetodoPago;
+    payment_type?: TipoPago;
     due_date: string;
     commission_rate: number;
     concept?: string;
@@ -88,23 +89,51 @@ export function PagoFormModal({
       if (initialAlumna) {
         setSelectedAlumna(initialAlumna);
         setAlumnaSearch(`${initialAlumna.last_name || ''}, ${initialAlumna.first_name}`);
-        if (initialAlumna.plan_amount && initialAlumna.plan_amount > 0) {
+
+        if (initialAlumna.preferred_payment_method) {
+          setPaymentMethod(initialAlumna.preferred_payment_method as MetodoPago);
+        }
+
+        if (initialAlumna.billing_due_date) {
+          setDueDate(initialAlumna.billing_due_date);
+        } else {
+          const next = new Date();
+          next.setMonth(next.getMonth() + 1);
+          setDueDate(next.toISOString().slice(0, 10));
+        }
+
+        // Si la alumna debe la matrícula de inscripción inicial
+        if (!initialAlumna.enrollment_paid) {
+          setDuracionTipo('INSCRIPCION');
+          setConcept('Matrícula de inscripción inicial');
+          setAmount(initialAlumna.enrollment_amount ? String(initialAlumna.enrollment_amount) : '9500');
+          setCommissionRate('0');
+        } else if (initialAlumna.plan_amount && initialAlumna.plan_amount > 0) {
+          setDuracionTipo('1_MES');
+          setConcept(initialAlumna.plan ? `Cuota mensualidad (${initialAlumna.plan})` : 'Cuota mensualidad (1 Mes)');
           setAmount(String(initialAlumna.plan_amount));
+        } else if (
+          initialAlumna.plan?.toLowerCase().includes('individual') ||
+          initialAlumna.plan?.toLowerCase().includes('prueba') ||
+          initialAlumna.plan?.toLowerCase().includes('suelta')
+        ) {
+          setDuracionTipo('CLASE_SUELTA');
+          setConcept('Clase suelta individual');
+          setAmount('8000');
         } else {
           setAmount('');
         }
       } else {
         setSelectedAlumna(null);
         setAmount('');
+        const next = new Date();
+        next.setMonth(next.getMonth() + 1);
+        setDueDate(next.toISOString().slice(0, 10));
       }
-
-      const next = new Date();
-      next.setMonth(next.getMonth() + 1);
-      setDueDate(next.toISOString().slice(0, 10));
 
       fetchAlumnas();
     }
-  }, [open, initialAlumna]);
+  }, [open, initialAlumna, defaultProfesoraId, defaultCommissionRate]);
 
   const handleDuracionChange = (tipo: '1_MES' | '2_MESES' | '3_MESES' | 'CLASE_SUELTA' | 'INSCRIPCION' | 'OTRO') => {
     setDuracionTipo(tipo);
@@ -114,35 +143,60 @@ export function PagoFormModal({
       const d = new Date(today);
       d.setMonth(d.getMonth() + 1);
       setDueDate(d.toISOString().slice(0, 10));
-      setConcept('Cuota mensualidad (1 Mes)');
+      setConcept(selectedAlumna?.plan ? `Cuota mensualidad (${selectedAlumna.plan})` : 'Cuota mensualidad (1 Mes)');
       if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount));
+      if (defaultCommissionRate != null) {
+        setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
+      } else {
+        setCommissionRate('40');
+      }
     } else if (tipo === '2_MESES') {
       const d = new Date(today);
       d.setMonth(d.getMonth() + 2);
       setDueDate(d.toISOString().slice(0, 10));
       setConcept('Cuota Bimestral (2 Meses)');
       if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount * 2));
+      if (defaultCommissionRate != null) {
+        setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
+      } else {
+        setCommissionRate('40');
+      }
     } else if (tipo === '3_MESES') {
       const d = new Date(today);
       d.setMonth(d.getMonth() + 3);
       setDueDate(d.toISOString().slice(0, 10));
       setConcept('Cuota Trimestral (3 Meses)');
       if (selectedAlumna?.plan_amount) setAmount(String(selectedAlumna.plan_amount * 3));
+      if (defaultCommissionRate != null) {
+        setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
+      } else {
+        setCommissionRate('40');
+      }
     } else if (tipo === 'CLASE_SUELTA') {
       setDueDate(today.toISOString().slice(0, 10));
       setConcept('Clase suelta individual');
       setAmount('8000');
+      if (defaultCommissionRate != null) {
+        setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
+      } else {
+        setCommissionRate('40');
+      }
     } else if (tipo === 'INSCRIPCION') {
       setDueDate(today.toISOString().slice(0, 10));
       setConcept('Matrícula de inscripción inicial');
       setAmount('9500');
+      setCommissionRate('0');
     } else {
       setConcept('Pago personalizado');
     }
   };
 
   const fetchAlumnas = async () => {
-    const { data } = await getAlumnas({ status: 'ACTIVE', limit: 200 });
+    const { data } = await getAlumnas({
+      status: 'ACTIVE',
+      profesoraId: defaultProfesoraId || undefined,
+      limit: 200,
+    });
     setAlumnas(data);
   };
 
@@ -192,16 +246,23 @@ export function PagoFormModal({
       return;
     }
 
-    const finalCommissionRate = disableCommissionEdit && defaultCommissionRate != null
-      ? defaultCommissionRate
-      : (parseFloat(commissionRate) || 40) / 100;
-
     const currentConcept = concept.trim() || 'Cuota mensualidad';
+
+    const isInscripcion =
+      duracionTipo === 'INSCRIPCION' ||
+      currentConcept.toLowerCase().includes('inscripci');
+
+    const finalCommissionRate = isInscripcion
+      ? 0
+      : (disableCommissionEdit && defaultCommissionRate != null
+          ? defaultCommissionRate
+          : (parseFloat(commissionRate) || 40) / 100);
 
     const success = await onSubmit({
       alumna_id: selectedAlumna.id,
       amount: numericAmount,
       payment_method: paymentMethod,
+      payment_type: isInscripcion ? 'INSCRIPCION' : (duracionTipo === 'CLASE_SUELTA' ? 'CLASE_SUELTA' : 'MENSUALIDAD'),
       due_date: dueDate,
       commission_rate: finalCommissionRate,
       concept: currentConcept,
@@ -537,10 +598,23 @@ export function PagoFormModal({
         {/* Preview de comision */}
         {selectedAlumna && amount && parseFloat(amount) > 0 && (
           <div className="p-3 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs flex items-center justify-between">
-            <span className="text-[var(--text-muted)]">Comision calculada ({commissionRate}%)</span>
-            <span className="font-bold text-[var(--color-wood)]">
-              ${(parseFloat(amount) * (parseFloat(commissionRate) || 40) / 100).toLocaleString()}
-            </span>
+            {duracionTipo === 'INSCRIPCION' || concept.toLowerCase().includes('inscripci') ? (
+              <>
+                <span className="text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-1">
+                  🟣 Caja General (Inscripción - Sin comisión a profesoras)
+                </span>
+                <span className="font-bold text-purple-600 dark:text-purple-400">
+                  $0 ARS
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[var(--text-muted)]">Comisión calculada ({commissionRate}%)</span>
+                <span className="font-bold text-[var(--color-wood)]">
+                  ${(parseFloat(amount) * (parseFloat(commissionRate) || 40) / 100).toLocaleString()} ARS
+                </span>
+              </>
+            )}
           </div>
         )}
 

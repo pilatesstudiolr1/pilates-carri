@@ -14,6 +14,7 @@ import {
   AlertCircle,
   HelpCircle,
   User,
+  Lock,
 } from 'lucide-react';
 
 const DIAS = [
@@ -60,6 +61,8 @@ interface ReformerMatrixViewProps {
   onCobrar?: (alumna: any) => void;
   asistencias?: Record<string, string>; // clase_alumna_id -> status
   maxCamillas?: number;
+  currentProfesoraId?: string;
+  isProfesoraView?: boolean;
 }
 
 function formatFechaCorta(fechaStr?: string | null): string {
@@ -82,6 +85,8 @@ export function ReformerMatrixView({
   onCobrar,
   asistencias = {},
   maxCamillas,
+  currentProfesoraId,
+  isProfesoraView = false,
 }: ReformerMatrixViewProps) {
   const { selectedSede } = useSede();
   const effectiveMaxCamillas = maxCamillas || (selectedSede?.max_camillas ? selectedSede.max_camillas : 6);
@@ -100,7 +105,7 @@ export function ReformerMatrixView({
       (c) => c.start_time.startsWith(hora) || c.start_time.slice(0, 5) === hora
     );
 
-    const camillasMap: Record<number, { alumna: any; caId: string; status?: string } | null> = {};
+    const camillasMap: Record<number, { alumna: any; caId: string; status?: string; is_other_profesora?: boolean } | null> = {};
     camillasList.forEach((num) => {
       camillasMap[num] = null;
     });
@@ -114,6 +119,7 @@ export function ReformerMatrixView({
               alumna: item.alumna || item,
               caId: item.id || `ca-${idx}`,
               status: item.status,
+              is_other_profesora: item.is_other_profesora || false,
             };
           }
         });
@@ -381,6 +387,117 @@ export function ReformerMatrixView({
                   const phone = alumna.phone || '';
                   const statusAsistencia = asistencias[item.caId];
 
+                  // 0. Si es vista de profesora y la alumna pertenece a otra profesora, enmascarar slot
+                  const isOtherProfesora =
+                    item.is_other_profesora ||
+                    (isProfesoraView &&
+                      currentProfesoraId &&
+                      alumna.profesora_id &&
+                      alumna.profesora_id !== currentProfesoraId);
+
+                  if (isProfesoraView && isOtherProfesora) {
+                    return (
+                      <div
+                        key={refNum}
+                        className="p-3 rounded-xl bg-[var(--bg-tertiary)]/60 border-2 border-dashed border-[var(--border-default)] flex flex-col justify-between min-h-[110px] text-left opacity-75 select-none"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
+                            <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
+                          </div>
+                          <span className="font-bold text-[12px] text-[var(--text-muted)] leading-tight flex items-center gap-1.5 mt-0.5">
+                            <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Ocupado
+                          </span>
+                          <span className="text-[10px] text-[var(--text-muted)] block mt-1 font-medium italic">
+                            Otra profesora
+                          </span>
+                        </div>
+                        <div className="mt-2 text-[10px] text-[var(--text-muted)] font-mono">
+                          No asignada a tu cargo
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Evaluar si es clase individual, clase de prueba o solo inscripción
+                  const isClaseIndividualOInscripcion =
+                    alumna.plan === 'Solo Inscripción / Clase de prueba' ||
+                    (alumna.plan && alumna.plan.toLowerCase().includes('individual')) ||
+                    (alumna.plan && alumna.plan.toLowerCase().includes('prueba')) ||
+                    (alumna.plan && alumna.plan.toLowerCase().includes('inscripci')) ||
+                    (alumna.enrollment_paid && (!alumna.plan_amount || alumna.plan_amount === 0));
+
+                  // CASO MORADO: Clase individual o sólo inscripción
+                  if (isClaseIndividualOInscripcion) {
+                    return (
+                      <div
+                        key={refNum}
+                        onClick={() => {
+                          if (onSelectOccupiedSlot) {
+                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                          } else if (row.clase) {
+                            onSelectClase(row.clase);
+                          }
+                        }}
+                        className="p-3 rounded-xl bg-[#faf5ff] dark:bg-[#1e102d] border-2 border-[#9333ea] hover:border-[#7e22ce] dark:border-[#a855f7] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#7e22ce] dark:text-[#d8b4fe] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
+                            <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                            {statusAsistencia === 'PRESENT' ? (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-950 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
+                                ✓ Presente
+                              </span>
+                            ) : statusAsistencia === 'ABSENT' ? (
+                              <span className="px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-950 text-rose-900 dark:text-rose-200 text-[9px] font-bold">
+                                ✗ Ausente
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-900/60 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
+                                🟣 Reserva / Prueba
+                              </span>
+                            )}
+                          </div>
+
+                          <span className="font-extrabold text-[13px] text-[#581c87] dark:text-[#f3e8ff] leading-tight block">
+                            {alumnaNombre}
+                          </span>
+
+                          <span className="text-[10px] text-[#7e22ce] dark:text-[#d8b4fe] block mt-1 font-semibold">
+                            {alumna.status === 'SUSPENDED'
+                              ? '⏸️ Suspendida (Tomó su clase)'
+                              : alumna.enrollment_paid
+                              ? 'Inscripción abonada'
+                              : 'Clase de prueba / Reserva'}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 space-y-1.5">
+                          <span className="text-[11px] text-[#7e22ce] dark:text-[#c4b5fd] font-mono block truncate">
+                            {phone || 'Sin tel'}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onCobrar) {
+                                onCobrar(alumna);
+                              } else if (onSelectOccupiedSlot) {
+                                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                              }
+                            }}
+                            className="w-full py-1 px-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
+                          >
+                            <span>💵 Cobrar</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   // Evaluar si es pendiente de inicio (fecha futura)
                   const fechaInicio = alumna.billing_start_date || alumna.start_date || alumna.entry_date;
                   const fechaReferencia = fechaAsistencia || hoyStr;
@@ -453,8 +570,25 @@ export function ReformerMatrixView({
                             {alumnaNombre}
                           </span>
                         </div>
-                        <div className="mt-2 text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
-                          {phone || 'Asistencia confirmada'}
+                        <div className="mt-2 space-y-1.5">
+                          <div className="text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
+                            {phone || 'Asistencia confirmada'}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onCobrar) {
+                                onCobrar(alumna);
+                              } else if (onSelectOccupiedSlot) {
+                                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                              }
+                            }}
+                            className="w-full py-1 px-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
+                          >
+                            <span>💵 Cobrar</span>
+                          </button>
                         </div>
                       </div>
                     );

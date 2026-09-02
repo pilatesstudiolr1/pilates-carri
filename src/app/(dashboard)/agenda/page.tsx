@@ -13,12 +13,13 @@ import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
-import { Clase, Profile, Alumna, MetodoPago } from '@/types/database';
+import { Clase, Profile, Alumna, MetodoPago, TipoPago } from '@/types/database';
 import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
 import { getProfiles } from '@/lib/services/profesoras';
 import { registrarPago } from '@/lib/services/pagos';
 import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Sparkles, Building2 } from 'lucide-react';
 import { useSede } from '@/hooks/useSede';
+import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
 
 const DIAS = [
@@ -33,10 +34,19 @@ const DIAS = [
 export default function AgendaPage() {
   const { confirm, alert: alertDialog } = useConfirm();
   const { selectedSedeId, setSelectedSedeId, sedes } = useSede();
+  const { profile } = useUser();
+  const isProfesora = profile?.role === 'PROFESORA';
+
   const [viewMode, setViewMode] = useState<'REFORMER' | 'WEEK' | 'DISPONIBILIDAD'>('REFORMER');
 
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [profesoraFilter, setProfesoraFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    if (isProfesora && profile?.id) {
+      setProfesoraFilter(profile.id);
+    }
+  }, [isProfesora, profile?.id]);
 
   const [clases, setClases] = useState<Clase[]>([]);
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
@@ -310,6 +320,29 @@ export default function AgendaPage() {
               },
               { onConflict: 'clase_alumna_id,date' }
             );
+
+            // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
+            if (data.asistenciaStatus === 'PRESENT') {
+              const { data: alumData } = await supabase
+                .from('alumnas')
+                .select('id, plan, plan_amount')
+                .eq('id', data.alumnaId)
+                .maybeSingle();
+
+              const isTrial =
+                alumData?.plan === 'Solo Inscripción / Clase de prueba' ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('individual')) ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('prueba')) ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('inscripci')) ||
+                (alumData?.plan_amount === 0 && !alumData?.plan);
+
+              if (isTrial) {
+                await supabase
+                  .from('alumnas')
+                  .update({ status: 'SUSPENDED' })
+                  .eq('id', data.alumnaId);
+              }
+            }
           }
         }
       }
@@ -335,6 +368,7 @@ export default function AgendaPage() {
     alumna_id: string;
     amount: number;
     payment_method: MetodoPago;
+    payment_type?: TipoPago;
     due_date: string;
     commission_rate: number;
     concept?: string;
@@ -347,6 +381,7 @@ export default function AgendaPage() {
         alumna_id: pagoData.alumna_id,
         amount: pagoData.amount,
         payment_method: pagoData.payment_method,
+        payment_type: pagoData.payment_type,
         due_date: pagoData.due_date,
         commission_rate: pagoData.commission_rate,
         concept: pagoData.concept,
@@ -535,6 +570,8 @@ export default function AgendaPage() {
           clases={clases}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          currentProfesoraId={isProfesora && profile?.id ? profile.id : undefined}
+          isProfesoraView={isProfesora}
           onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
             handleAbrirTurnoModal(day, time, camilla || 1, null)
           }
@@ -592,6 +629,8 @@ export default function AgendaPage() {
             setSelectedAlumnaParaPago(null);
           }}
           initialAlumna={selectedAlumnaParaPago}
+          defaultProfesoraId={isProfesora && profile?.id ? profile.id : (selectedAlumnaParaPago?.profesora_id || undefined)}
+          disableCommissionEdit={isProfesora}
           onSubmit={handleRegistrarCobro}
         />
       )}

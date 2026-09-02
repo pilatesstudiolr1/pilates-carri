@@ -8,6 +8,7 @@ export async function getAlumnas(options?: {
   limit?: number;
   offset?: number;
   sedeId?: string;
+  profesoraId?: string;
 }): Promise<{ data: Alumna[]; count: number; error: string | null }> {
   try {
     const supabase = createClient();
@@ -17,6 +18,10 @@ export async function getAlumnas(options?: {
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
       query = query.eq('sede_id', options.sedeId);
+    }
+
+    if (options?.profesoraId && options.profesoraId !== 'ALL') {
+      query = query.eq('profesora_id', options.profesoraId);
     }
 
     if (options?.status && options.status !== 'ALL') {

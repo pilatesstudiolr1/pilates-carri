@@ -34,13 +34,26 @@ export async function getClases(options?: {
     const formattedClases: Clase[] = (data || []).map((item: any) => {
       let filteredAlumnas = item.clase_alumnas || [];
 
-      // Si se filtra por profesora, mostrar las alumnas vinculadas a esa profesora
+      // Si se filtra por profesora, enmascarar alumnas asignadas a otras profesoras
+      // para no filtrar la camilla (evita doble asignación) pero proteger privacidad
       if (options?.profesoraId && options.profesoraId !== 'ALL') {
-        filteredAlumnas = filteredAlumnas.filter(
-          (ca: any) =>
-            ca.alumna?.profesora_id === options.profesoraId ||
-            item.profesora_id === options.profesoraId
-        );
+        filteredAlumnas = filteredAlumnas.map((ca: any) => {
+          if (ca.alumna && ca.alumna.profesora_id && ca.alumna.profesora_id !== options.profesoraId) {
+            return {
+              ...ca,
+              is_other_profesora: true,
+              alumna: {
+                id: ca.alumna.id,
+                first_name: 'Ocupado',
+                last_name: '(Otra profesora)',
+                phone: '',
+                dni: '',
+                profesora_id: ca.alumna.profesora_id,
+              },
+            };
+          }
+          return ca;
+        });
       }
 
       return {
@@ -92,11 +105,23 @@ export async function getClasesConAlumnas(options?: {
       let filteredAlumnas = item.clase_alumnas || [];
 
       if (options?.profesoraId && options.profesoraId !== 'ALL') {
-        filteredAlumnas = filteredAlumnas.filter(
-          (ca: any) =>
-            ca.alumna?.profesora_id === options.profesoraId ||
-            item.profesora_id === options.profesoraId
-        );
+        filteredAlumnas = filteredAlumnas.map((ca: any) => {
+          if (ca.alumna && ca.alumna.profesora_id && ca.alumna.profesora_id !== options.profesoraId) {
+            return {
+              ...ca,
+              is_other_profesora: true,
+              alumna: {
+                id: ca.alumna.id,
+                first_name: 'Ocupado',
+                last_name: '(Otra profesora)',
+                phone: '',
+                dni: '',
+                profesora_id: ca.alumna.profesora_id,
+              },
+            };
+          }
+          return ca;
+        });
       }
 
       return {

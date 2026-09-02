@@ -10,6 +10,7 @@ import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
+import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Clase, Profile } from '@/types/database';
 import {
@@ -19,6 +20,7 @@ import {
   removeAlumnaFromClase,
   deleteClase,
 } from '@/lib/services/agenda';
+import { registrarPago } from '@/lib/services/pagos';
 import { getProfiles } from '@/lib/services/profesoras';
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
@@ -65,6 +67,8 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
+  const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
+  const [selectedAlumnaParaPago, setSelectedAlumnaParaPago] = useState<any | null>(null);
 
   const [selectedClase, setSelectedClase] = useState<Clase | null>(null);
   const [turnoModalDayName, setTurnoModalDayName] = useState('Lunes');
@@ -277,6 +281,29 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             date: fechaHoy,
             status: data.asistenciaStatus,
           });
+
+          // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
+          if (data.asistenciaStatus === 'PRESENT') {
+            const { data: alumData } = await supabase
+              .from('alumnas')
+              .select('id, plan, plan_amount')
+              .eq('id', data.alumnaId)
+              .maybeSingle();
+
+            const isTrial =
+              alumData?.plan === 'Solo Inscripción / Clase de prueba' ||
+              (alumData?.plan && alumData.plan.toLowerCase().includes('individual')) ||
+              (alumData?.plan && alumData.plan.toLowerCase().includes('prueba')) ||
+              (alumData?.plan && alumData.plan.toLowerCase().includes('inscripci')) ||
+              (alumData?.plan_amount === 0 && !alumData?.plan);
+
+            if (isTrial) {
+              await supabase
+                .from('alumnas')
+                .update({ status: 'SUSPENDED' })
+                .eq('id', data.alumnaId);
+            }
+          }
         }
       }
 
@@ -401,6 +428,12 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             clases={clases}
             selectedDay={selectedDay}
             onSelectDay={setSelectedDay}
+            currentProfesoraId={profile?.id}
+            isProfesoraView={true}
+            onCobrar={(alumna) => {
+              setSelectedAlumnaParaPago(alumna);
+              setIsPagoModalOpen(true);
+            }}
             onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
               handleAbrirTurnoModal(day, time, camilla || 1, null)
             }
@@ -434,6 +467,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
         presetTime={presetTime}
         presetCamilla={presetCamilla}
         alumnaAsignada={selectedAlumnaAsignada}
+        profesoraFilter={profile?.id}
         onSave={handleSaveTurnoFromModal}
         onDeleteTurno={async (claseId, alumnaId) => {
           if (alumnaId) {
@@ -491,6 +525,44 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
         initialStartTime={presetTime}
         loading={submitting}
       />
+
+      {/* Modal de Cobro Directo heredado de la Alumna */}
+      {isPagoModalOpen && (
+        <PagoFormModal
+          open={isPagoModalOpen}
+          onClose={() => {
+            setIsPagoModalOpen(false);
+            setSelectedAlumnaParaPago(null);
+            fetchAgenda();
+          }}
+          initialAlumna={selectedAlumnaParaPago}
+          defaultProfesoraId={profile?.id}
+          defaultCommissionRate={profile?.commission_rate ?? 0.4}
+          disableCommissionEdit={true}
+          onSubmit={async (pagoData) => {
+            const res = await registrarPago({
+              ...pagoData,
+              profesora_id: profile?.id || pagoData.profesora_id,
+            });
+            if (res.data) {
+              await alertDialog({
+                title: '¡Cobro Registrado!',
+                message: `Se registró correctamente el cobro por $${pagoData.amount.toLocaleString('es-AR')}.`,
+                variant: 'success',
+              });
+              fetchAgenda();
+              return true;
+            } else {
+              await alertDialog({
+                title: 'Error al cobrar',
+                message: res.error || 'No se pudo registrar el pago',
+                variant: 'danger',
+              });
+              return false;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

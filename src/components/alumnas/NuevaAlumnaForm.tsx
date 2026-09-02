@@ -235,9 +235,16 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
 
   const handlePlanChange = (planName: string) => {
     setSelectedPlanName(planName);
+    if (planName === 'Solo Inscripción / Clase de prueba') {
+      setImporte('0');
+      return;
+    }
     const foundPlan = planes.find((p) => p.name === planName);
     if (foundPlan) {
       setImporte(foundPlan.price.toString());
+      if (status === 'SUSPENDED') {
+        setStatus('ACTIVE');
+      }
     }
   };
 
@@ -369,6 +376,17 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
 
     const inscripcionMontoNum = parseFloat(montoInscripcion) || 9500;
 
+    const finalPlanAmount = parseFloat(importe) || 0;
+    let finalStatus = status;
+    if (
+      selectedPlanName &&
+      selectedPlanName !== 'Solo Inscripción / Clase de prueba' &&
+      finalPlanAmount > 0 &&
+      status === 'SUSPENDED'
+    ) {
+      finalStatus = 'ACTIVE';
+    }
+
     const payload = {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
@@ -382,13 +400,13 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
       profesora_id: selectedProfesoraId || null,
       sede_id: alumnaSedeId || null,
       plan: selectedPlanName || null,
-      plan_amount: parseFloat(importe) || 0,
+      plan_amount: finalPlanAmount,
       billing_start_date: billingStartDate || null,
       billing_due_date: billingDueDate || null,
       enrollment_paid: cobrarInscripcion,
       enrollment_amount: cobrarInscripcion ? inscripcionMontoNum : 0,
       preferred_payment_method: cobrarInscripcion ? metodoPagoInscripcion : null,
-      status,
+      status: finalStatus,
       medical_clearance: hasMedicalClearance,
       diseases: diseases.trim() || null,
       surgeries: surgeries.trim() || null,
@@ -676,16 +694,20 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
                 onChange={(e) => handlePlanChange(e.target.value)}
                 className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
               >
-                {planes.length === 0 ? (
-                  <option value="">Sin planes activos (configure en Configuración)</option>
-                ) : (
-                  planes.map((pl) => (
-                    <option key={pl.id} value={pl.name}>
-                      {pl.name} - ${pl.price.toLocaleString()}
-                    </option>
-                  ))
-                )}
+                <option value="Solo Inscripción / Clase de prueba">
+                  🟣 Solo Inscripción / Clase de prueba ($0 - Reserva)
+                </option>
+                {planes.map((pl) => (
+                  <option key={pl.id} value={pl.name}>
+                    {pl.name} - ${pl.price.toLocaleString()}
+                  </option>
+                ))}
               </select>
+              {selectedPlanName === 'Solo Inscripción / Clase de prueba' && (
+                <p className="text-[11px] text-purple-700 dark:text-purple-300 font-medium mt-1">
+                  🟣 Sin cobro de plan ($0). Sirve para reservar lugar o clase de prueba individual. Al marcar asistencia en la agenda quedará suspendida automáticamente hasta asignarle un plan mensual.
+                </p>
+              )}
             </div>
 
             <Input

@@ -143,8 +143,12 @@ export function TurnoModal({
         setSelectedProfesoraId('');
       }
 
-      // Cargar lista de alumnas activas
-      getAlumnas({ status: 'ACTIVE', limit: 300 }).then((res) => {
+      // Cargar lista de alumnas activas (filtradas por profesora si corresponde)
+      getAlumnas({
+        status: 'ACTIVE',
+        profesoraId: profesoraFilter && profesoraFilter !== 'ALL' ? profesoraFilter : undefined,
+        limit: 300,
+      }).then((res) => {
         setAlumnas(res.data || []);
       });
     }

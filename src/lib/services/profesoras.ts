@@ -180,7 +180,7 @@ export async function getLiquidacionProfesoras(): Promise<{
     const [pagosRes, alumnasRes, profilesRes] = await Promise.all([
       supabase
         .from('pagos')
-        .select('amount, payment_date, profesora_id, alumna_id')
+        .select('amount, payment_date, profesora_id, alumna_id, payment_type')
         .gte('payment_date', `${mesActual}-01`),
       supabase
         .from('alumnas')
@@ -217,7 +217,8 @@ export async function getLiquidacionProfesoras(): Promise<{
 
       const esHoy = pago.payment_date === hoy;
       const rate = profesora.commission_rate ?? 0.4;
-      const comision = (pago.amount || 0) * rate;
+      const isInscripcion = pago.payment_type === 'INSCRIPCION';
+      const comision = isInscripcion ? 0 : (pago.amount || 0) * rate;
 
       if (!map.has(pid)) {
         map.set(pid, {

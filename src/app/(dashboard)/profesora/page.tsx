@@ -170,7 +170,13 @@ export default function ProfesoraVistaPage() {
 
       const total = pagosSemana.reduce((acc, p) => acc + (p.amount || 0), 0);
       setSemanaTotal(total);
-      setSemanaComision(total * commissionRate);
+
+      // Excluir pagos de inscripción de la comisión
+      const totalComisionable = pagosSemana
+        .filter((p) => p.payment_type !== 'INSCRIPCION' && !p.concept?.toLowerCase().includes('inscripci'))
+        .reduce((acc, p) => acc + (p.amount || 0), 0);
+
+      setSemanaComision(totalComisionable * commissionRate);
     } catch (err) {
       console.error('Error calculando resumen semanal:', err);
     }
@@ -211,6 +217,30 @@ export default function ProfesoraVistaPage() {
           date: selectedDate,
           status,
         });
+      }
+
+      // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
+      if (status === 'PRESENT') {
+        const { data: caData } = await supabase
+          .from('clase_alumnas')
+          .select('alumna_id, alumna:alumnas(id, plan, plan_amount)')
+          .eq('id', claseAlumnaId)
+          .maybeSingle();
+
+        const alum = (caData as any)?.alumna;
+        const isTrial =
+          alum?.plan === 'Solo Inscripción / Clase de prueba' ||
+          (alum?.plan && alum.plan.toLowerCase().includes('individual')) ||
+          (alum?.plan && alum.plan.toLowerCase().includes('prueba')) ||
+          (alum?.plan && alum.plan.toLowerCase().includes('inscripci')) ||
+          (alum?.plan_amount === 0 && !alum?.plan);
+
+        if (isTrial && caData?.alumna_id) {
+          await supabase
+            .from('alumnas')
+            .update({ status: 'SUSPENDED' })
+            .eq('id', caData.alumna_id);
+        }
       }
     } catch (err) {
       console.error('Error al guardar asistencia:', err);
@@ -744,7 +774,10 @@ export default function ProfesoraVistaPage() {
                       const alumnaNombre = pago.alumna
                         ? `${pago.alumna.last_name || ''}, ${pago.alumna.first_name}`.trim()
                         : 'Alumna';
-                      const comisionMonto = (pago.amount || 0) * commissionRate;
+                      const isPagoInscripcion =
+                        pago.payment_type === 'INSCRIPCION' ||
+                        (pago.concept?.toLowerCase().includes('inscripci') ?? false);
+                      const comisionMonto = isPagoInscripcion ? 0 : (pago.amount || 0) * commissionRate;
 
                       return (
                         <tr key={pago.id} className="hover:bg-[var(--bg-tertiary)]/40 transition-colors">

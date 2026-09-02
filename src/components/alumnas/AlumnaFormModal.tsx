@@ -157,9 +157,16 @@ export function AlumnaFormModal({
 
   const handlePlanChange = (planName: string) => {
     setSelectedPlan(planName);
+    if (planName === 'Solo Inscripción / Clase de prueba') {
+      setPlanAmount('0');
+      return;
+    }
     const found = planes.find((p) => p.name === planName);
     if (found) {
       setPlanAmount(found.price.toString());
+      if (status === 'SUSPENDED') {
+        setStatus('ACTIVE');
+      }
     }
   };
 
@@ -170,6 +177,17 @@ export function AlumnaFormModal({
     if (!firstName.trim() || !phone.trim()) {
       setErrorMsg('Por favor completa los campos obligatorios (Nombre y Teléfono)');
       return;
+    }
+
+    const finalAmount = parseFloat(planAmount) || 0;
+    let finalStatus = status;
+    if (
+      selectedPlan &&
+      selectedPlan !== 'Solo Inscripción / Clase de prueba' &&
+      finalAmount > 0 &&
+      status === 'SUSPENDED'
+    ) {
+      finalStatus = 'ACTIVE';
     }
 
     const payload: AlumnaInsert = {
@@ -195,7 +213,7 @@ export function AlumnaFormModal({
       health_observations: alumnaToEdit?.health_observations || null,
       // Plan y facturacion
       plan: selectedPlan || null,
-      plan_amount: parseFloat(planAmount) || 0,
+      plan_amount: finalAmount,
       billing_start_date: billingStartDate || null,
       billing_due_date: billingDueDate || null,
       enrollment_paid: enrollmentPaid,
@@ -203,7 +221,7 @@ export function AlumnaFormModal({
       monthly_paid: alumnaToEdit?.monthly_paid || false,
       preferred_payment_method: enrollmentPaid ? preferredPaymentMethod : null,
       // Estado y fechas
-      status,
+      status: finalStatus,
       entry_date: entryDate || new Date().toISOString().split('T')[0],
       exit_date: alumnaToEdit?.exit_date || null,
       exit_reason: alumnaToEdit?.exit_reason || null,
@@ -402,6 +420,9 @@ export function AlumnaFormModal({
                 className="w-full h-10 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold cursor-pointer"
               >
                 <option value="">Seleccionar plan</option>
+                <option value="Solo Inscripción / Clase de prueba">
+                  🟣 Solo Inscripción / Clase de prueba ($0 - Reserva)
+                </option>
                 {planes.map((p) => (
                   <option key={p.id} value={p.name}>
                     {p.name} - ${p.price.toLocaleString()}

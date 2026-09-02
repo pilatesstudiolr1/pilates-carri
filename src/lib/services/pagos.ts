@@ -55,8 +55,18 @@ export async function registrarPago(pagoData: {
     const supabase = createClient();
     const today = new Date().toISOString().split('T')[0];
 
-    const commRate = pagoData.commission_rate != null ? pagoData.commission_rate : 0.40;
-    const commAmount = (pagoData.amount || 0) * commRate;
+    const isInscripcion =
+      pagoData.payment_type === 'INSCRIPCION' ||
+      (pagoData.concept?.toLowerCase().includes('inscripci') ?? false);
+
+    const commRate = isInscripcion
+      ? 0
+      : (pagoData.commission_rate != null ? pagoData.commission_rate : 0.40);
+    const commAmount = isInscripcion ? 0 : (pagoData.amount || 0) * commRate;
+
+    const finalPaymentType: TipoPago = isInscripcion
+      ? 'INSCRIPCION'
+      : (pagoData.payment_type || 'MENSUALIDAD');
 
     const { data, error } = await supabase
       .from('pagos')
@@ -64,9 +74,9 @@ export async function registrarPago(pagoData: {
         alumna_id: pagoData.alumna_id,
         amount: pagoData.amount,
         payment_method: pagoData.payment_method,
-        payment_type: pagoData.payment_type || 'MENSUALIDAD',
+        payment_type: finalPaymentType,
         payment_date: today,
-        concept: pagoData.concept || (pagoData.payment_type === 'INSCRIPCION' ? 'Inscripción inicial' : 'Cuota mensualidad'),
+        concept: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Inscripción inicial' : 'Cuota mensualidad'),
         period: pagoData.billing_month || null,
         commission_rate: commRate,
         commission_amount: commAmount,
