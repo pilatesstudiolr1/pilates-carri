@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { CajaMovimiento, MetodoPago, Sede } from '@/types/database';
-import { getMovimientos, registrarMovimiento } from '@/lib/services/caja';
+import { getMovimientos, registrarMovimiento, deleteMovimiento } from '@/lib/services/caja';
 import { getSedes } from '@/lib/services/sedes';
 import { METODOS_PAGO } from '@/lib/constants';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useUser } from '@/hooks/useUser';
 import {
   Wallet,
   Plus,
@@ -28,6 +29,7 @@ import {
   ChevronRight,
   Receipt,
   Search,
+  Trash2,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 30;
@@ -40,7 +42,10 @@ function formatMonthLabel(monthKey: string) {
 }
 
 export default function CajaPage() {
-  const { alert: alertDialog } = useConfirm();
+  const { confirm, alert: alertDialog } = useConfirm();
+  const { profile } = useUser();
+  const isAdmin = profile?.role === 'ADMIN';
+
   const [sedes, setSedes] = useState<Sede[]>([]);
   const [selectedSedeId, setSelectedSedeId] = useState<string>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL');
@@ -132,6 +137,27 @@ export default function CajaPage() {
       setConcepto('');
       setMonto('');
       setIsModalOpen(false);
+      fetchData();
+    }
+  };
+
+  const handleDeleteMovimiento = async (mov: CajaMovimiento) => {
+    const isConfirmed = await confirm({
+      title: 'Eliminar Movimiento de Caja',
+      message: `¿Estás seguro de eliminar el movimiento "${mov.concepto}" por $${(Number(mov.monto) || 0).toLocaleString('es-AR')}? Si corresponde a un cobro registrado, también se anulará el registro para que la caja quede limpia.`,
+      confirmText: 'Sí, eliminar',
+      variant: 'danger',
+    });
+    if (!isConfirmed) return;
+
+    const { error } = await deleteMovimiento(mov.id);
+    if (error) {
+      await alertDialog({
+        title: 'Error al eliminar',
+        message: `No se pudo eliminar el movimiento: ${error}`,
+        variant: 'danger',
+      });
+    } else {
       fetchData();
     }
   };
@@ -412,6 +438,7 @@ export default function CajaPage() {
                   <th className="py-3 px-4 font-semibold">Método de Pago</th>
                   <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Monto</th>
                   <th className="py-3 px-4 font-semibold text-right">Fecha y Hora</th>
+                  {isAdmin && <th className="py-3 px-4 font-semibold text-center w-20">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
@@ -460,6 +487,19 @@ export default function CajaPage() {
                         second: '2-digit',
                       })}
                     </td>
+
+                    {isAdmin && (
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMovimiento(mov)}
+                          className="p-1.5 rounded-[8px] bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer inline-flex items-center justify-center"
+                          title="Eliminar movimiento / pago ficticio (Solo Admin)"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

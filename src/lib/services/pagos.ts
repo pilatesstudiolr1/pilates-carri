@@ -107,6 +107,7 @@ export async function registrarPago(pagoData: {
         monto: pagoData.amount,
         metodo_pago: pagoData.payment_method,
         sede_id: pagoData.sede_id || null,
+        description: data?.id ? `pago_id:${data.id}` : null,
       });
       if (cajaError) {
         console.warn('Advertencia al registrar movimiento de caja:', cajaError.message);
@@ -118,6 +119,7 @@ export async function registrarPago(pagoData: {
     return {
       data: {
         ...data,
+        due_date: pagoData.due_date,
         commission_rate: (data as any)?.commission_rate ?? commRate,
         commission_amount: (data as any)?.commission_amount ?? commAmount,
       } as Pago,
@@ -134,12 +136,44 @@ export async function registrarPago(pagoData: {
 export async function deletePago(id: string): Promise<{ error: string | null }> {
   try {
     const supabase = createClient();
+
+    // 1. Obtener detalles del pago antes de borrarlo
+    const { data: pago } = await supabase
+      .from('pagos')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    // 2. Eliminar el pago
     const { error } = await supabase
       .from('pagos')
       .delete()
       .eq('id', id);
 
     if (error) return { error: error.message };
+
+    // 3. Eliminar el movimiento correspondiente en caja_movimientos si existe
+    if (pago) {
+      try {
+        const { error: delDescError } = await supabase
+          .from('caja_movimientos')
+          .delete()
+          .eq('description', `pago_id:${id}`);
+
+        if (delDescError) {
+          // Si no tenía description con pago_id, buscar por monto, fecha y tipo
+          await supabase
+            .from('caja_movimientos')
+            .delete()
+            .eq('monto', pago.amount)
+            .eq('fecha', pago.payment_date)
+            .eq('tipo', 'INGRESO');
+        }
+      } catch (syncErr) {
+        console.warn('Advertencia al sincronizar borrado de caja:', syncErr);
+      }
+    }
+
     return { error: null };
   } catch (err) {
     return {
@@ -147,3 +181,4 @@ export async function deletePago(id: string): Promise<{ error: string | null }> 
     };
   }
 }
+

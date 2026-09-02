@@ -271,7 +271,10 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
 
   const getOccupiedCamillasForTurno = (dayOfWeek: number, startTime: string): number[] => {
     const matchingClase = allClases.find(
-      (c) => c.day_of_week === dayOfWeek && c.start_time.startsWith(startTime)
+      (c) =>
+        c.day_of_week === dayOfWeek &&
+        c.start_time.startsWith(startTime) &&
+        (!alumnaSedeId || c.sede_id === alumnaSedeId)
     );
     if (!matchingClase) return [];
     return occupiedMap[matchingClase.id] || [];
@@ -281,9 +284,22 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
     const occ = getOccupiedCamillasForTurno(dayOfWeek, startTime);
     const maxC = currentSedeObj?.max_camillas || 6;
     const free = Array.from({ length: maxC }, (_, i) => i + 1).filter((num) => !occ.includes(num));
-    if (currentCamilla && !free.includes(currentCamilla) && currentCamilla <= maxC) {
-      free.push(currentCamilla);
-      free.sort((a, b) => a - b);
+
+    // Solo si estamos editando y este reformer ya era suyo en esta clase:
+    if (alumnaToEdit && currentCamilla && !free.includes(currentCamilla) && currentCamilla <= maxC) {
+      const matchingClase = allClases.find(
+        (c) =>
+          c.day_of_week === dayOfWeek &&
+          c.start_time.startsWith(startTime) &&
+          (!alumnaSedeId || c.sede_id === alumnaSedeId)
+      );
+      const isHerOwnCamilla = matchingClase?.clase_alumnas?.some(
+        (ca: any) => ca.alumna_id === alumnaToEdit.id && ca.camilla === currentCamilla
+      );
+      if (isHerOwnCamilla) {
+        free.push(currentCamilla);
+        free.sort((a, b) => a - b);
+      }
     }
     return free;
   };
@@ -309,8 +325,8 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
         if (t.id !== id) return t;
         const updated = { ...t, [field]: value };
         if (field === 'day_of_week' || field === 'start_time') {
-          const avail = getAvailableCamillasForTurno(updated.day_of_week, updated.start_time, updated.camilla);
-          if (!avail.includes(updated.camilla) && avail.length > 0) {
+          const avail = getAvailableCamillasForTurno(updated.day_of_week, updated.start_time);
+          if (avail.length > 0 && !avail.includes(updated.camilla)) {
             updated.camilla = avail[0];
           }
         }
@@ -324,7 +340,7 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
     if (allClases.length > 0 && currentSedeObj) {
       setTurnosFijos((prev) =>
         prev.map((t) => {
-          const avail = getAvailableCamillasForTurno(t.day_of_week, t.start_time);
+          const avail = getAvailableCamillasForTurno(t.day_of_week, t.start_time, t.camilla);
           if (!avail.includes(t.camilla) && avail.length > 0) {
             return { ...t, camilla: avail[0] };
           }
@@ -429,21 +445,25 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
       await supabase.from('clase_alumnas').delete().eq('alumna_id', targetAlumnaId);
     }
 
-    const currentSedeObj = sedes.find(s => s.id === alumnaSedeId);
+    const currentSedeObj = sedes.find((s) => s.id === alumnaSedeId);
     const { data: clasesActuales } = await getClases({ sedeId: alumnaSedeId || undefined });
-    const listaClases = clasesActuales || [];
+    const listaClases = [...(clasesActuales || [])];
+    const turnoErrors: string[] = [];
 
     for (const tf of turnosFijos) {
       let targetClase = listaClases.find(
-        (c) => c.day_of_week === tf.day_of_week && c.start_time.startsWith(tf.start_time)
+        (c) =>
+          c.day_of_week === tf.day_of_week &&
+          c.start_time.startsWith(tf.start_time) &&
+          (!alumnaSedeId || c.sede_id === alumnaSedeId)
       );
 
       if (!targetClase) {
         const endHourNum = parseInt(tf.start_time.split(':')[0], 10) + 1;
         const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
 
-        const { data: createdClase } = await createClase({
-          name: `Turno ${tf.start_time}`,
+        const { data: createdClase, error: createClaseErr } = await createClase({
+          name: `Turno ${tf.start_time} hs`,
           profesora_id: selectedProfesoraId || null,
           day_of_week: tf.day_of_week,
           start_time: `${tf.start_time}:00`,
@@ -451,20 +471,50 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
           max_capacity: currentSedeObj?.max_camillas || 6,
           sede_id: alumnaSedeId || null,
         });
-        targetClase = createdClase || undefined;
+
+        if (createClaseErr || !createdClase) {
+          turnoErrors.push(`No se pudo crear el turno ${tf.start_time} hs: ${createClaseErr || 'Error desconocido'}`);
+          continue;
+        }
+
+        targetClase = createdClase;
+        listaClases.push(createdClase);
       }
 
       if (targetClase) {
-        await addAlumnaToClase(targetClase.id, targetAlumnaId, tf.camilla);
+        // Si el turno en la sede no tenía profesora asignada y el formulario especificó una, asociarla
+        if (!targetClase.profesora_id && selectedProfesoraId) {
+          await supabase
+            .from('clases')
+            .update({ profesora_id: selectedProfesoraId })
+            .eq('id', targetClase.id);
+        }
+
+        const { error: assignErr } = await addAlumnaToClase(targetClase.id, targetAlumnaId, tf.camilla);
+        if (assignErr) {
+          const diaLabel = DIAS.find((d) => d.value === tf.day_of_week)?.label || `Día ${tf.day_of_week}`;
+          turnoErrors.push(`${diaLabel} a las ${tf.start_time} hs: ${assignErr}`);
+        }
       }
     }
 
     setLoading(false);
-    setSuccessMsg(alumnaToEdit ? 'Alumna y turnos actualizados exitosamente.' : 'Alumna guardada exitosamente y turnos fijos asignados.');
 
-    setTimeout(() => {
-      if (onSuccess) onSuccess();
-    }, 1200);
+    if (turnoErrors.length > 0) {
+      setErrorMsg(`Alumna guardada, pero con advertencias en turnos:\n${turnoErrors.join('\n')}`);
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+      }, 3500);
+    } else {
+      setSuccessMsg(
+        alumnaToEdit
+          ? 'Alumna y turnos fijos actualizados exitosamente.'
+          : 'Alumna guardada exitosamente y turnos fijos asignados en la agenda.'
+      );
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+      }, 1200);
+    }
   };
 
   return (

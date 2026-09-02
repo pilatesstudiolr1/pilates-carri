@@ -33,6 +33,11 @@ const PLANTILLAS_PREDEFINIDAS = [
     texto: 'Feliz cumpleaños {nombre}. Te deseamos un excelente día de parte de todo el equipo de Pilates Studio LR. Gracias por entrenar con nosotros.',
   },
   {
+    id: 'pago_confirmado',
+    titulo: 'Aviso de Pago Impactado y Vencimiento',
+    texto: `¡Hola {nombre}! 👋✨\n\nTe confirmamos que tu pago ha impactado correctamente en *Pilates Studio*. ✅\n\n🧾 *DETALLE DEL COMPROBANTE:*\n-----------------------------------------\n💰 *Total Abonado:* \${monto}\n🗓️ *Próximo Vencimiento de tu Cuota:* {vencimiento}\n-----------------------------------------`,
+  },
+  {
     id: 'recuperacion',
     titulo: 'Confirmación de Turno de Recuperación',
     texto: 'Hola {nombre}. Te confirmamos tu turno de recuperación para el día {horario}. Por favor avísanos si necesitas reprogramar. Te esperamos.',

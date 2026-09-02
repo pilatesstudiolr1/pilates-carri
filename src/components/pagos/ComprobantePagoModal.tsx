@@ -3,6 +3,7 @@
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Pago } from '@/types/database';
+import { formatFechaArg, buildAvisoPagoWhatsAppMessage, openWhatsAppMessage } from '@/lib/utils';
 import {
   X,
   Printer,
@@ -13,6 +14,7 @@ import {
   User,
   Phone,
   FileText,
+  Calendar,
 } from 'lucide-react';
 
 interface ComprobantePagoModalProps {
@@ -217,6 +219,11 @@ export function ComprobantePagoModal({
             <span class="info-val">${metodoLabel}</span>
           </div>
 
+          <div class="info-row" style="border-bottom: 1px solid #f1f5f9; padding: 10px 0;">
+            <span class="info-label">Próximo Vencimiento:</span>
+            <span class="info-val" style="color: #047857; font-weight: 800;">${formatFechaArg(pago.due_date || alumna?.billing_due_date)}</span>
+          </div>
+
           ${pago.notes ? `
           <div class="info-row" style="border-bottom: 1px solid #f1f5f9; padding: 10px 0;">
             <span class="info-label">Observaciones:</span>
@@ -250,24 +257,17 @@ export function ComprobantePagoModal({
 
   const handleSendWhatsApp = () => {
     if (!alumna?.phone) return;
-    const phoneClean = alumna.phone.replace(/\D/g, '');
-    const phoneFormatted = phoneClean.startsWith('54') ? phoneClean : `549${phoneClean}`;
-
-    const textMsg = encodeURIComponent(
-      `🧾 *COMPROBANTE DE PAGO — PILATES STUDIO*\n` +
-      `-----------------------------------------\n` +
-      `👤 *Alumna:* ${alumnaNombre}\n` +
-      `📅 *Fecha:* ${pago.payment_date}\n` +
-      `📌 *Concepto:* ${pago.concept || 'Mensualidad Pilates Reformer'}\n` +
-      `💳 *Medio de Pago:* ${metodoLabel}\n` +
-      `💰 *Total Abonado:* ${montoFormateado}\n` +
-      `-----------------------------------------\n` +
-      `✅ *Estado:* Confirmado e Ingresado\n` +
-      `¡Muchas gracias por entrenar con nosotros!`
-    );
-
-    window.open(`https://wa.me/${phoneFormatted}?text=${textMsg}`, '_blank');
+    const textMsg = buildAvisoPagoWhatsAppMessage({
+      nombreCliente: alumnaNombre,
+      monto: pago.amount,
+      concepto: pago.concept || 'Mensualidad Pilates Reformer',
+      metodoPago: pago.payment_method,
+      fechaPago: pago.payment_date,
+      vencimientoCuota: pago.due_date || alumna.billing_due_date,
+    });
+    openWhatsAppMessage(alumna.phone, textMsg);
   };
+
 
   const modalContent = (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 sm:p-6 bg-black/70 backdrop-blur-xs animate-fade-in overflow-y-auto">
@@ -349,6 +349,16 @@ export function ComprobantePagoModal({
                 {metodoLabel}
               </span>
             </div>
+
+            <div className="flex items-center justify-between text-xs border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Próximo Vencimiento:
+              </span>
+              <span className="font-bold font-mono text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                {formatFechaArg(pago.due_date || alumna?.billing_due_date)}
+              </span>
+            </div>
+
 
             {pago.notes && (
               <div className="flex items-start justify-between text-xs border-b border-[var(--border-default)] pb-2">

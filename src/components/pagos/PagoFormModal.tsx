@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/Input';
 import { Alumna, MetodoPago } from '@/types/database';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { METODOS_PAGO } from '@/lib/constants';
-import { DollarSign, Calendar, CreditCard, Percent, FileText, CheckCircle2, Search, X, User } from 'lucide-react';
+import { formatFechaArg, buildAvisoPagoWhatsAppMessage, openWhatsAppMessage } from '@/lib/utils';
+import { DollarSign, Calendar, CreditCard, Percent, FileText, CheckCircle2, Search, X, User, MessageCircle } from 'lucide-react';
 
 interface PagoFormModalProps {
   open: boolean;
@@ -47,6 +48,15 @@ export function PagoFormModal({
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago>('efectivo');
 
+  // Estado para confirmación exitosa con aviso de WhatsApp
+  const [paymentConfirmed, setPaymentConfirmed] = useState<{
+    alumna: Alumna;
+    amount: number;
+    dueDate: string;
+    concept: string;
+    paymentMethod: MetodoPago;
+  } | null>(null);
+
   // Concepto y duracion del pago
   const [duracionTipo, setDuracionTipo] = useState<'1_MES' | '2_MESES' | '3_MESES' | 'CLASE_SUELTA' | 'INSCRIPCION' | 'OTRO'>('1_MES');
   const [concept, setConcept] = useState('Cuota mensualidad');
@@ -63,6 +73,7 @@ export function PagoFormModal({
 
   useEffect(() => {
     if (open) {
+      setPaymentConfirmed(null);
       setErrorMsg('');
       setAlumnaSearch('');
       setNotes('');
@@ -185,20 +196,151 @@ export function PagoFormModal({
       ? defaultCommissionRate
       : (parseFloat(commissionRate) || 40) / 100;
 
+    const currentConcept = concept.trim() || 'Cuota mensualidad';
+
     const success = await onSubmit({
       alumna_id: selectedAlumna.id,
       amount: numericAmount,
       payment_method: paymentMethod,
       due_date: dueDate,
       commission_rate: finalCommissionRate,
-      concept: concept.trim() || 'Cuota mensualidad',
+      concept: currentConcept,
       period: new Date().toISOString().slice(0, 7),
       profesora_id: defaultProfesoraId || selectedAlumna.profesora_id || undefined,
       notes: notes.trim(),
     });
 
-    if (success) onClose();
+    if (success) {
+      setPaymentConfirmed({
+        alumna: selectedAlumna,
+        amount: numericAmount,
+        dueDate: dueDate,
+        concept: currentConcept,
+        paymentMethod: paymentMethod,
+      });
+    }
   };
+
+  const handleSendWhatsAppConfirmation = () => {
+    if (!paymentConfirmed || !paymentConfirmed.alumna.phone) return;
+    const alumnaNombre = `${paymentConfirmed.alumna.first_name} ${paymentConfirmed.alumna.last_name || ''}`.trim();
+    const textMsg = buildAvisoPagoWhatsAppMessage({
+      nombreCliente: alumnaNombre,
+      monto: paymentConfirmed.amount,
+      concepto: paymentConfirmed.concept,
+      metodoPago: paymentConfirmed.paymentMethod,
+      fechaPago: new Date().toISOString().slice(0, 10),
+      vencimientoCuota: paymentConfirmed.dueDate,
+    });
+    openWhatsAppMessage(paymentConfirmed.alumna.phone, textMsg);
+  };
+
+  if (paymentConfirmed) {
+    const alumnaNombre = `${paymentConfirmed.alumna.first_name} ${paymentConfirmed.alumna.last_name || ''}`.trim();
+    return (
+      <Modal
+        open={open}
+        onClose={() => {
+          setPaymentConfirmed(null);
+          onClose();
+        }}
+        title="¡Cobro Registrado con Éxito!"
+        description="Comprobante e impacto correcto de cuota"
+        size="md"
+      >
+        <div className="flex flex-col gap-5 text-[var(--text-primary)]">
+          <div className="flex flex-col items-center justify-center text-center p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl gap-2">
+            <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md">
+              <CheckCircle2 className="h-7 w-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-[var(--text-primary)]">
+                Pago impactado correctamente
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                El cobro ingresó en caja y el vencimiento de la cuota fue actualizado.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl p-4 space-y-2.5 text-xs">
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Alumna:
+              </span>
+              <strong className="text-[var(--text-primary)] font-bold text-sm capitalize">
+                {alumnaNombre}
+              </strong>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <DollarSign className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Monto Abonado:
+              </span>
+              <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+                ${paymentConfirmed.amount.toLocaleString('es-AR')} ARS
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <FileText className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Concepto:
+              </span>
+              <span className="text-[var(--text-primary)] font-semibold">
+                {paymentConfirmed.concept}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Medio de Pago:
+              </span>
+              <span className="text-[var(--text-primary)] font-semibold capitalize">
+                {paymentConfirmed.paymentMethod.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Próximo Vencimiento:
+              </span>
+              <span className="font-bold font-mono text-emerald-700 dark:text-emerald-400 text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                {formatFechaArg(paymentConfirmed.dueDate)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2.5 pt-2">
+            <Button
+              type="button"
+              variant="primary"
+              className="w-full justify-center bg-[#25D366] hover:bg-[#20bd5a] text-white border-transparent"
+              icon={<MessageCircle className="h-4 w-4" />}
+              onClick={handleSendWhatsAppConfirmation}
+              disabled={!paymentConfirmed.alumna.phone}
+            >
+              {paymentConfirmed.alumna.phone
+                ? `Enviar Aviso por WhatsApp a ${paymentConfirmed.alumna.first_name}`
+                : 'Sin teléfono registrado'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              className="w-full justify-center"
+              onClick={() => {
+                setPaymentConfirmed(null);
+                onClose();
+              }}
+            >
+              Listo / Cerrar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
 
   return (
     <Modal

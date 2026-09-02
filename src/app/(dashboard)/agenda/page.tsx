@@ -17,7 +17,7 @@ import { Clase, Profile, Alumna, MetodoPago } from '@/types/database';
 import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
 import { getProfiles } from '@/lib/services/profesoras';
 import { registrarPago } from '@/lib/services/pagos';
-import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Sparkles } from 'lucide-react';
+import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Sparkles, Building2 } from 'lucide-react';
 import { useSede } from '@/hooks/useSede';
 import { createClient } from '@/lib/supabase/client';
 
@@ -32,7 +32,7 @@ const DIAS = [
 
 export default function AgendaPage() {
   const { confirm, alert: alertDialog } = useConfirm();
-  const { selectedSedeId, sedes } = useSede();
+  const { selectedSedeId, setSelectedSedeId, sedes } = useSede();
   const [viewMode, setViewMode] = useState<'REFORMER' | 'WEEK' | 'DISPONIBILIDAD'>('REFORMER');
 
   const [selectedDay, setSelectedDay] = useState<number>(1);
@@ -474,25 +474,47 @@ export default function AgendaPage() {
           </button>
         </div>
 
-        {/* Filtro Profesora */}
-        <div className="flex items-center gap-2 self-start md:self-auto">
-          <span className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1">
-            <User className="h-3.5 w-3.5" /> Profesora:
-          </span>
-          <select
-            value={profesoraFilter}
-            onChange={(e) => setProfesoraFilter(e.target.value)}
-            className="h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none focus:border-[var(--border-focus)] cursor-pointer"
-          >
-            <option value="ALL">Todas las Profesoras</option>
-            {profesoras
-              .filter((p) => p.role === 'PROFESORA')
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
+        {/* Filtros: Sede y Profesora */}
+        <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
+          {/* Selector de Sede */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+              <Building2 className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Sede:
+            </span>
+            <select
+              value={selectedSedeId}
+              onChange={(e) => setSelectedSedeId(e.target.value)}
+              className="h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none focus:border-[var(--color-wood)] cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">Todas las Sedes</option>
+              {sedes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
                 </option>
               ))}
-          </select>
+            </select>
+          </div>
+
+          {/* Filtro Profesora */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+              <User className="h-3.5 w-3.5" /> Profesora:
+            </span>
+            <select
+              value={profesoraFilter}
+              onChange={(e) => setProfesoraFilter(e.target.value)}
+              className="h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none focus:border-[var(--border-focus)] cursor-pointer shadow-2xs"
+            >
+              <option value="ALL">Todas las Profesoras</option>
+              {profesoras
+                .filter((p) => p.role === 'PROFESORA')
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
+                  </option>
+                ))}
+            </select>
+          </div>
         </div>
       </div>
 

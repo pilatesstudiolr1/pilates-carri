@@ -203,56 +203,109 @@ export async function addAlumnaToClase(
   camilla?: number | null
 ): Promise<{ error: string | null }> {
   try {
+    if (!claseId || !alumnaId) {
+      return { error: 'Faltan parámetros obligatorios (claseId o alumnaId)' };
+    }
+
     const supabase = createClient();
 
-    // Verificar capacidad
-    const { data: clase } = await supabase
-      .from('clases')
-      .select('max_capacity, clase_alumnas(id)')
-      .eq('id', claseId)
-      .single();
-
-    if (clase) {
-      const currentCount = clase.clase_alumnas?.length || 0;
-      if (currentCount >= clase.max_capacity) {
-        return { error: `La clase ha alcanzado la capacidad maxima de ${clase.max_capacity} alumnas.` };
-      }
-    }
-
-    // Verificar que la camilla no este ya ocupada en este turno
-    if (camilla != null) {
-      const { data: camillaOcupada } = await supabase
-        .from('clase_alumnas')
-        .select('id')
-        .eq('clase_id', claseId)
-        .eq('camilla', camilla)
-        .maybeSingle();
-
-      if (camillaOcupada) {
-        return { error: `La camilla ${camilla} ya esta asignada a otra alumna en este turno.` };
-      }
-    }
-
-    // Verificar que la alumna no este ya en este turno
+    // 1. Verificar si la alumna ya está inscrita en este turno
     const { data: yaAsignada } = await supabase
       .from('clase_alumnas')
-      .select('id')
+      .select('id, camilla')
       .eq('clase_id', claseId)
       .eq('alumna_id', alumnaId)
       .maybeSingle();
 
     if (yaAsignada) {
-      return { error: 'La alumna ya esta asignada a este turno.' };
+      // Ya está en este turno, no duplicar ni generar error
+      return { error: null };
     }
 
-    const { error } = await supabase.from('clase_alumnas').insert({
+    // 2. Obtener capacidad y camillas actualmente ocupadas en la clase
+    const { data: clase, error: claseError } = await supabase
+      .from('clases')
+      .select('max_capacity, clase_alumnas(id, camilla, alumna_id)')
+      .eq('id', claseId)
+      .single();
+
+    if (claseError || !clase) {
+      return { error: claseError?.message || 'No se encontró la clase especificada' };
+    }
+
+    const maxCap = clase.max_capacity || 6;
+    const existing = (clase.clase_alumnas || []) as any[];
+
+    if (existing.length >= maxCap) {
+      return { error: `La clase ha alcanzado la capacidad máxima de ${maxCap} alumnas.` };
+    }
+
+    const occupiedCamillas: number[] = existing
+      .map((ca: any) => ca.camilla)
+      .filter((c): c is number => typeof c === 'number' && c > 0);
+
+    // 3. Determinar qué camilla asignar (respetar si está libre, o auto-asignar la siguiente libre)
+    let finalCamilla: number | null = null;
+
+    if (camilla != null && camilla >= 1 && camilla <= maxCap && !occupiedCamillas.includes(camilla)) {
+      finalCamilla = camilla;
+    } else {
+      // Buscar la primera camilla libre del 1 al maxCap
+      for (let num = 1; num <= maxCap; num++) {
+        if (!occupiedCamillas.includes(num)) {
+          finalCamilla = num;
+          break;
+        }
+      }
+    }
+
+    if (finalCamilla == null) {
+      return { error: `No hay reformers libres en este turno (cupo completo: ${maxCap}).` };
+    }
+
+    // 4. Insertar la inscripción
+    const { error: insertError } = await supabase.from('clase_alumnas').insert({
       clase_id: claseId,
       alumna_id: alumnaId,
-      camilla: camilla ?? null,
+      camilla: finalCamilla,
       status: 'ACTIVE',
     });
 
-    if (error) return { error: error.message };
+    if (insertError) {
+      // Si por concurrencia chocó con la camilla, reintentar una vez con cualquier otra libre
+      if (insertError.code === '23505' /* unique_violation */) {
+        const { data: freshClase } = await supabase
+          .from('clases')
+          .select('max_capacity, clase_alumnas(camilla)')
+          .eq('id', claseId)
+          .single();
+
+        const freshOccupied: number[] = (freshClase?.clase_alumnas || [])
+          .map((ca: any) => ca.camilla)
+          .filter((c: any): c is number => typeof c === 'number' && c > 0);
+
+        let retryCamilla: number | null = null;
+        for (let num = 1; num <= maxCap; num++) {
+          if (!freshOccupied.includes(num)) {
+            retryCamilla = num;
+            break;
+          }
+        }
+
+        if (retryCamilla != null) {
+          const { error: retryError } = await supabase.from('clase_alumnas').insert({
+            clase_id: claseId,
+            alumna_id: alumnaId,
+            camilla: retryCamilla,
+            status: 'ACTIVE',
+          });
+          if (retryError) return { error: retryError.message };
+          return { error: null };
+        }
+      }
+      return { error: insertError.message };
+    }
+
     return { error: null };
   } catch (err) {
     return {

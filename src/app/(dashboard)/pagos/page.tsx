@@ -10,6 +10,7 @@ import { ComprobantePagoModal } from '@/components/pagos/ComprobantePagoModal';
 import { Alumna, Pago, MetodoPago } from '@/types/database';
 import { getPagos, registrarPago, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
+import { buildAvisoPagoWhatsAppMessage } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
 import { useSede } from '@/hooks/useSede';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -184,7 +185,11 @@ export default function PagosPage() {
     // Asociar datos de la alumna para el modal de comprobante
     const pagoConAlumna: Pago = {
       ...newPago,
-      alumna: alum || undefined,
+      due_date: newPago.due_date || nextDueDate,
+      alumna: alum ? {
+        ...alum,
+        billing_due_date: nextDueDate,
+      } : undefined,
     };
 
     setSelectedComprobantePago(pagoConAlumna);
@@ -199,7 +204,7 @@ export default function PagosPage() {
   const handleDeletePagoConfirm = async (pagoId: string) => {
     const isOk = await confirm({
       title: 'Eliminar registro de pago',
-      message: '¿Estás seguro de eliminar este registro de pago? Esta acción no se puede deshacer.',
+      message: '¿Estás seguro de eliminar este registro de pago? Esta acción no se puede deshacer y también ajustará la caja.',
       confirmText: 'Sí, eliminar',
       variant: 'danger',
     });
@@ -243,31 +248,15 @@ export default function PagosPage() {
     }
 
     const alumnaNombre = alumna ? `${alumna.first_name} ${alumna.last_name || ''}`.trim() : 'Alumna';
-    const montoFormateado = `$${(Number(pago.amount) || 0).toLocaleString('es-AR')} ARS`;
-    const metodoLabel =
-      pago.payment_method === 'transferencia'
-        ? 'Transferencia Bancaria'
-        : pago.payment_method === 'efectivo'
-        ? 'Efectivo en Caja'
-        : pago.payment_method === 'mercado_pago'
-        ? 'Mercado Pago'
-        : pago.payment_method === 'tarjeta'
-        ? 'Tarjeta de Débito / POS'
-        : (pago.payment_method || 'Pago General');
-
-    const textMsg = encodeURIComponent(
-      `🧾 *COMPROBANTE DE PAGO — PILATES STUDIO*\n` +
-      `-----------------------------------------\n` +
-      `👤 *Alumna:* ${alumnaNombre}\n` +
-      `📅 *Fecha:* ${pago.payment_date}\n` +
-      `📌 *Concepto:* ${pago.concept || 'Mensualidad Pilates'}\n` +
-      `💳 *Medio de Pago:* ${metodoLabel}\n` +
-      `💰 *Total Abonado:* ${montoFormateado}\n` +
-      `-----------------------------------------\n` +
-      `✅ *Estado:* Confirmado e Ingresado en Caja\n` +
-      `¡Muchas gracias por entrenar con nosotros!`
-    );
-    window.open(`https://wa.me/${phoneFormatted}?text=${textMsg}`, '_blank');
+    const textMsg = buildAvisoPagoWhatsAppMessage({
+      nombreCliente: alumnaNombre,
+      monto: pago.amount,
+      concepto: pago.concept || 'Mensualidad Pilates',
+      metodoPago: pago.payment_method,
+      fechaPago: pago.payment_date,
+      vencimientoCuota: pago.due_date || alumna?.billing_due_date,
+    });
+    window.open(`https://wa.me/${phoneFormatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
   };
 
   // Filtrar alumnas vencidas
@@ -701,14 +690,16 @@ export default function PagosPage() {
                         >
                           <MessageCircle className="h-4 w-4" />
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePagoConfirm(pago.id)}
-                          className="p-1.5 rounded-[8px] bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
-                          title="Eliminar Pago"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePagoConfirm(pago.id)}
+                            className="p-1.5 rounded-[8px] bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                            title="Eliminar Pago (Solo Admin)"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

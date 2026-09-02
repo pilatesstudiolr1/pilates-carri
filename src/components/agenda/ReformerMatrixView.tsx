@@ -160,17 +160,32 @@ export function ReformerMatrixView({
         <div className="flex items-center gap-2 flex-wrap">
           {DIAS.map((d) => {
             const isSelected = selectedDay === d.value;
+            const countDia = clases
+              .filter((c) => c.day_of_week === d.value)
+              .reduce((acc, c) => acc + (c.alumnas?.length || 0), 0);
+
             return (
               <button
                 key={d.value}
                 onClick={() => onSelectDay(d.value)}
-                className={`px-4 sm:px-5 py-2 rounded-[29px] text-xs font-semibold tracking-tight transition-all cursor-pointer ${
+                className={`px-3.5 sm:px-4 py-2 rounded-[29px] text-xs font-semibold tracking-tight transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs font-bold'
                     : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border-default)]'
                 }`}
               >
-                {d.label}
+                <span>{d.label}</span>
+                {countDia > 0 && (
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                      isSelected
+                        ? 'bg-white/25 text-white'
+                        : 'bg-[var(--color-wood)]/15 text-[var(--color-wood)]'
+                    }`}
+                  >
+                    {countDia}
+                  </span>
+                )}
               </button>
             );
           })}

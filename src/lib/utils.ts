@@ -53,3 +53,85 @@ export function sleep(ms: number): Promise<void> {
 export function generateId(): string {
   return crypto.randomUUID();
 }
+
+export function formatFechaArg(dateStr?: string | Date | null): string {
+  if (!dateStr) return '-';
+  if (typeof dateStr === 'string') {
+    const clean = dateStr.slice(0, 10);
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return `${d}/${m}/${y}`;
+    }
+  }
+  return formatDate(dateStr);
+}
+
+export function cleanAndFormatWhatsAppPhone(phone?: string | null): string | null {
+  if (!phone) return null;
+  let clean = phone.replace(/\D/g, '');
+  if (!clean) return null;
+  if (clean.startsWith('0')) clean = clean.slice(1);
+  if (clean.startsWith('15')) clean = clean.slice(2);
+  if (clean.startsWith('54')) {
+    if (!clean.startsWith('549')) {
+      clean = `549${clean.slice(2)}`;
+    }
+  } else {
+    clean = `549${clean}`;
+  }
+  return clean;
+}
+
+export function buildAvisoPagoWhatsAppMessage(data: {
+  nombreCliente: string;
+  monto: number | string;
+  concepto?: string | null;
+  metodoPago?: string | null;
+  fechaPago?: string | null;
+  vencimientoCuota?: string | null;
+}): string {
+  const nombreLimpio = (data.nombreCliente || '').trim();
+  const primerNombre = nombreLimpio.split(' ')[0] || 'Alumna';
+
+  const montoNum = typeof data.monto === 'number' ? data.monto : (parseFloat(data.monto) || 0);
+  const montoStr = `$${montoNum.toLocaleString('es-AR')} ARS`;
+
+  const metodo = (data.metodoPago || 'efectivo').toLowerCase();
+  const metodoLabel =
+    metodo === 'transferencia'
+      ? 'Transferencia Bancaria'
+      : metodo === 'efectivo'
+      ? 'Efectivo en Caja'
+      : metodo === 'mercado_pago' || metodo === 'mercadopago'
+      ? 'Mercado Pago'
+      : metodo === 'tarjeta' || metodo === 'debito'
+      ? 'Tarjeta de Débito / POS'
+      : (data.metodoPago || 'Efectivo');
+
+  const fechaPagoStr = data.fechaPago ? formatFechaArg(data.fechaPago) : formatFechaArg(new Date().toISOString());
+  const vencimientoStr = data.vencimientoCuota ? formatFechaArg(data.vencimientoCuota) : 'A confirmar';
+
+  return (
+    `¡Hola ${primerNombre}! 👋✨\n\n` +
+    `Te confirmamos que tu pago ha impactado correctamente en *Pilates Studio*. ✅\n\n` +
+    `🧾 *DETALLE DEL COMPROBANTE:*\n` +
+    `-----------------------------------------\n` +
+    `👤 *Alumna:* ${nombreLimpio || 'Alumna'}\n` +
+    `📅 *Fecha de Pago:* ${fechaPagoStr}\n` +
+    `📌 *Concepto:* ${data.concepto || 'Cuota mensualidad'}\n` +
+    `💳 *Medio de Pago:* ${metodoLabel}\n` +
+    `💰 *Total Abonado:* ${montoStr}\n` +
+    `-----------------------------------------\n` +
+    `🗓️ *Próximo Vencimiento de tu Cuota:* ${vencimientoStr}\n` +
+    `-----------------------------------------`
+  );
+}
+
+export function openWhatsAppMessage(phone: string, text: string): boolean {
+  const formatted = cleanAndFormatWhatsAppPhone(phone);
+  if (!formatted) return false;
+  window.open(`https://wa.me/${formatted}?text=${encodeURIComponent(text)}`, '_blank');
+  return true;
+}
+
