@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
 import { Alumna, Clase, Profile } from '@/types/database';
 import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
+import { getLocalDateISO } from '@/lib/utils';
+
 import {
   X,
   CheckCircle2,
@@ -26,6 +28,7 @@ interface TurnoModalProps {
   presetTime: string;
   presetCamilla: number;
   alumnaAsignada?: any | null;
+  initialAsistenciaStatus?: string;
   profesoras?: Profile[];
   profesoraFilter?: string;
   onSave: (data: {
@@ -50,11 +53,13 @@ export function TurnoModal({
   presetTime,
   presetCamilla,
   alumnaAsignada = null,
+  initialAsistenciaStatus,
   profesoras = [],
   profesoraFilter = 'ALL',
   onSave,
   onDeleteTurno,
 }: TurnoModalProps) {
+
   const [mounted, setMounted] = useState(false);
   const isOccupied = !!alumnaAsignada;
 
@@ -74,7 +79,8 @@ export function TurnoModal({
   const [selectedAlumnaId, setSelectedAlumnaId] = useState<string>('');
   const [nuevaAlumnaNombre, setNuevaAlumnaNombre] = useState('');
   const [nuevaAlumnaTelefono, setNuevaAlumnaTelefono] = useState('');
-  const [fechaInicioClases, setFechaInicioClases] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [fechaInicioClases, setFechaInicioClases] = useState<string>(() => getLocalDateISO());
+
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -114,15 +120,23 @@ export function TurnoModal({
       if (alumnaAsignada) {
         const alumnaObj = alumnaAsignada.alumna || alumnaAsignada;
         setSelectedAlumnaId(alumnaObj.id || '');
-        setAsistenciaStatus(alumnaAsignada.status || 'UNMARKED');
+        const currentStatus =
+          initialAsistenciaStatus ||
+          alumnaAsignada.asistenciaStatus ||
+          (alumnaAsignada.status && ['PRESENT', 'ABSENT', 'RECOVERY', 'SUSPENDED'].includes(alumnaAsignada.status)
+            ? alumnaAsignada.status
+            : 'UNMARKED');
+        setAsistenciaStatus(currentStatus as any);
         setSelectedCamilla(presetCamilla || alumnaAsignada.camilla || 1);
-        setFechaInicioClases(alumnaObj.billing_start_date || alumnaObj.start_date || new Date().toISOString().split('T')[0]);
+        setFechaInicioClases(alumnaObj.billing_start_date || alumnaObj.start_date || getLocalDateISO());
       } else {
         setSelectedAlumnaId('');
         setNuevaAlumnaNombre('');
         setNuevaAlumnaTelefono('');
         setAsistenciaStatus('UNMARKED');
-        setFechaInicioClases(new Date().toISOString().split('T')[0]);
+        setFechaInicioClases(getLocalDateISO());
+
+
 
         // Si la camilla preset está libre usarla, de lo contrario elegir la primera libre
         if (camillasLibres.includes(presetCamilla)) {
@@ -199,8 +213,9 @@ export function TurnoModal({
           status: 'ACTIVE',
           sede_id: clase?.sede_id || null,
           billing_start_date: fechaInicioClases || null,
-          entry_date: fechaInicioClases || new Date().toISOString().split('T')[0],
+          entry_date: fechaInicioClases || getLocalDateISO(),
         });
+
 
         if (res.error || !res.data) {
           setErrorMsg(res.error || 'Error al crear la alumna');
@@ -328,10 +343,11 @@ export function TurnoModal({
               </div>
 
               {camillasLibres.length === 0 ? (
-                <p className="text-xs text-rose-600 font-bold py-1">
-                  ⚠️ No hay reformers libres en este horario.
+                <p className="text-xs text-rose-600 font-bold py-1 flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" /> No hay reformers libres en este horario.
                 </p>
               ) : (
+
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 pt-1">
                   {camillasLibres.map((cNum) => {
                     const isSelected = selectedCamilla === cNum;
@@ -583,11 +599,12 @@ export function TurnoModal({
                   onChange={(e) => setFechaInicioClases(e.target.value)}
                   className="w-full h-9 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-bold focus:outline-none focus:border-[var(--color-wood)] cursor-pointer"
                 />
-                {fechaInicioClases > new Date().toISOString().split('T')[0] && (
+                {fechaInicioClases > getLocalDateISO() && (
                   <p className="text-[10px] text-purple-600 dark:text-purple-400 font-bold flex items-center gap-1">
-                    <span>★</span> Figurará como "Pendiente de inicio" en la agenda hasta esa fecha.
+                    <span>*</span> Figurará como "Pendiente de inicio" en la agenda hasta esa fecha.
                   </p>
                 )}
+
               </div>
             </div>
           )}

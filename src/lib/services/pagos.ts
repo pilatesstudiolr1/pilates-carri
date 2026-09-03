@@ -38,6 +38,8 @@ export async function getPagos(options?: {
   }
 }
 
+import { getLocalDateISO } from '@/lib/utils';
+
 export async function registrarPago(pagoData: {
   alumna_id: string;
   amount: number;
@@ -50,10 +52,11 @@ export async function registrarPago(pagoData: {
   notes?: string;
   sede_id?: string;
   profesora_id?: string;
+  allow_duplicate?: boolean;
 }): Promise<{ data: Pago | null; error: string | null }> {
   try {
     const supabase = createClient();
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalDateISO();
 
     const isInscripcion =
       pagoData.payment_type === 'INSCRIPCION' ||
@@ -68,6 +71,26 @@ export async function registrarPago(pagoData: {
       ? 'INSCRIPCION'
       : (pagoData.payment_type || 'MENSUALIDAD');
 
+    const currentPeriod = pagoData.billing_month || today.slice(0, 7);
+
+    // Prevención de doble registro de mensualidad para el mismo período
+    if (finalPaymentType === 'MENSUALIDAD' && !pagoData.allow_duplicate) {
+      const { data: existingPago } = await supabase
+        .from('pagos')
+        .select('id, amount, payment_date, concept')
+        .eq('alumna_id', pagoData.alumna_id)
+        .eq('payment_type', 'MENSUALIDAD')
+        .eq('period', currentPeriod)
+        .limit(1);
+
+      if (existingPago && existingPago.length > 0) {
+        return {
+          data: null,
+          error: `Esta alumna ya tiene una mensualidad registrada para el período actual (${currentPeriod}). No se procesó el cobro duplicado.`,
+        };
+      }
+    }
+
     const { data, error } = await supabase
       .from('pagos')
       .insert({
@@ -77,7 +100,7 @@ export async function registrarPago(pagoData: {
         payment_type: finalPaymentType,
         payment_date: today,
         concept: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Inscripción inicial' : 'Cuota mensualidad'),
-        period: pagoData.billing_month || null,
+        period: currentPeriod,
         commission_rate: commRate,
         commission_amount: commAmount,
         notes: pagoData.notes || null,
@@ -95,7 +118,7 @@ export async function registrarPago(pagoData: {
       if (pagoData.due_date) {
         alumnaUpdate.billing_due_date = pagoData.due_date;
       }
-      if (pagoData.payment_type === 'INSCRIPCION') {
+      if (finalPaymentType === 'INSCRIPCION') {
         alumnaUpdate.enrollment_paid = true;
       } else {
         alumnaUpdate.monthly_paid = true;
@@ -113,10 +136,11 @@ export async function registrarPago(pagoData: {
     try {
       const { error: cajaError } = await supabase.from('caja_movimientos').insert({
         tipo: 'INGRESO',
-        concepto: pagoData.concept || (pagoData.payment_type === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
+        concepto: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
         monto: pagoData.amount,
         metodo_pago: pagoData.payment_method,
         sede_id: pagoData.sede_id || null,
+        fecha: today,
         description: data?.id ? `pago_id:${data.id}` : null,
       });
       if (cajaError) {
@@ -142,6 +166,34 @@ export async function registrarPago(pagoData: {
     };
   }
 }
+
+export async function actualizarSedePago(
+  pagoId: string,
+  nuevaSedeId: string | null
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = createClient();
+    const { error: pagoError } = await supabase
+      .from('pagos')
+      .update({ sede_id: nuevaSedeId })
+      .eq('id', pagoId);
+
+    if (pagoError) return { error: pagoError.message };
+
+    // Sincronizar en caja_movimientos si existe el movimiento asociado
+    await supabase
+      .from('caja_movimientos')
+      .update({ sede_id: nuevaSedeId })
+      .eq('description', `pago_id:${pagoId}`);
+
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al actualizar sede del pago',
+    };
+  }
+}
+
 
 export async function deletePago(id: string): Promise<{ error: string | null }> {
   try {
@@ -182,6 +234,38 @@ export async function deletePago(id: string): Promise<{ error: string | null }> 
       } catch (syncErr) {
         console.warn('Advertencia al sincronizar borrado de caja:', syncErr);
       }
+
+      // 4. Sincronizar estado de la alumna si se eliminó su último pago
+      if (pago.alumna_id) {
+        try {
+          const { data: otrosPagos } = await supabase
+            .from('pagos')
+            .select('due_date')
+            .eq('alumna_id', pago.alumna_id)
+            .order('payment_date', { ascending: false })
+            .limit(1);
+
+          const hoy = getLocalDateISO();
+          if (otrosPagos && otrosPagos.length > 0 && otrosPagos[0].due_date) {
+            await supabase
+              .from('alumnas')
+              .update({
+                billing_due_date: otrosPagos[0].due_date,
+                monthly_paid: otrosPagos[0].due_date >= hoy,
+              })
+              .eq('id', pago.alumna_id);
+          } else {
+            await supabase
+              .from('alumnas')
+              .update({
+                monthly_paid: false,
+              })
+              .eq('id', pago.alumna_id);
+          }
+        } catch (syncAlumnaErr) {
+          console.warn('Advertencia al sincronizar estado de alumna tras eliminar pago:', syncAlumnaErr);
+        }
+      }
     }
 
     return { error: null };
@@ -191,4 +275,5 @@ export async function deletePago(id: string): Promise<{ error: string | null }> 
     };
   }
 }
+
 

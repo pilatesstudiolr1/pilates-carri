@@ -13,7 +13,9 @@ import { AgendaProfesoraView } from '@/components/agenda/AgendaProfesoraView';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { buildAvisoPagoWhatsAppMessage, openWhatsAppMessage, getLocalDateISO } from '@/lib/utils';
 import {
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -39,13 +41,15 @@ import {
   CalendarCheck,
   Plus,
   Phone,
+  MessageCircle,
 } from 'lucide-react';
 
 interface AsistenciaState {
   [claseAlumnaId: string]: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED';
 }
 
-type VistaProfesora = 'HUB' | 'MIS_TURNOS' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES' | 'MI_COMISION';
+type VistaProfesora = 'HUB' | 'MIS_TURNOS' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
+
 
 export default function ProfesoraVistaPage() {
   const { profile } = useUser();
@@ -54,9 +58,7 @@ export default function ProfesoraVistaPage() {
   // Estado de Navegación: Por defecto la primera vista es 'HUB' (Accesos Rápidos)
   const [vistaActual, setVistaActual] = useState<VistaProfesora>('HUB');
 
-  const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateISO());
   const [clases, setClases] = useState<any[]>([]);
   const [asistencias, setAsistencias] = useState<AsistenciaState>({});
   const [disponibilidad, setDisponibilidad] = useState<DisponibilidadCamillaItem[]>([]);
@@ -73,18 +75,18 @@ export default function ProfesoraVistaPage() {
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
   const [selectedAlumnaForPago, setSelectedAlumnaForPago] = useState<any | null>(null);
 
+  // Modal de Aviso de Pago por WhatsApp
+  const [pagoAvisoExitoso, setPagoAvisoExitoso] = useState<{ pago: any; alumna: any } | null>(null);
+  const [isAvisoModalOpen, setIsAvisoModalOpen] = useState(false);
+
   // Modal para agendar alumna en turno
   const [asignarModalOpen, setAsignarModalOpen] = useState(false);
   const [selectedClaseForAssign, setSelectedClaseForAssign] = useState<any | null>(null);
   const [presetCamillaForAssign, setPresetCamillaForAssign] = useState<number>(1);
 
-  // Liquidación de la semana para la profesora
-  const [semanaTotal, setSemanaTotal] = useState<number>(0);
-  const [semanaComision, setSemanaComision] = useState<number>(0);
-
   const isProfesora = profile?.role === 'PROFESORA';
   const userName = profile?.full_name || 'Profesora';
-  const commissionRate = profile?.commission_rate ?? 0.40;
+
 
   // Cargar clases y asistencias del día seleccionado
   const fetchClasesYAsistencias = useCallback(async () => {
@@ -146,48 +148,12 @@ export default function ProfesoraVistaPage() {
     }
   }, [profile?.id]);
 
-  // Cargar resumen de liquidación semanal
-  const fetchResumenSemanal = useCallback(async () => {
-    if (!profile?.id) return;
-    try {
-      const now = new Date(selectedDate);
-      const day = now.getDay();
-      const diffStart = now.getDate() - day + (day === 0 ? -6 : 1); // Lunes
-      const startDate = new Date(now.setDate(diffStart)).toISOString().split('T')[0];
-
-      const endDateObj = new Date(startDate);
-      endDateObj.setDate(endDateObj.getDate() + 6);
-      const endDate = endDateObj.toISOString().split('T')[0];
-
-      const pagosRes = await getPagos({
-        status: 'PAID',
-        profesoraId: isProfesora && profile?.id ? profile.id : undefined,
-      });
-      const pagosSemana = pagosRes.data.filter((p) => {
-        const pDate = p.created_at ? p.created_at.split('T')[0] : (p.payment_date || '');
-        return pDate >= startDate && pDate <= endDate;
-      });
-
-      const total = pagosSemana.reduce((acc, p) => acc + (p.amount || 0), 0);
-      setSemanaTotal(total);
-
-      // Excluir pagos de inscripción de la comisión
-      const totalComisionable = pagosSemana
-        .filter((p) => p.payment_type !== 'INSCRIPCION' && !p.concept?.toLowerCase().includes('inscripci'))
-        .reduce((acc, p) => acc + (p.amount || 0), 0);
-
-      setSemanaComision(totalComisionable * commissionRate);
-    } catch (err) {
-      console.error('Error calculando resumen semanal:', err);
-    }
-  }, [selectedDate, profile?.id, isProfesora, commissionRate]);
-
   useEffect(() => {
     fetchClasesYAsistencias();
-    fetchResumenSemanal();
     fetchDisponibilidad();
     fetchMisPagos();
-  }, [fetchClasesYAsistencias, fetchResumenSemanal, fetchDisponibilidad, fetchMisPagos]);
+  }, [fetchClasesYAsistencias, fetchDisponibilidad, fetchMisPagos]);
+
 
   // Manejador de asistencia
   const handleMarcarAsistencia = async (
@@ -284,9 +250,9 @@ export default function ProfesoraVistaPage() {
     setSelectedDate(current.toISOString().split('T')[0]);
   };
 
-  // Métricas rápidas calculadas para el Hub y Módulos
-  const hoyStr = new Date().toISOString().split('T')[0];
-  const mesStr = new Date().toISOString().slice(0, 7);
+  // Métricas operativas para el Hub y Módulos
+  const hoyStr = getLocalDateISO();
+  const mesStr = hoyStr.slice(0, 7);
 
   const cobrosHoy = useMemo(() => {
     return misPagos.filter((p) => {
@@ -295,10 +261,6 @@ export default function ProfesoraVistaPage() {
     });
   }, [misPagos, hoyStr]);
 
-  const totalCobradoHoy = useMemo(() => {
-    return cobrosHoy.reduce((acc, p) => acc + (p.amount || 0), 0);
-  }, [cobrosHoy]);
-
   const cobrosMes = useMemo(() => {
     return misPagos.filter((p) => {
       const d = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : '');
@@ -306,9 +268,6 @@ export default function ProfesoraVistaPage() {
     });
   }, [misPagos, mesStr]);
 
-  const totalCobradoMes = useMemo(() => {
-    return cobrosMes.reduce((acc, p) => acc + (p.amount || 0), 0);
-  }, [cobrosMes]);
 
   const totalLibresSemana = useMemo(() => {
     return disponibilidad.reduce((acc, d) => acc + (d.libres_count || 0), 0);
@@ -405,22 +364,10 @@ export default function ProfesoraVistaPage() {
               <CalendarIcon className="h-3.5 w-3.5" />
               <span>Agenda</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => setVistaActual('MI_COMISION')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                vistaActual === 'MI_COMISION'
-                  ? 'bg-[#001f1f] text-white shadow-2xs dark:bg-emerald-700'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Mi Comisión</span>
-            </button>
           </div>
         </div>
       )}
+
 
       {/* =========================================================================
           VISTA 1: HUB PRINCIPAL (PRIMERA VISTA AL INICIAR SESIÓN CON BOTONES DE ACCESO RÁPIDO)
@@ -576,36 +523,10 @@ export default function ProfesoraVistaPage() {
               </div>
             </button>
 
-            {/* 5. Mi Comisión Semanal */}
-            <button
-              type="button"
-              onClick={() => setVistaActual('MI_COMISION')}
-              className="group p-6 rounded-2xl bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] hover:border-[#001f1f] dark:hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 cursor-pointer"
-            >
-              <div className="flex items-start justify-between">
-                <div className="w-12 h-12 rounded-2xl bg-[#cdface]/50 text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
-                  <TrendingUp className="h-6 w-6" />
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20">
-                  {Math.round(commissionRate * 100)}%
-                </span>
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-[var(--text-primary)]">
-                  Mi Comisión Semanal
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-                  Seguimiento de recaudación semanal y porcentaje estimado acumulado.
-                </p>
-              </div>
-              <div className="pt-3 border-t border-[var(--border-default)] flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
-                <span>Ver liquidación</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </button>
           </div>
         </div>
       )}
+
 
       {/* =========================================================================
           VISTA 2: HISTORIAL Y REGISTRO DE COBROS DE LA PROFESORA
@@ -645,52 +566,62 @@ export default function ProfesoraVistaPage() {
             </Button>
           </div>
 
-          {/* Tarjetas de Resumen de Cobros */}
+          {/* Tarjetas de Resumen Operativo de Cobros (Sin comisiones ni recaudación total visible para la profesora) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card padding="md" className="border-l-4 border-l-emerald-600">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                    Cobrado Hoy
+                    Cobros Registrados Hoy
                   </p>
-                  <p className="text-xl font-extrabold text-[var(--text-primary)] mt-1">
-                    ${totalCobradoHoy.toLocaleString('es-AR')} ARS
+                  <p className="text-2xl font-extrabold text-[var(--text-primary)] mt-1">
+                    {cobrosHoy.length}
                   </p>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    {cobrosHoy.length} {cobrosHoy.length === 1 ? 'cobro hoy' : 'cobros hoy'}
+                    {cobrosHoy.length === 1 ? 'cobro cargado hoy' : 'cobros cargados hoy'}
                   </p>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-[#cdface] text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center font-bold">
-                  <DollarSign className="h-5 w-5" />
+                  <Receipt className="h-5 w-5" />
                 </div>
               </div>
             </Card>
 
             <Card padding="md" className="border-l-4 border-l-[#001f1f] dark:border-l-emerald-400">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Total Cobrado en el Mes
-                </p>
-                <p className="text-xl font-extrabold text-[var(--text-primary)] mt-1">
-                  ${totalCobradoMes.toLocaleString('es-AR')} ARS
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  {cobrosMes.length} {cobrosMes.length === 1 ? 'cobro en el mes' : 'cobros en el mes'}
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    Cobros en el Mes
+                  </p>
+                  <p className="text-2xl font-extrabold text-[var(--text-primary)] mt-1">
+                    {cobrosMes.length}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    {cobrosMes.length === 1 ? 'cobro en el mes' : 'cobros en el mes'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] flex items-center justify-center font-bold">
+                  <CalendarCheck className="h-5 w-5" />
+                </div>
               </div>
             </Card>
 
-            <Card padding="md" className="border-l-4 border-l-amber-500">
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Comisión Estimada ({Math.round(commissionRate * 100)}%)
-                </p>
-                <p className="text-xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-1">
-                  ${(totalCobradoMes * commissionRate).toLocaleString('es-AR')} ARS
-                </p>
-                <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                  Calculado sobre tu recaudación mensual
-                </p>
+            <Card padding="md" className="border-l-4 border-l-blue-500">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                    Historial Completo
+                  </p>
+                  <p className="text-2xl font-extrabold text-[var(--text-primary)] mt-1">
+                    {misPagos.length}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Cobros registrados por vos
+                  </p>
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold">
+                  <UserCheck className="h-5 w-5" />
+                </div>
               </div>
             </Card>
           </div>
@@ -761,7 +692,7 @@ export default function ProfesoraVistaPage() {
                       <th className="py-2.5 px-3">Concepto</th>
                       <th className="py-2.5 px-3">Método</th>
                       <th className="py-2.5 px-3 text-right">Monto</th>
-                      <th className="py-2.5 px-3 text-right">Tu Comisión ({Math.round(commissionRate * 100)}%)</th>
+                      <th className="py-2.5 px-3 text-right">Aviso WhatsApp</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border-default)]">
@@ -774,10 +705,6 @@ export default function ProfesoraVistaPage() {
                       const alumnaNombre = pago.alumna
                         ? `${pago.alumna.last_name || ''}, ${pago.alumna.first_name}`.trim()
                         : 'Alumna';
-                      const isPagoInscripcion =
-                        pago.payment_type === 'INSCRIPCION' ||
-                        (pago.concept?.toLowerCase().includes('inscripci') ?? false);
-                      const comisionMonto = isPagoInscripcion ? 0 : (pago.amount || 0) * commissionRate;
 
                       return (
                         <tr key={pago.id} className="hover:bg-[var(--bg-tertiary)]/40 transition-colors">
@@ -804,8 +731,27 @@ export default function ProfesoraVistaPage() {
                           <td className="py-3 px-3 text-right font-black text-[var(--text-primary)]">
                             ${(pago.amount || 0).toLocaleString('es-AR')} ARS
                           </td>
-                          <td className="py-3 px-3 text-right font-bold text-emerald-700 dark:text-emerald-300">
-                            ${comisionMonto.toLocaleString('es-AR')} ARS
+                          <td className="py-3 px-3 text-right">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const phone = pago.alumna?.phone;
+                                const mensaje = buildAvisoPagoWhatsAppMessage({
+                                  nombreCliente: `${pago.alumna?.first_name || ''} ${pago.alumna?.last_name || ''}`.trim(),
+                                  monto: Number(pago.amount || 0),
+                                  metodoPago: pago.payment_method,
+                                  concepto: pago.concept,
+                                  fechaPago: pago.payment_date,
+                                  vencimientoCuota: pago.due_date,
+                                });
+                                openWhatsAppMessage(phone, mensaje);
+                              }}
+                              icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-600" />}
+                              className="text-[11px] font-bold"
+                            >
+                              Enviar Aviso
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -815,6 +761,7 @@ export default function ProfesoraVistaPage() {
               </div>
             )}
           </div>
+
         </div>
       )}
 
@@ -1204,65 +1151,6 @@ export default function ProfesoraVistaPage() {
         </div>
       )}
 
-      {/* =========================================================================
-          VISTA 6: MI COMISIÓN SEMANAL
-          ========================================================================= */}
-      {vistaActual === 'MI_COMISION' && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-5 sm:p-6 shadow-sm">
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="px-3 py-0.5 rounded-full bg-[#cdface] text-[#001f1f] text-[11px] font-black uppercase tracking-wider border border-[#001f1f] shadow-2xs">
-                Liquidación
-              </span>
-              <span className="text-xs font-semibold text-[var(--text-muted)]">
-                Semana en curso
-              </span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] flex items-center gap-2">
-              <TrendingUp className="h-6 w-6 text-emerald-600" />
-              <span>Mi Resumen y Comisión Semanal</span>
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
-              Detalle de cobros realizados en tus clases y tu comisión calculada.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card padding="md" className="border-l-4 border-l-[#001f1f] dark:border-l-emerald-400">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    Cobrado en tus Clases (Semana)
-                  </span>
-                  <p className="text-2xl font-extrabold text-[var(--text-primary)]">
-                    ${semanaTotal.toLocaleString('es-AR')} ARS
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-[#cdface] text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center">
-                  <DollarSign className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
-
-            <Card padding="md" className="border-l-4 border-l-emerald-500">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-                    Tu Comisión Semanal ({Math.round(commissionRate * 100)}%)
-                  </span>
-                  <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400">
-                    ${semanaComision.toLocaleString('es-AR')} ARS
-                  </p>
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5" />
-                </div>
-              </div>
-            </Card>
-          </div>
-        </div>
-      )}
-
       {/* Modal para Agendar Alumna en Turno */}
       {selectedClaseForAssign && (
         <AsignarAlumnaModal
@@ -1293,31 +1181,112 @@ export default function ProfesoraVistaPage() {
         open={pagoModalOpen}
         initialAlumna={selectedAlumnaForPago}
         defaultProfesoraId={profile?.id}
-        defaultCommissionRate={commissionRate}
         disableCommissionEdit={true}
         onClose={() => {
           setPagoModalOpen(false);
           setSelectedAlumnaForPago(null);
-          fetchResumenSemanal();
           fetchMisPagos();
         }}
         onSubmit={async (data) => {
           const res = await registrarPago({
             ...data,
             profesora_id: profile?.id || data.profesora_id,
-            commission_rate: commissionRate,
+            sede_id: data.sede_id || selectedAlumnaForPago?.sede_id || profile?.sede_id || undefined,
           });
           if (res.data) {
-            fetchResumenSemanal();
+            const savedPago = res.data;
+            const currentAlumna = selectedAlumnaForPago;
+            setPagoModalOpen(false);
+            setSelectedAlumnaForPago(null);
+            setPagoAvisoExitoso({ pago: savedPago, alumna: currentAlumna });
+            setIsAvisoModalOpen(true);
             fetchMisPagos();
+            fetchClasesYAsistencias();
             return true;
           }
           return false;
         }}
       />
+
+      {/* Modal de Aviso y Confirmación WhatsApp para Alumna */}
+      {isAvisoModalOpen && pagoAvisoExitoso && (
+        <Modal
+          open={isAvisoModalOpen}
+          onClose={() => {
+            setIsAvisoModalOpen(false);
+            setPagoAvisoExitoso(null);
+          }}
+          title="¡Cobro Registrado con Éxito!"
+          description="El pago ingresó a la caja de la sede y la cuota fue renovada."
+          size="sm"
+        >
+          <div className="flex flex-col gap-4 text-[var(--text-primary)]">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Pago ingresado correctamente</span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Alumna: <strong className="text-[var(--text-primary)]">{pagoAvisoExitoso.alumna?.first_name} {pagoAvisoExitoso.alumna?.last_name}</strong>
+              </p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong> ({pagoAvisoExitoso.pago?.payment_method})
+              </p>
+              {pagoAvisoExitoso.pago?.due_date && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Nuevo Vencimiento: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{pagoAvisoExitoso.pago.due_date}</strong>
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              Puedes enviar un comprobante pre-armado a su WhatsApp para confirmarle la recepción de su pago:
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  const alumna = pagoAvisoExitoso.alumna;
+                  const pago = pagoAvisoExitoso.pago;
+                  const phone = alumna?.phone;
+                  const mensaje = buildAvisoPagoWhatsAppMessage({
+                    nombreCliente: `${alumna?.first_name || ''} ${alumna?.last_name || ''}`.trim(),
+                    monto: Number(pago?.amount || 0),
+
+                    metodoPago: pago?.payment_method,
+                    concepto: pago?.concept,
+                    fechaPago: pago?.payment_date,
+                    vencimientoCuota: pago?.due_date,
+                  });
+                  openWhatsAppMessage(phone, mensaje);
+                  setIsAvisoModalOpen(false);
+                  setPagoAvisoExitoso(null);
+                }}
+                icon={<MessageCircle className="h-4 w-4" />}
+                className="w-full bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold"
+              >
+                Enviar Aviso por WhatsApp
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsAvisoModalOpen(false);
+                  setPagoAvisoExitoso(null);
+                }}
+                className="w-full"
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
+
 
 function getDayOfWeekFromDate(dateStr: string): number {
   const d = new Date(dateStr + 'T12:00:00');

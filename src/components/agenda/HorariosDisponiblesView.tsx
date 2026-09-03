@@ -331,12 +331,13 @@ export function HorariosDisponiblesView({
         {/* Listado Vertical */}
         {slotsFiltrados.length === 0 ? (
           <div className="py-12 text-center flex flex-col items-center justify-center gap-2">
-            <div className="w-12 h-12 rounded-full bg-[#cdface]/30 text-[#001f1f] dark:text-emerald-300 flex items-center justify-center text-xl">
-              🕒
+            <div className="w-12 h-12 rounded-full bg-[#cdface]/30 text-[#001f1f] dark:text-emerald-300 flex items-center justify-center">
+              <Clock className="h-6 w-6 text-emerald-700 dark:text-emerald-400" />
             </div>
             <p className="text-sm font-bold text-[var(--text-primary)]">
               No hay turnos disponibles para los filtros seleccionados.
             </p>
+
             <p className="text-xs text-[var(--text-muted)] max-w-sm">
               Podés seleccionar otro día en el Paso 1 para ver los horarios con lugares libres.
             </p>

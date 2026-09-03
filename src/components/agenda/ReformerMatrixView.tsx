@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Clase } from '@/types/database';
+import { getLocalDateISO } from '@/lib/utils';
 import {
   Calendar,
   Plus,
@@ -15,7 +16,9 @@ import {
   HelpCircle,
   User,
   Lock,
+  CreditCard,
 } from 'lucide-react';
+
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -67,12 +70,14 @@ interface ReformerMatrixViewProps {
 
 function formatFechaCorta(fechaStr?: string | null): string {
   if (!fechaStr) return '';
-  const parts = fechaStr.split('-');
+  const clean = fechaStr.slice(0, 10);
+  const parts = clean.split('-');
   if (parts.length === 3) {
     return `${parts[2]}/${parts[1]}`;
   }
-  return fechaStr;
+  return clean;
 }
+
 
 export function ReformerMatrixView({
   clases,
@@ -93,8 +98,9 @@ export function ReformerMatrixView({
   const camillasList = Array.from({ length: effectiveMaxCamillas }, (_, i) => i + 1);
 
   const [fechaAsistencia, setFechaAsistencia] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    () => getLocalDateISO()
   );
+
 
   // Filtrar clases del día seleccionado
   const clasesDelDia = clases.filter((c) => c.day_of_week === selectedDay);
@@ -156,7 +162,8 @@ export function ReformerMatrixView({
 
   const totalCapacidadDia = HORARIOS_ESTANDAR.length * effectiveMaxCamillas;
   const nombreDiaActual = DIAS.find((d) => d.value === selectedDay)?.label || 'Lunes';
-  const hoyStr = new Date().toISOString().split('T')[0];
+  const hoyStr = getLocalDateISO();
+
 
   return (
     <div className="flex flex-col gap-6 text-[var(--text-primary)] w-full">
@@ -420,6 +427,72 @@ export function ReformerMatrixView({
                     );
                   }
 
+                  // Cálculo de vencimiento y estado de cuota
+                  const hoyStr = getLocalDateISO();
+                  const dueDate = alumna.billing_due_date;
+                  let vencimientoTexto = 'Sin vencimiento';
+                  let vencimientoColor = 'text-[var(--text-muted)]';
+                  let isAlDia = false;
+
+                  if (dueDate) {
+                    const cleanDue = dueDate.slice(0, 10);
+                    const [y, m, d] = cleanDue.split('-').map(Number);
+                    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                      const vencObj = new Date(y, m - 1, d);
+                      const [hy, hm, hd] = hoyStr.split('-').map(Number);
+                      const hoyObj = new Date(hy, hm - 1, hd);
+                      const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
+
+                      if (diffDias < 0) {
+                        vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
+                        vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+                        isAlDia = false;
+                      } else if (diffDias <= 5) {
+                        vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
+                        vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
+                        isAlDia = true;
+                      } else {
+                        vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
+                        vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+                        isAlDia = true;
+                      }
+                    }
+                  } else if (alumna.monthly_paid) {
+
+                    isAlDia = true;
+                    vencimientoTexto = 'Cuota al día';
+                    vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+                  }
+
+                  const renderBotonCobroOAlDia = (btnCustomColor?: string) => {
+                    if (isAlDia) {
+                      return (
+                        <div className="w-full py-1 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                          <span>Cuota al día</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onCobrar) {
+                            onCobrar(alumna);
+                          } else if (onSelectOccupiedSlot) {
+                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                          }
+                        }}
+                        className={`w-full py-1 px-2 rounded-lg ${btnCustomColor || 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 shadow-2xs transition-transform active:scale-95 cursor-pointer`}
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        <span>Cobrar Cuota</span>
+                      </button>
+                    );
+                  };
+
                   // Evaluar si es clase individual, clase de prueba o solo inscripción
                   const isClaseIndividualOInscripcion =
                     alumna.plan === 'Solo Inscripción / Clase de prueba' ||
@@ -456,6 +529,11 @@ export function ReformerMatrixView({
                                 ✗ Ausente
                               </span>
                             )}
+                            {statusAsistencia === 'RECOVERY' && (
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-200 text-[9px] font-bold">
+                                ↻ Recupera
+                              </span>
+                            )}
                           </div>
 
                           {/* Nombre de la Alumna en negrita */}
@@ -463,12 +541,17 @@ export function ReformerMatrixView({
                             {alumnaNombre}
                           </span>
 
-                          {/* Subtítulo estándar */}
-                          {!statusAsistencia && (
-                            <span className="text-[11px] text-[#7e22ce] dark:text-[#d8b4fe] block mt-0.5 font-medium">
-                              Sin marcar
+                          {/* Vencimiento y subtítulo */}
+                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                            <span className={`text-[10px] ${vencimientoColor}`}>
+                              {vencimientoTexto}
                             </span>
-                          )}
+                            {!statusAsistencia && (
+                              <span className="text-[10px] text-[#7e22ce] dark:text-[#d8b4fe] font-medium">
+                                • Sin marcar
+                              </span>
+                            )}
+                          </div>
                         </div>
 
                         <div className="mt-2 space-y-1.5">
@@ -476,20 +559,7 @@ export function ReformerMatrixView({
                             {phone || 'Sin tel'}
                           </span>
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onCobrar) {
-                                onCobrar(alumna);
-                              } else if (onSelectOccupiedSlot) {
-                                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                              }
-                            }}
-                            className="w-full py-1 px-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
-                          >
-                            <span>💵 Cobrar</span>
-                          </button>
+                          {renderBotonCobroOAlDia('bg-purple-600 hover:bg-purple-700')}
                         </div>
                       </div>
                     );
@@ -526,6 +596,11 @@ export function ReformerMatrixView({
                           {/* Nombre en negrita */}
                           <span className="font-extrabold text-[13px] text-[#4c1d95] dark:text-[#f3e8ff] leading-tight block">
                             {alumnaNombre}
+                          </span>
+
+                          {/* Vencimiento */}
+                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                            {vencimientoTexto}
                           </span>
 
                           {/* Badge Violeta Pendiente de Inicio */}
@@ -566,26 +641,16 @@ export function ReformerMatrixView({
                           <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
                             {alumnaNombre}
                           </span>
+                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                            {vencimientoTexto}
+                          </span>
                         </div>
                         <div className="mt-2 space-y-1.5">
                           <div className="text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
                             {phone || 'Asistencia confirmada'}
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onCobrar) {
-                                onCobrar(alumna);
-                              } else if (onSelectOccupiedSlot) {
-                                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                              }
-                            }}
-                            className="w-full py-1 px-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
-                          >
-                            <span>💵 Cobrar</span>
-                          </button>
+                          {renderBotonCobroOAlDia()}
                         </div>
                       </div>
                     );
@@ -615,15 +680,59 @@ export function ReformerMatrixView({
                           <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
                             {alumnaNombre}
                           </span>
+                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                            {vencimientoTexto}
+                          </span>
                         </div>
-                        <div className="mt-2 text-[11px] font-medium text-[#9f1239] dark:text-[#fda4af] truncate">
-                          {phone || 'Falta registrada'}
+                        <div className="mt-2 space-y-1.5">
+                          <div className="text-[11px] font-medium text-[#9f1239] dark:text-[#fda4af] truncate">
+                            {phone || 'Falta registrada'}
+                          </div>
+                          {renderBotonCobroOAlDia()}
                         </div>
                       </div>
                     );
                   }
 
-                  // Estilo Estándar / Sin Marcar con Botón Cobrar (Idéntico a Captura 2)
+                  // Estilo Recupera (Índigo)
+                  if (statusAsistencia === 'RECOVERY') {
+                    return (
+                      <div
+                        key={refNum}
+                        onClick={() => {
+                          if (onSelectOccupiedSlot) {
+                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+                          } else if (row.clase) {
+                            onSelectClase(row.clase);
+                          }
+                        }}
+                        className="p-3 rounded-xl bg-[#eef2ff] dark:bg-[#13122b] border-2 border-[#6366f1] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#3730a3] dark:text-[#c7d2fe] mb-1">
+                            <span className="lg:hidden">REF {refNum}</span>
+                            <span className="px-1.5 py-0.5 rounded bg-[#e0e7ff] dark:bg-[#312e81] text-[#3730a3] dark:text-[#c7d2fe] text-[9px] font-bold">
+                              ↻ Recupera
+                            </span>
+                          </div>
+                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                            {alumnaNombre}
+                          </span>
+                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                            {vencimientoTexto}
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-1.5">
+                          <div className="text-[11px] font-medium text-[#3730a3] dark:text-[#c7d2fe] truncate">
+                            {phone || 'Turno recuperatorio'}
+                          </div>
+                          {renderBotonCobroOAlDia()}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // Estilo Estándar / Sin Marcar
                   return (
                     <div
                       key={refNum}
@@ -647,10 +756,17 @@ export function ReformerMatrixView({
                           {alumnaNombre}
                         </span>
 
-                        {/* Subtítulo: Sin marcar */}
-                        <span className="text-[11px] text-[var(--text-muted)] block mt-0.5 font-medium">
-                          Sin marcar
-                        </span>
+                        {/* Vencimiento y Subtítulo: Sin marcar */}
+                        <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                          <span className={`text-[10px] ${vencimientoColor}`}>
+                            {vencimientoTexto}
+                          </span>
+                          {!statusAsistencia && (
+                            <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                              • Sin marcar
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="mt-2 space-y-1.5">
@@ -659,25 +775,13 @@ export function ReformerMatrixView({
                           {phone || 'Sin tel'}
                         </span>
 
-                        {/* Botón directo Cobrar (Idéntico a la Captura 2) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onCobrar) {
-                              onCobrar(alumna);
-                            } else if (onSelectOccupiedSlot) {
-                              onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                            }
-                          }}
-                          className="w-full py-1 px-2 rounded-lg bg-[#22c55e] hover:bg-[#16a34a] text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer"
-                        >
-                          <span>💵 Cobrar</span>
-                        </button>
+                        {/* Botón dinámico Cobrar / Al día */}
+                        {renderBotonCobroOAlDia()}
                       </div>
                     </div>
                   );
                 }
+
 
                 // CASO 2: LUGAR DISPONIBLE
                 return (

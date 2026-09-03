@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { Spinner } from '@/components/ui/Spinner';
 import { CajaMovimiento, MetodoPago, Sede } from '@/types/database';
-import { getMovimientos, registrarMovimiento, deleteMovimiento } from '@/lib/services/caja';
+import { getMovimientos, registrarMovimiento, deleteMovimiento, actualizarSedeMovimiento } from '@/lib/services/caja';
 import { getSedes } from '@/lib/services/sedes';
 import { METODOS_PAGO } from '@/lib/constants';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -30,6 +30,7 @@ import {
   Receipt,
   Search,
   Trash2,
+  ArrowRightLeft,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 30;
@@ -65,6 +66,13 @@ export default function CajaPage() {
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('efectivo');
   const [movimientoSedeId, setMovimientoSedeId] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Modal Reasignar / Cambiar Sede de Movimiento
+  const [isChangeSedeModalOpen, setIsChangeSedeModalOpen] = useState(false);
+  const [movimientoToChangeSede, setMovimientoToChangeSede] = useState<CajaMovimiento | null>(null);
+  const [targetSedeId, setTargetSedeId] = useState<string>('');
+  const [changingSede, setChangingSede] = useState(false);
+
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -162,8 +170,48 @@ export default function CajaPage() {
     }
   };
 
+  const handleOpenChangeSede = (mov: CajaMovimiento) => {
+    setMovimientoToChangeSede(mov);
+    setTargetSedeId(mov.sede_id || (sedes[0]?.id || ''));
+    setIsChangeSedeModalOpen(true);
+  };
+
+  const handleChangeSedeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!movimientoToChangeSede || !targetSedeId) return;
+
+    if (targetSedeId === movimientoToChangeSede.sede_id) {
+      setIsChangeSedeModalOpen(false);
+      return;
+    }
+
+    setChangingSede(true);
+    const res = await actualizarSedeMovimiento(movimientoToChangeSede.id, targetSedeId);
+    setChangingSede(false);
+
+    if (res.error) {
+      await alertDialog({
+        title: 'Error al cambiar sede',
+        message: res.error,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    await alertDialog({
+      title: 'Sede actualizada',
+      message: 'El movimiento y su pago asociado se reasignaron exitosamente a la sede seleccionada.',
+      variant: 'success',
+    });
+
+    setIsChangeSedeModalOpen(false);
+    setMovimientoToChangeSede(null);
+    fetchData();
+  };
+
   // Filtrado de movimientos por Mes, Tipo y Búsqueda
   const movimientosFiltrados = movimientos.filter((m) => {
+
     if (selectedMonth !== 'ALL') {
       const mMonth = m.creado_en ? m.creado_en.slice(0, 7) : '';
       if (mMonth !== selectedMonth) return false;
@@ -430,15 +478,16 @@ export default function CajaPage() {
           </p>
         ) : (
           <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+            <table className="w-full text-left text-xs border-collapse min-w-[750px]">
               <thead>
                 <tr className="border-b border-[var(--border-default)] text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">
                   <th className="py-3 px-4 font-semibold">Tipo</th>
                   <th className="py-3 px-4 font-semibold">Concepto</th>
+                  <th className="py-3 px-4 font-semibold">Sede</th>
                   <th className="py-3 px-4 font-semibold">Método de Pago</th>
                   <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Monto</th>
                   <th className="py-3 px-4 font-semibold text-right">Fecha y Hora</th>
-                  {isAdmin && <th className="py-3 px-4 font-semibold text-center w-20">Acciones</th>}
+                  {isAdmin && <th className="py-3 px-4 font-semibold text-center w-28">Acciones</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
@@ -459,6 +508,13 @@ export default function CajaPage() {
 
                     <td className="py-3.5 px-4 font-bold text-sm">
                       {mov.concepto}
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[11px] font-semibold text-[var(--text-secondary)]">
+                        <Building2 className="h-3 w-3 text-[var(--color-wood)]" />
+                        {sedes.find((s) => s.id === mov.sede_id)?.name || 'Sin sede'}
+                      </span>
                     </td>
 
                     <td className="py-3.5 px-4 capitalize text-[var(--text-secondary)] font-medium">
@@ -490,20 +546,31 @@ export default function CajaPage() {
 
                     {isAdmin && (
                       <td className="py-3.5 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMovimiento(mov)}
-                          className="p-1.5 rounded-[8px] bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer inline-flex items-center justify-center"
-                          title="Eliminar movimiento / pago ficticio (Solo Admin)"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenChangeSede(mov)}
+                            className="p-1.5 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-[var(--color-wood)]/20 text-[var(--text-primary)] transition-colors cursor-pointer inline-flex items-center justify-center"
+                            title="Reasignar / Cambiar de sede"
+                          >
+                            <ArrowRightLeft className="h-3.5 w-3.5 text-[var(--color-wood)]" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMovimiento(mov)}
+                            className="p-1.5 rounded-[8px] bg-rose-500/15 hover:bg-rose-500/25 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer inline-flex items-center justify-center"
+                            title="Eliminar movimiento / pago ficticio (Solo Admin)"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     )}
                   </tr>
                 ))}
               </tbody>
             </table>
+
           </div>
         )}
 
@@ -639,6 +706,60 @@ export default function CajaPage() {
           </div>
         </form>
       </Modal>
+
+      {/* MODAL REASIGNAR SEDE DE MOVIMIENTO */}
+      <Modal
+        open={isChangeSedeModalOpen}
+        onClose={() => setIsChangeSedeModalOpen(false)}
+        title="Reasignar Sede del Movimiento"
+        description="Si registraste este cobro o movimiento en la sede equivocada, cámbialo aquí directamente."
+      >
+        <form onSubmit={handleChangeSedeSubmit} className="space-y-4 text-[var(--text-primary)]">
+          <div className="p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-xs space-y-1">
+            <p className="text-[var(--text-muted)]">Concepto:</p>
+            <p className="font-bold text-[var(--text-primary)]">{movimientoToChangeSede?.concepto}</p>
+            <p className="text-[var(--text-muted)] mt-1">
+              Monto: <span className="font-mono font-bold text-emerald-700 dark:text-emerald-400">${Number(movimientoToChangeSede?.monto || 0).toLocaleString('es-AR')}</span>
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
+              <Building2 className="h-3.5 w-3.5 text-[var(--color-wood)]" /> Selecciona la Sede Correcta *
+            </label>
+            <select
+              value={targetSedeId}
+              onChange={(e) => setTargetSedeId(e.target.value)}
+              className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-xs font-medium cursor-pointer"
+            >
+              {sedes.map((s) => (
+                <option key={s.id} value={s.id} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-default)]">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setIsChangeSedeModalOpen(false)}
+              disabled={changingSede}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              loading={changingSede}
+              icon={<ArrowRightLeft className="h-4 w-4" />}
+            >
+              Guardar Cambio
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
+

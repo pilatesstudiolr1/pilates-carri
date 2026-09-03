@@ -1,5 +1,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { CajaMovimiento, MetodoPago } from '@/types/database';
+import { deletePago } from '@/lib/services/pagos';
+
 
 export async function getMovimientos(options?: {
   sedeId?: string;
@@ -80,7 +82,7 @@ export async function deleteMovimiento(id: string): Promise<{ error: string | nu
         }
 
         if (targetPagoId) {
-          await supabase.from('pagos').delete().eq('id', targetPagoId);
+          await deletePago(targetPagoId);
         } else if (
           mov.tipo === 'INGRESO' &&
           mov.concepto &&
@@ -97,9 +99,10 @@ export async function deleteMovimiento(id: string): Promise<{ error: string | nu
             .limit(1);
 
           if (matchingPagos && matchingPagos.length > 0) {
-            await supabase.from('pagos').delete().eq('id', matchingPagos[0].id);
+            await deletePago(matchingPagos[0].id);
           }
         }
+
       } catch (syncErr) {
         console.warn('Advertencia al sincronizar borrado de pago desde caja:', syncErr);
       }
@@ -112,4 +115,43 @@ export async function deleteMovimiento(id: string): Promise<{ error: string | nu
     };
   }
 }
+
+export async function actualizarSedeMovimiento(
+  movimientoId: string,
+  nuevaSedeId: string | null
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = createClient();
+
+    const { data: mov } = await supabase
+      .from('caja_movimientos')
+      .select('*')
+      .eq('id', movimientoId)
+      .maybeSingle();
+
+    const { error } = await supabase
+      .from('caja_movimientos')
+      .update({ sede_id: nuevaSedeId })
+      .eq('id', movimientoId);
+
+    if (error) return { error: error.message };
+
+    if (mov && mov.description && mov.description.startsWith('pago_id:')) {
+      const targetPagoId = mov.description.replace('pago_id:', '').trim();
+      if (targetPagoId) {
+        await supabase
+          .from('pagos')
+          .update({ sede_id: nuevaSedeId })
+          .eq('id', targetPagoId);
+      }
+    }
+
+    return { error: null };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : 'Error al actualizar la sede del movimiento',
+    };
+  }
+}
+
 

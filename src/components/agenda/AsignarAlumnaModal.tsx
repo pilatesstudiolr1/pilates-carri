@@ -205,10 +205,11 @@ export function AsignarAlumnaModal({
           </div>
 
           {camillasLibres.length === 0 ? (
-            <p className="text-xs text-rose-600 font-bold">
-              ⚠️ No hay reformers disponibles en este horario.
+            <p className="text-xs text-rose-600 font-bold flex items-center gap-1.5">
+              <AlertCircle className="h-4 w-4 shrink-0" /> No hay reformers disponibles en este horario.
             </p>
           ) : (
+
             <div className="flex flex-wrap gap-2 pt-1">
               {camillasLibres.map((cNum) => {
                 const isSelected = camillaSeleccionada === cNum;

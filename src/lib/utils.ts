@@ -135,3 +135,48 @@ export function openWhatsAppMessage(phone: string, text: string): boolean {
   return true;
 }
 
+import {
+  getSyncedLocalDateISO,
+  getSyncedLocalTime,
+  syncTimeWithTimeZoneDB,
+  getTimeSyncInfo,
+} from '@/lib/services/timeService';
+
+export function getLocalDateISO(d?: Date | string): string {
+  return getSyncedLocalDateISO(d);
+}
+
+export function getLocalTimeISO(d?: Date | string): string {
+  return getSyncedLocalTime(d);
+}
+
+export { syncTimeWithTimeZoneDB, getTimeSyncInfo };
+
+
+export function calculateNextDueDate(
+  currentDueDate?: string | null,
+  monthsToAdd = 1,
+  basePaymentDate?: string | null
+): string {
+  const todayStr = getLocalDateISO();
+  let base: Date;
+
+  if (currentDueDate && currentDueDate >= todayStr) {
+    const [y, m, d] = currentDueDate.slice(0, 10).split('-').map(Number);
+    base = new Date(y, m - 1, d);
+  } else if (basePaymentDate) {
+    const [y, m, d] = basePaymentDate.slice(0, 10).split('-').map(Number);
+    base = new Date(y, m - 1, d);
+  } else {
+    const [y, m, d] = todayStr.split('-').map(Number);
+    base = new Date(y, m - 1, d);
+  }
+
+  base.setMonth(base.getMonth() + monthsToAdd);
+  const year = base.getFullYear();
+  const month = String(base.getMonth() + 1).padStart(2, '0');
+  const day = String(base.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+

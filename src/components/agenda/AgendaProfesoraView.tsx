@@ -11,6 +11,7 @@ import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
 import { PagoFormModal } from '@/components/pagos/PagoFormModal';
+import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Clase, Profile } from '@/types/database';
 import {
@@ -22,8 +23,14 @@ import {
 } from '@/lib/services/agenda';
 import { registrarPago } from '@/lib/services/pagos';
 import { getProfiles } from '@/lib/services/profesoras';
+import { buildAvisoPagoWhatsAppMessage, openWhatsAppMessage } from '@/lib/utils';
+import { MessageCircle, CheckCircle2 } from 'lucide-react';
+
+
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
+import { createClient } from '@/lib/supabase/client';
+import { getLocalDateISO } from '@/lib/utils';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -61,6 +68,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [filtroSoloMisClases, setFiltroSoloMisClases] = useState(true);
+  const [asistencias, setAsistencias] = useState<Record<string, string>>({});
 
   // Modales
   const [isClaseModalOpen, setIsClaseModalOpen] = useState(false);
@@ -69,6 +77,10 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
   const [selectedAlumnaParaPago, setSelectedAlumnaParaPago] = useState<any | null>(null);
+  const [pagoAvisoExitoso, setPagoAvisoExitoso] = useState<{ pago: any; alumna: any } | null>(null);
+  const [isAvisoModalOpen, setIsAvisoModalOpen] = useState(false);
+
+
 
   const [selectedClase, setSelectedClase] = useState<Clase | null>(null);
   const [turnoModalDayName, setTurnoModalDayName] = useState('Lunes');
@@ -98,9 +110,32 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
     }
   }, [selectedSedeId, filtroSoloMisClases, profile?.id]);
 
+  const fetchAsistencias = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const fechaHoy = getLocalDateISO();
+      const { data } = await supabase
+        .from('asistencias')
+        .select('clase_alumna_id, status')
+        .eq('date', fechaHoy);
+
+      if (data) {
+        const map: Record<string, string> = {};
+        data.forEach((a: any) => {
+          if (a.clase_alumna_id) map[a.clase_alumna_id] = a.status;
+        });
+        setAsistencias(map);
+      }
+    } catch (err) {
+      console.error('Error cargando asistencias:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchAgenda();
-  }, [fetchAgenda]);
+    fetchAsistencias();
+  }, [fetchAgenda, fetchAsistencias]);
+
 
   const handleCreateClase = async (data: {
     name: string;
@@ -263,51 +298,75 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
       // Asignar alumna al turno en la camilla correspondiente
       await addAlumnaToClase(targetClaseId, data.alumnaId, data.camilla);
 
-      // Si se marcó asistencia específica
-      if (data.asistenciaStatus && data.asistenciaStatus !== 'UNMARKED') {
+      // Si se marcó asistencia
+      if (data.asistenciaStatus) {
         const supabase = (await import('@/lib/supabase/client')).createClient();
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const fechaHoy = getLocalDateISO();
 
         const { data: caData } = await supabase
           .from('clase_alumnas')
           .select('id')
           .eq('clase_id', targetClaseId)
           .eq('alumna_id', data.alumnaId)
-          .single();
+          .maybeSingle();
 
         if (caData) {
-          await supabase.from('asistencias').upsert({
-            clase_alumna_id: caData.id,
-            date: fechaHoy,
-            status: data.asistenciaStatus,
-          });
-
-          // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
-          if (data.asistenciaStatus === 'PRESENT') {
-            const { data: alumData } = await supabase
-              .from('alumnas')
-              .select('id, plan, plan_amount')
-              .eq('id', data.alumnaId)
+          if (data.asistenciaStatus === 'UNMARKED') {
+            await supabase
+              .from('asistencias')
+              .delete()
+              .eq('clase_alumna_id', caData.id)
+              .eq('date', fechaHoy);
+          } else {
+            const { data: existingAsis } = await supabase
+              .from('asistencias')
+              .select('id')
+              .eq('clase_alumna_id', caData.id)
+              .eq('date', fechaHoy)
               .maybeSingle();
 
-            const isTrial =
-              alumData?.plan === 'Solo Inscripción / Clase de prueba' ||
-              (alumData?.plan && alumData.plan.toLowerCase().includes('individual')) ||
-              (alumData?.plan && alumData.plan.toLowerCase().includes('prueba')) ||
-              (alumData?.plan && alumData.plan.toLowerCase().includes('inscripci')) ||
-              (alumData?.plan_amount === 0 && !alumData?.plan);
-
-            if (isTrial) {
+            if (existingAsis?.id) {
               await supabase
+                .from('asistencias')
+                .update({ status: data.asistenciaStatus })
+                .eq('id', existingAsis.id);
+            } else {
+              await supabase
+                .from('asistencias')
+                .insert({
+                  clase_alumna_id: caData.id,
+                  date: fechaHoy,
+                  status: data.asistenciaStatus,
+                });
+            }
+
+            // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
+            if (data.asistenciaStatus === 'PRESENT') {
+              const { data: alumData } = await supabase
                 .from('alumnas')
-                .update({ status: 'SUSPENDED' })
-                .eq('id', data.alumnaId);
+                .select('id, plan, plan_amount')
+                .eq('id', data.alumnaId)
+                .maybeSingle();
+
+              const isTrial =
+                alumData?.plan === 'Solo Inscripción / Clase de prueba' ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('individual')) ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('prueba')) ||
+                (alumData?.plan && alumData.plan.toLowerCase().includes('inscripci')) ||
+                (alumData?.plan_amount === 0 && !alumData?.plan);
+
+              if (isTrial) {
+                await supabase
+                  .from('alumnas')
+                  .update({ status: 'SUSPENDED' })
+                  .eq('id', data.alumnaId);
+              }
             }
           }
         }
       }
 
-      fetchAgenda();
+      await Promise.all([fetchAgenda(), fetchAsistencias()]);
       setIsTurnoModalOpen(false);
       return true;
     } catch (err) {
@@ -315,6 +374,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
       return false;
     }
   };
+
 
   return (
     <div className="flex flex-col gap-5 animate-fade-in text-[var(--text-primary)]">
@@ -430,11 +490,14 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             onSelectDay={setSelectedDay}
             currentProfesoraId={profile?.id}
             isProfesoraView={true}
+            asistencias={asistencias}
             onCobrar={(alumna) => {
               setSelectedAlumnaParaPago(alumna);
               setIsPagoModalOpen(true);
             }}
             onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
+
+
               handleAbrirTurnoModal(day, time, camilla || 1, null)
             }
             onSelectOccupiedSlot={(day: number, time: string, camilla: number, item: any) =>
@@ -467,6 +530,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
         presetTime={presetTime}
         presetCamilla={presetCamilla}
         alumnaAsignada={selectedAlumnaAsignada}
+        initialAsistenciaStatus={selectedAlumnaAsignada?.caId ? asistencias[selectedAlumnaAsignada.caId] : undefined}
         profesoraFilter={profile?.id}
         onSave={handleSaveTurnoFromModal}
         onDeleteTurno={async (claseId, alumnaId) => {
@@ -526,7 +590,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
         loading={submitting}
       />
 
-      {/* Modal de Cobro Directo heredado de la Alumna */}
+      {/* Modal de Cobro Directo */}
       {isPagoModalOpen && (
         <PagoFormModal
           open={isPagoModalOpen}
@@ -534,23 +598,24 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             setIsPagoModalOpen(false);
             setSelectedAlumnaParaPago(null);
             fetchAgenda();
+            fetchAsistencias();
           }}
           initialAlumna={selectedAlumnaParaPago}
           defaultProfesoraId={profile?.id}
-          defaultCommissionRate={profile?.commission_rate ?? 0.4}
-          disableCommissionEdit={true}
           onSubmit={async (pagoData) => {
             const res = await registrarPago({
               ...pagoData,
               profesora_id: profile?.id || pagoData.profesora_id,
+              sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
             });
             if (res.data) {
-              await alertDialog({
-                title: '¡Cobro Registrado!',
-                message: `Se registró correctamente el cobro por $${pagoData.amount.toLocaleString('es-AR')}.`,
-                variant: 'success',
-              });
-              fetchAgenda();
+              const savedPago = res.data;
+              const currentAlumna = selectedAlumnaParaPago;
+              setIsPagoModalOpen(false);
+              setSelectedAlumnaParaPago(null);
+              setPagoAvisoExitoso({ pago: savedPago, alumna: currentAlumna });
+              setIsAvisoModalOpen(true);
+              await Promise.all([fetchAgenda(), fetchAsistencias()]);
               return true;
             } else {
               await alertDialog({
@@ -563,6 +628,84 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
           }}
         />
       )}
+
+      {/* Modal de Aviso y Comprobante WhatsApp para Alumna */}
+      {isAvisoModalOpen && pagoAvisoExitoso && (
+        <Modal
+          open={isAvisoModalOpen}
+          onClose={() => {
+            setIsAvisoModalOpen(false);
+            setPagoAvisoExitoso(null);
+          }}
+          title="¡Cobro Registrado con Éxito!"
+          description="El pago ingresó a la caja de la sede y la cuota fue renovada."
+          size="sm"
+        >
+          <div className="flex flex-col gap-4 text-[var(--text-primary)]">
+            <div className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 space-y-2">
+              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-bold text-sm">
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Pago impactado en caja</span>
+              </div>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Alumna: <strong className="text-[var(--text-primary)]">{pagoAvisoExitoso.alumna?.first_name} {pagoAvisoExitoso.alumna?.last_name}</strong>
+              </p>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong> ({pagoAvisoExitoso.pago?.payment_method})
+              </p>
+              {pagoAvisoExitoso.pago?.due_date && (
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Nuevo Vencimiento: <strong className="text-emerald-700 dark:text-emerald-400 font-bold">{pagoAvisoExitoso.pago.due_date}</strong>
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-[var(--text-muted)]">
+              Puedes enviar un comprobante pre-armado al WhatsApp de la alumna para confirmarle el pago recibido:
+            </p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              <Button
+                variant="primary"
+                onClick={() => {
+                  const alumna = pagoAvisoExitoso.alumna;
+                  const pago = pagoAvisoExitoso.pago;
+                  const phone = alumna?.phone;
+                  const mensaje = buildAvisoPagoWhatsAppMessage({
+                    nombreCliente: `${alumna?.first_name || ''} ${alumna?.last_name || ''}`.trim(),
+                    monto: Number(pago?.amount || 0),
+                    metodoPago: pago?.payment_method,
+                    concepto: pago?.concept,
+                    fechaPago: pago?.payment_date,
+                    vencimientoCuota: pago?.due_date,
+                  });
+
+                  openWhatsAppMessage(phone, mensaje);
+                  setIsAvisoModalOpen(false);
+                  setPagoAvisoExitoso(null);
+                }}
+                icon={<MessageCircle className="h-4 w-4" />}
+                className="w-full bg-[#25D366] hover:bg-[#1EBE5D] text-white font-bold"
+              >
+                Enviar Aviso por WhatsApp
+              </Button>
+
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIsAvisoModalOpen(false);
+                  setPagoAvisoExitoso(null);
+                }}
+                className="w-full"
+              >
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
+
+

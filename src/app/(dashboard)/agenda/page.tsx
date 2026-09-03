@@ -21,6 +21,7 @@ import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Spar
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
+import { getLocalDateISO } from '@/lib/utils';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -106,7 +107,7 @@ export default function AgendaPage() {
   const fetchAsistencias = useCallback(async () => {
     try {
       const supabase = createClient();
-      const fechaHoy = new Date().toISOString().split('T')[0];
+      const fechaHoy = getLocalDateISO();
       const { data } = await supabase
         .from('asistencias')
         .select('clase_alumna_id, status')
@@ -123,6 +124,7 @@ export default function AgendaPage() {
       console.error('Error cargando asistencias:', err);
     }
   }, []);
+
 
   useEffect(() => {
     fetchAsistencias();
@@ -294,7 +296,7 @@ export default function AgendaPage() {
 
       if (data.asistenciaStatus) {
         const supabase = (await import('@/lib/supabase/client')).createClient();
-        const fechaHoy = new Date().toISOString().split('T')[0];
+        const fechaHoy = getLocalDateISO();
 
         const { data: caData } = await supabase
           .from('clase_alumnas')
@@ -311,15 +313,32 @@ export default function AgendaPage() {
               .eq('clase_alumna_id', caData.id)
               .eq('date', fechaHoy);
           } else {
-            await supabase.from('asistencias').upsert(
-              {
-                clase_alumna_id: caData.id,
-                date: fechaHoy,
-                status: data.asistenciaStatus,
-                notes: data.observaciones || null,
-              },
-              { onConflict: 'clase_alumna_id,date' }
-            );
+            // Guardado seguro: verificar si ya existe registro para esa clase_alumna_id y fecha
+            const { data: existingAsis } = await supabase
+              .from('asistencias')
+              .select('id')
+              .eq('clase_alumna_id', caData.id)
+              .eq('date', fechaHoy)
+              .maybeSingle();
+
+            if (existingAsis?.id) {
+              await supabase
+                .from('asistencias')
+                .update({
+                  status: data.asistenciaStatus,
+                  notes: data.observaciones || null,
+                })
+                .eq('id', existingAsis.id);
+            } else {
+              await supabase
+                .from('asistencias')
+                .insert({
+                  clase_alumna_id: caData.id,
+                  date: fechaHoy,
+                  status: data.asistenciaStatus,
+                  notes: data.observaciones || null,
+                });
+            }
 
             // Si se marcó PRESENT y la alumna es de clase individual / sólo inscripción ($0), suspenderla
             if (data.asistenciaStatus === 'PRESENT') {
@@ -375,6 +394,7 @@ export default function AgendaPage() {
     period?: string;
     profesora_id?: string;
     notes?: string;
+    sede_id?: string;
   }): Promise<boolean> => {
     try {
       const res = await registrarPago({
@@ -388,7 +408,7 @@ export default function AgendaPage() {
         billing_month: pagoData.period,
         profesora_id: pagoData.profesora_id,
         notes: pagoData.notes,
-        sede_id: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
+        sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
       });
 
       if (res.error) {
@@ -408,6 +428,7 @@ export default function AgendaPage() {
 
       setIsPagoModalOpen(false);
       setSelectedAlumnaParaPago(null);
+      await Promise.all([fetchAgenda(), fetchAsistencias()]);
       return true;
     } catch (err: any) {
       await alertDialog({
@@ -418,6 +439,7 @@ export default function AgendaPage() {
       return false;
     }
   };
+
 
   const currentSedeNombre = sedes.find((s) => s.id === selectedSedeId)?.name || 'Pilates Studio';
 
@@ -607,8 +629,10 @@ export default function AgendaPage() {
         presetTime={presetTime}
         presetCamilla={presetCamilla}
         alumnaAsignada={selectedAlumnaAsignada}
+        initialAsistenciaStatus={selectedAlumnaAsignada?.caId ? asistencias[selectedAlumnaAsignada.caId] : undefined}
         profesoras={profesoras}
         profesoraFilter={profesoraFilter}
+
         onSave={handleSaveTurnoFromModal}
         onDeleteTurno={async (claseId, alumnaId) => {
           if (alumnaId) {
@@ -620,7 +644,7 @@ export default function AgendaPage() {
         }}
       />
 
-      {/* MODAL RÁPIDO DE COBRO [💵 Cobrar] */}
+      {/* MODAL RÁPIDO DE COBRO [Cobrar Cuota] */}
       {isPagoModalOpen && (
         <PagoFormModal
           open={isPagoModalOpen}

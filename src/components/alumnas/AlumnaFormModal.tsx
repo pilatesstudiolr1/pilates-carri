@@ -421,8 +421,9 @@ export function AlumnaFormModal({
               >
                 <option value="">Seleccionar plan</option>
                 <option value="Solo Inscripción / Clase de prueba">
-                  🟣 Solo Inscripción / Clase de prueba ($0 - Reserva)
+                  Solo Inscripción / Clase de prueba ($0 - Reserva)
                 </option>
+
                 {planes.map((p) => (
                   <option key={p.id} value={p.name}>
                     {p.name} - ${p.price.toLocaleString()}

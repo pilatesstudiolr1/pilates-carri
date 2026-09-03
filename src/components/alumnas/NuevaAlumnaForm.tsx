@@ -695,8 +695,9 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
                 className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
               >
                 <option value="Solo Inscripción / Clase de prueba">
-                  🟣 Solo Inscripción / Clase de prueba ($0 - Reserva)
+                  Solo Inscripción / Clase de prueba ($0 - Reserva)
                 </option>
+
                 {planes.map((pl) => (
                   <option key={pl.id} value={pl.name}>
                     {pl.name} - ${pl.price.toLocaleString()}

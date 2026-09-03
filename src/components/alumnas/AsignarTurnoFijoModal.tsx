@@ -8,7 +8,8 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Alumna, Clase } from '@/types/database';
 import { getClasesConAlumnas } from '@/lib/services/agenda';
 import { DIAS_MAP } from '@/lib/constants';
-import { Calendar, BedDouble, CheckCircle2, Clock, Users } from 'lucide-react';
+import { Calendar, BedDouble, CheckCircle2, Clock, Users, AlertCircle } from 'lucide-react';
+
 
 interface AsignarTurnoFijoModalProps {
   isOpen: boolean;
@@ -216,10 +217,11 @@ export function AsignarTurnoFijoModal({
 
               if (camillasDisponibles.length === 0) {
                 return (
-                  <p className="text-xs text-rose-500 font-bold bg-rose-500/10 p-3 rounded-lg border border-rose-500/30">
-                    ⚠️ No hay reformers disponibles en este turno. Todos están ocupados.
+                  <p className="text-xs text-rose-500 font-bold bg-rose-500/10 p-3 rounded-lg border border-rose-500/30 flex items-center gap-1.5">
+                    <AlertCircle className="h-4 w-4 shrink-0" /> No hay reformers disponibles en este turno. Todos están ocupados.
                   </p>
                 );
+
               }
 
               return (
