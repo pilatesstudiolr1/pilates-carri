@@ -128,6 +128,38 @@ export function buildAvisoPagoWhatsAppMessage(data: {
   );
 }
 
+export function buildMensajeBienvenidaInscripcion(data: {
+  nombre: string;
+  fechaInicio: string;
+  turnosStr: string;
+  montoInscripcion?: number | string;
+  sedeNombre?: string;
+}): string {
+  const nombreLimpio = (data.nombre || '').trim();
+  const primerNombre = nombreLimpio.split(' ')[0] || 'Alumna';
+  const fechaStr = data.fechaInicio.includes('-')
+    ? formatFechaArg(data.fechaInicio)
+    : data.fechaInicio;
+
+  const montoNum =
+    typeof data.montoInscripcion === 'number'
+      ? data.montoInscripcion
+      : (parseFloat(data.montoInscripcion as string) || 9500);
+
+  const montoStr = `$${montoNum.toLocaleString('es-AR')}`;
+  const sedeStr = data.sedeNombre?.trim() || 'Sede Centro';
+
+  let msg = `¡Hola ${primerNombre}! 👋\n`;
+  msg += `Confirmamos el pago de tu inscripción (${montoStr}) y tu lugar reservado. ✅\n\n`;
+  msg += `📋 *Detalle de tu turno:*\n`;
+  msg += `• 🗓️ Inicio de clases: *${fechaStr}*\n`;
+  msg += `• ⏰ Horarios: *${data.turnosStr}*\n`;
+  msg += `• 📍 Sede: *${sedeStr}*\n\n`;
+  msg += `¡Te esperamos!`;
+
+  return msg;
+}
+
 export function openWhatsAppMessage(phone: string, text: string): boolean {
   const formatted = cleanAndFormatWhatsAppPhone(phone);
   if (!formatted) return false;

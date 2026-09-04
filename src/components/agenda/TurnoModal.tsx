@@ -3,9 +3,11 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/Button';
-import { Alumna, Clase, Profile } from '@/types/database';
+import { Alumna, Clase, Profile, MetodoPago } from '@/types/database';
 import { getAlumnas, createAlumna } from '@/lib/services/alumnas';
-import { getLocalDateISO } from '@/lib/utils';
+import { registrarPago } from '@/lib/services/pagos';
+import { getLocalDateISO, formatFechaArg, openWhatsAppMessage, buildMensajeBienvenidaInscripcion } from '@/lib/utils';
+import { useSede } from '@/hooks/useSede';
 
 import {
   X,
@@ -18,6 +20,7 @@ import {
   Check,
   User,
   Calendar,
+  DollarSign,
 } from 'lucide-react';
 
 interface TurnoModalProps {
@@ -62,6 +65,11 @@ export function TurnoModal({
 
   const [mounted, setMounted] = useState(false);
   const isOccupied = !!alumnaAsignada;
+  const { sedes, selectedSedeId } = useSede();
+  const currentSedeName =
+    sedes.find((s) => s.id === clase?.sede_id)?.name ||
+    sedes.find((s) => s.id === selectedSedeId)?.name ||
+    'Sede Centro';
 
   // Estado de Profesora asignada
   const [selectedProfesoraId, setSelectedProfesoraId] = useState<string>('');
@@ -80,7 +88,17 @@ export function TurnoModal({
   const [nuevaAlumnaNombre, setNuevaAlumnaNombre] = useState('');
   const [nuevaAlumnaTelefono, setNuevaAlumnaTelefono] = useState('');
   const [fechaInicioClases, setFechaInicioClases] = useState<string>(() => getLocalDateISO());
-
+  const [cobrarInscripcionRapida, setCobrarInscripcionRapida] = useState(true);
+  const [montoInscripcionRapida, setMontoInscripcionRapida] = useState('9500');
+  const [metodoPagoInscripcionRapida, setMetodoPagoInscripcionRapida] = useState<MetodoPago>('efectivo');
+  const [savedAlumnaWhatsApp, setSavedAlumnaWhatsApp] = useState<{
+    nombre: string;
+    phone: string;
+    fechaInicio: string;
+    turnosStr: string;
+    montoInscripcion: number;
+    sedeNombre: string;
+  } | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -199,12 +217,17 @@ export function TurnoModal({
 
     try {
       let finalAlumnaId = isOccupied ? currentAlumna?.id : selectedAlumnaId;
+      let isNuevaAlumna = false;
+      let createdAlumnaNombre = '';
+      let createdAlumnaPhone = '';
+      let createdMontoInscripcion = 0;
 
       // Si es alta rápida de nueva alumna escrita a mano
       if (!finalAlumnaId && nuevaAlumnaNombre.trim()) {
         const partes = nuevaAlumnaNombre.trim().split(' ');
         const first_name = partes[0] || 'Alumna';
         const last_name = partes.slice(1).join(' ') || 'Sin apellido';
+        const inscripcionNum = parseFloat(montoInscripcionRapida) || 9500;
 
         const res = await createAlumna({
           first_name,
@@ -214,8 +237,12 @@ export function TurnoModal({
           sede_id: clase?.sede_id || null,
           billing_start_date: fechaInicioClases || null,
           entry_date: fechaInicioClases || getLocalDateISO(),
+          enrollment_paid: cobrarInscripcionRapida,
+          enrollment_amount: cobrarInscripcionRapida ? inscripcionNum : 0,
+          preferred_payment_method: cobrarInscripcionRapida ? metodoPagoInscripcionRapida : null,
+          monthly_paid: false,
+          billing_due_date: null,
         });
-
 
         if (res.error || !res.data) {
           setErrorMsg(res.error || 'Error al crear la alumna');
@@ -223,6 +250,27 @@ export function TurnoModal({
           return;
         }
         finalAlumnaId = res.data.id;
+        isNuevaAlumna = true;
+        createdAlumnaNombre = `${first_name} ${last_name}`.trim();
+        createdAlumnaPhone = nuevaAlumnaTelefono.trim();
+        createdMontoInscripcion = cobrarInscripcionRapida ? inscripcionNum : 0;
+
+        // Registrar cobro contable de inscripción
+        if (cobrarInscripcionRapida && inscripcionNum > 0) {
+          try {
+            await registrarPago({
+              alumna_id: finalAlumnaId,
+              amount: inscripcionNum,
+              payment_method: metodoPagoInscripcionRapida,
+              payment_type: 'INSCRIPCION',
+              concept: 'Inscripción inicial',
+              sede_id: clase?.sede_id || undefined,
+              profesora_id: selectedProfesoraId || (profesoraFilter !== 'ALL' ? profesoraFilter : undefined),
+            });
+          } catch (pErr) {
+            console.warn('Error al registrar pago de inscripción rápida:', pErr);
+          }
+        }
       } else if (finalAlumnaId && fechaInicioClases) {
         // Actualizar la fecha de inicio de clases en la ficha de la alumna
         const supabase = (await import('@/lib/supabase/client')).createClient();
@@ -262,7 +310,18 @@ export function TurnoModal({
       });
 
       if (ok) {
-        onClose();
+        if (isNuevaAlumna && createdAlumnaPhone) {
+          setSavedAlumnaWhatsApp({
+            nombre: createdAlumnaNombre,
+            phone: createdAlumnaPhone,
+            fechaInicio: fechaInicioClases || getLocalDateISO(),
+            turnosStr: `${dayName} ${presetTime} hs (Ref ${selectedCamilla})`,
+            montoInscripcion: createdMontoInscripcion,
+            sedeNombre: currentSedeName,
+          });
+        } else {
+          onClose();
+        }
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Error al guardar el turno');
@@ -281,11 +340,20 @@ export function TurnoModal({
 
   const handleWhatsApp = () => {
     if (!alumnaTelefono) return;
-    const clean = alumnaTelefono.replace(/\D/g, '');
-    const msg = encodeURIComponent(
-      `Hola ${alumnaNombreCompleto}! Nos comunicamos de Pilates Studio respecto a tu turno de Reformer ${selectedCamilla} (${dayName} a las ${presetTime} hs).`
-    );
-    window.open(`https://wa.me/${clean}?text=${msg}`, '_blank');
+    const fechaInicio = currentAlumna?.billing_start_date || currentAlumna?.start_date;
+    let msg = '';
+    if (fechaInicio && fechaInicio > getLocalDateISO()) {
+      msg = buildMensajeBienvenidaInscripcion({
+        nombre: alumnaNombreCompleto,
+        fechaInicio: fechaInicio,
+        turnosStr: `${dayName} ${presetTime} hs (Ref ${selectedCamilla})`,
+        montoInscripcion: currentAlumna?.enrollment_amount || 9500,
+        sedeNombre: currentSedeName,
+      });
+    } else {
+      msg = `¡Hola ${alumnaNombreCompleto.split(' ')[0]}! 👋 Te escribimos de Pilates Studio respecto a tu turno de Reformer ${selectedCamilla} (${dayName} a las ${presetTime} hs).`;
+    }
+    openWhatsAppMessage(alumnaTelefono, msg);
   };
 
   const modalNode = (
@@ -604,7 +672,41 @@ export function TurnoModal({
                     <span>*</span> Figurará como "Pendiente de inicio" en la agenda hasta esa fecha.
                   </p>
                 )}
+              </div>
 
+              {/* Cobro de Inscripción Rápida */}
+              <div className="bg-[var(--bg-primary)] p-3 rounded-xl border border-[var(--border-default)] space-y-2">
+                <label className="flex items-center justify-between text-xs font-bold cursor-pointer select-none">
+                  <span className="flex items-center gap-1.5 text-[var(--text-primary)]">
+                    <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                    Cobrar Inscripción ($9.500)
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={cobrarInscripcionRapida}
+                    onChange={(e) => setCobrarInscripcionRapida(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                  />
+                </label>
+
+                {cobrarInscripcionRapida && (
+                  <div className="pt-1.5 border-t border-[var(--border-default)] space-y-1.5 animate-fade-in">
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)] block">
+                      Medio de pago:
+                    </label>
+                    <select
+                      value={metodoPagoInscripcionRapida}
+                      onChange={(e) => setMetodoPagoInscripcionRapida(e.target.value as MetodoPago)}
+                      className="w-full h-8 px-2.5 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-semibold focus:outline-none cursor-pointer"
+                    >
+                      <option value="efectivo">Efectivo en mano</option>
+                      <option value="transferencia">Transferencia bancaria</option>
+                      <option value="mercado_pago">Mercado Pago</option>
+                      <option value="tarjeta">Tarjeta Débito / POS</option>
+                      <option value="otro">Otro</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -626,6 +728,87 @@ export function TurnoModal({
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmación de WhatsApp tras agendar en TurnoModal */}
+      {savedAlumnaWhatsApp && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] shadow-2xl rounded-2xl p-5 sm:p-6 text-[var(--text-primary)] space-y-4">
+            <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+              <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[var(--text-primary)]">
+                  ¡Alumna agendada con éxito!
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Lugar reservado en la agenda.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-default)] text-xs space-y-1.5">
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Alumna:</span>{' '}
+                <strong className="text-[var(--text-primary)]">{savedAlumnaWhatsApp.nombre}</strong>
+              </p>
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Inicio de clases:</span>{' '}
+                {formatFechaArg(savedAlumnaWhatsApp.fechaInicio)}
+              </p>
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Turno:</span>{' '}
+                {savedAlumnaWhatsApp.turnosStr}
+              </p>
+              {savedAlumnaWhatsApp.montoInscripcion > 0 && (
+                <p>
+                  <span className="font-bold text-[var(--text-secondary)]">Inscripción:</span>{' '}
+                  ${savedAlumnaWhatsApp.montoInscripcion.toLocaleString('es-AR')} abonada
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] font-medium">
+              ¿Deseas enviarle el mensaje de bienvenida y confirmación por WhatsApp?
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <Button
+                type="button"
+                variant="primary"
+                className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                onClick={() => {
+                  const msg = buildMensajeBienvenidaInscripcion({
+                    nombre: savedAlumnaWhatsApp.nombre,
+                    fechaInicio: savedAlumnaWhatsApp.fechaInicio,
+                    turnosStr: savedAlumnaWhatsApp.turnosStr,
+                    montoInscripcion: savedAlumnaWhatsApp.montoInscripcion,
+                    sedeNombre: savedAlumnaWhatsApp.sedeNombre,
+                  });
+                  openWhatsAppMessage(savedAlumnaWhatsApp.phone, msg);
+                  setSavedAlumnaWhatsApp(null);
+                  onClose();
+                }}
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>Enviar WhatsApp</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full sm:w-auto cursor-pointer"
+                onClick={() => {
+                  setSavedAlumnaWhatsApp(null);
+                  onClose();
+                }}
+              >
+                Listo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

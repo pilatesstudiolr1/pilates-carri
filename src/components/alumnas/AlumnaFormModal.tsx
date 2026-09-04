@@ -114,9 +114,6 @@ export function AlumnaFormModal({
 
   const resetForm = () => {
     const today = new Date().toISOString().split('T')[0];
-    const nextMonth = new Date();
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    const dueStr = nextMonth.toISOString().split('T')[0];
 
     setFirstName('');
     setLastName('');
@@ -136,7 +133,7 @@ export function AlumnaFormModal({
     setSelectedPlan('');
     setPlanAmount('0');
     setBillingStartDate(today);
-    setBillingDueDate(dueStr);
+    setBillingDueDate('');
     setSedeId(selectedSedeId && selectedSedeId !== 'ALL' ? selectedSedeId : (sedes[0]?.id || ''));
     setEnrollmentPaid(true);
     setEnrollmentAmount('9500');

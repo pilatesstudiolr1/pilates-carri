@@ -11,7 +11,8 @@ import { getPlanes, PlanItem } from '@/lib/services/planes';
 import { addAlumnaToClase, getClases, createClase, getClasesByAlumna } from '@/lib/services/agenda';
 import { registrarPago } from '@/lib/services/pagos';
 import { createClient } from '@/lib/supabase/client';
-import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble, DollarSign, Building2 } from 'lucide-react';
+import { User, Phone, Mail, MapPin, Calendar, Heart, Shield, Plus, Trash2, CheckCircle2, AlertCircle, Clock, BedDouble, DollarSign, Building2, MessageCircle } from 'lucide-react';
+import { formatFechaArg, openWhatsAppMessage, buildMensajeBienvenidaInscripcion, getLocalDateISO } from '@/lib/utils';
 
 import { useSede } from '@/hooks/useSede';
 
@@ -96,11 +97,15 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
   const [billingStartDate, setBillingStartDate] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-  const [billingDueDate, setBillingDueDate] = useState<string>(() => {
-    const start = new Date();
-    start.setMonth(start.getMonth() + 1);
-    return start.toISOString().split('T')[0];
-  });
+  const [billingDueDate, setBillingDueDate] = useState<string>('');
+  const [savedAlumnaWhatsApp, setSavedAlumnaWhatsApp] = useState<{
+    nombre: string;
+    phone: string;
+    fechaInicio: string;
+    turnosStr: string;
+    montoInscripcion: number;
+    sedeNombre: string;
+  } | null>(null);
   const [status, setStatus] = useState<AlumnaStatus>('ACTIVE');
 
   // Cobro Inicial de Inscripción ($9500)
@@ -204,13 +209,6 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
 
   const handleStartDateChange = (dateStr: string) => {
     setBillingStartDate(dateStr);
-    if (dateStr) {
-      const d = new Date(dateStr + 'T00:00:00');
-      if (!isNaN(d.getTime())) {
-        d.setMonth(d.getMonth() + 1);
-        setBillingDueDate(d.toISOString().split('T')[0]);
-      }
-    }
   };
 
   // Calcular edad automaticamente
@@ -403,6 +401,7 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
       plan_amount: finalPlanAmount,
       billing_start_date: billingStartDate || null,
       billing_due_date: billingDueDate || null,
+      monthly_paid: alumnaToEdit ? (alumnaToEdit.monthly_paid || false) : false,
       enrollment_paid: cobrarInscripcion,
       enrollment_amount: cobrarInscripcion ? inscripcionMontoNum : 0,
       preferred_payment_method: cobrarInscripcion ? metodoPagoInscripcion : null,
@@ -523,6 +522,21 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
       setTimeout(() => {
         if (onSuccess) onSuccess();
       }, 3500);
+    } else if (!alumnaToEdit && phone.trim()) {
+      const turnosLabels = turnosFijos.map((tf) => {
+        const diaLabel = DIAS.find((d) => d.value === tf.day_of_week)?.label || `Día ${tf.day_of_week}`;
+        return `${diaLabel} ${tf.start_time} hs (Ref ${tf.camilla})`;
+      });
+      const turnosStr = turnosLabels.join(', ');
+
+      setSavedAlumnaWhatsApp({
+        nombre: `${firstName.trim()} ${lastName.trim()}`.trim(),
+        phone: phone.trim(),
+        fechaInicio: billingStartDate || getLocalDateISO(),
+        turnosStr: turnosStr || 'A coordinar',
+        montoInscripcion: cobrarInscripcion ? inscripcionMontoNum : 0,
+        sedeNombre: currentSedeObj?.name || '',
+      });
     } else {
       setSuccessMsg(
         alumnaToEdit
@@ -1042,6 +1056,87 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
           </Button>
         </div>
       </form>
+
+      {/* Modal de confirmación de WhatsApp tras agendar */}
+      {savedAlumnaWhatsApp && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+          <div className="w-full max-w-md bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] shadow-2xl rounded-2xl p-5 sm:p-6 text-[var(--text-primary)] space-y-4">
+            <div className="flex items-center gap-3 text-emerald-600 dark:text-emerald-400">
+              <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-[var(--text-primary)]">
+                  ¡Alumna agendada con éxito!
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Lugar reservado y ficha guardada.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-default)] text-xs space-y-1.5">
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Alumna:</span>{' '}
+                <strong className="text-[var(--text-primary)]">{savedAlumnaWhatsApp.nombre}</strong>
+              </p>
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Inicio de clases:</span>{' '}
+                {formatFechaArg(savedAlumnaWhatsApp.fechaInicio)}
+              </p>
+              <p>
+                <span className="font-bold text-[var(--text-secondary)]">Turnos reservados:</span>{' '}
+                {savedAlumnaWhatsApp.turnosStr}
+              </p>
+              {savedAlumnaWhatsApp.montoInscripcion > 0 && (
+                <p>
+                  <span className="font-bold text-[var(--text-secondary)]">Inscripción:</span>{' '}
+                  ${savedAlumnaWhatsApp.montoInscripcion.toLocaleString('es-AR')} abonada
+                </p>
+              )}
+            </div>
+
+            <p className="text-xs text-[var(--text-secondary)] font-medium">
+              ¿Deseas enviarle el mensaje de bienvenida y confirmación de reserva por WhatsApp?
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+              <Button
+                type="button"
+                variant="primary"
+                className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                onClick={() => {
+                  const msg = buildMensajeBienvenidaInscripcion({
+                    nombre: savedAlumnaWhatsApp.nombre,
+                    fechaInicio: savedAlumnaWhatsApp.fechaInicio,
+                    turnosStr: savedAlumnaWhatsApp.turnosStr,
+                    montoInscripcion: savedAlumnaWhatsApp.montoInscripcion,
+                    sedeNombre: savedAlumnaWhatsApp.sedeNombre,
+                  });
+                  openWhatsAppMessage(savedAlumnaWhatsApp.phone, msg);
+                  setSavedAlumnaWhatsApp(null);
+                  if (onSuccess) onSuccess();
+                }}
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>Enviar WhatsApp</span>
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full sm:w-auto cursor-pointer"
+                onClick={() => {
+                  setSavedAlumnaWhatsApp(null);
+                  if (onSuccess) onSuccess();
+                }}
+              >
+                Listo
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }

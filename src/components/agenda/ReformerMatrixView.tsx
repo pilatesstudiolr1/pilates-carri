@@ -434,34 +434,45 @@ export function ReformerMatrixView({
                   let vencimientoColor = 'text-[var(--text-muted)]';
                   let isAlDia = false;
 
-                  if (dueDate) {
-                    const cleanDue = dueDate.slice(0, 10);
-                    const [y, m, d] = cleanDue.split('-').map(Number);
-                    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-                      const vencObj = new Date(y, m - 1, d);
-                      const [hy, hm, hd] = hoyStr.split('-').map(Number);
-                      const hoyObj = new Date(hy, hm - 1, hd);
-                      const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
+                  if (alumna.monthly_paid) {
+                    if (dueDate) {
+                      const cleanDue = dueDate.slice(0, 10);
+                      const [y, m, d] = cleanDue.split('-').map(Number);
+                      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+                        const vencObj = new Date(y, m - 1, d);
+                        const [hy, hm, hd] = hoyStr.split('-').map(Number);
+                        const hoyObj = new Date(hy, hm - 1, hd);
+                        const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
 
-                      if (diffDias < 0) {
-                        vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
-                        vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
-                        isAlDia = false;
-                      } else if (diffDias <= 5) {
-                        vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
-                        vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
-                        isAlDia = true;
-                      } else {
-                        vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
-                        vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
-                        isAlDia = true;
+                        if (diffDias < 0) {
+                          vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
+                          vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+                          isAlDia = false;
+                        } else if (diffDias <= 5) {
+                          vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
+                          vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
+                          isAlDia = true;
+                        } else {
+                          vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
+                          vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+                          isAlDia = true;
+                        }
                       }
+                    } else {
+                      isAlDia = true;
+                      vencimientoTexto = 'Cuota al día';
+                      vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
                     }
-                  } else if (alumna.monthly_paid) {
-
-                    isAlDia = true;
-                    vencimientoTexto = 'Cuota al día';
-                    vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+                  } else {
+                    // La cuota mensual NO fue abonada todavía
+                    isAlDia = false;
+                    if (alumna.enrollment_paid) {
+                      vencimientoTexto = 'Inscripción paga · Cuota pendiente';
+                      vencimientoColor = 'text-amber-700 dark:text-amber-400 font-bold';
+                    } else {
+                      vencimientoTexto = 'Cuota pendiente';
+                      vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+                    }
                   }
 
                   const renderBotonCobroOAlDia = (btnCustomColor?: string) => {
@@ -609,9 +620,13 @@ export function ReformerMatrixView({
                           </div>
                         </div>
 
-                        {/* Teléfono */}
-                        <div className="mt-2 text-[11px] font-medium text-[#6b21a8] dark:text-[#c4b5fd] truncate">
-                          {phone || 'Sin teléfono'}
+                        {/* Teléfono y Acción de Cobro */}
+                        <div className="mt-2 space-y-1.5">
+                          <span className="text-[11px] font-medium text-[#6b21a8] dark:text-[#c4b5fd] block truncate">
+                            {phone || 'Sin teléfono'}
+                          </span>
+
+                          {renderBotonCobroOAlDia('bg-purple-700 hover:bg-purple-800')}
                         </div>
                       </div>
                     );
