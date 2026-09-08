@@ -594,6 +594,8 @@ export default function AgendaPage() {
           onSelectDay={setSelectedDay}
           currentProfesoraId={isProfesora && profile?.id ? profile.id : undefined}
           isProfesoraView={isProfesora}
+          profesoraWorkHours={isProfesora ? profile?.work_hours : undefined}
+          profesoraWorkDays={isProfesora ? profile?.work_days : undefined}
           onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
             handleAbrirTurnoModal(day, time, camilla || 1, null)
           }
@@ -614,6 +616,7 @@ export default function AgendaPage() {
           selectedDay={selectedDay}
           onSelectClase={handleSelectClaseBlock}
           onSelectEmptySlot={(day, time) => handleAbrirTurnoModal(day, time, 1, null)}
+          profesoraWorkHours={isProfesora ? profile?.work_hours : undefined}
         />
       )}
 

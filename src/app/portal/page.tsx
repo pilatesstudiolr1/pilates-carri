@@ -15,6 +15,7 @@ import {
   Layers,
   Receipt,
   Flower2,
+  Calendar,
 } from 'lucide-react';
 
 export default function LatticePortalPage() {
@@ -82,6 +83,7 @@ export default function LatticePortalPage() {
 
         {/* Cards Grid — Lattice Pastel Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          
           {/* Card: Profesora (Solo si es PROFESORA) */}
           {!loading && profile?.role === 'PROFESORA' && (
             <Link href="/profesora" className="group block">

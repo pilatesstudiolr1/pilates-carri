@@ -73,7 +73,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
   const filteredItems = useMemo(() => {
     if (userRole === 'PROFESORA') {
       return [
-        { label: 'Panel Docente', href: '/profesora', icon: 'LayoutGrid', section: 'Principal' },
+        { label: 'Panel General', href: '/profesora', icon: 'LayoutGrid', section: 'Principal' },
       ];
     }
 

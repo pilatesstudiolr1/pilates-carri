@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Clase } from '@/types/database';
 import { getLocalDateISO } from '@/lib/utils';
@@ -66,6 +66,8 @@ interface ReformerMatrixViewProps {
   maxCamillas?: number;
   currentProfesoraId?: string;
   isProfesoraView?: boolean;
+  profesoraWorkHours?: string[];
+  profesoraWorkDays?: string[];
 }
 
 function formatFechaCorta(fechaStr?: string | null): string {
@@ -92,6 +94,8 @@ export function ReformerMatrixView({
   maxCamillas,
   currentProfesoraId,
   isProfesoraView = false,
+  profesoraWorkHours,
+  profesoraWorkDays,
 }: ReformerMatrixViewProps) {
   const { selectedSede } = useSede();
   const effectiveMaxCamillas = maxCamillas || (selectedSede?.max_camillas ? selectedSede.max_camillas : 6);
@@ -101,14 +105,48 @@ export function ReformerMatrixView({
     () => getLocalDateISO()
   );
 
+  // Normalizar una hora a formato "HH:mm" (ej. "8:00" -> "08:00", "08:00:00" -> "08:00")
+  const normalizeHour = (h?: string | null): string => {
+    if (!h) return '';
+    const clean = h.trim();
+    const [hh, mm] = clean.split(':');
+    const padH = (hh || '0').padStart(2, '0');
+    const padM = (mm || '00').padEnd(2, '0').slice(0, 2);
+    return `${padH}:${padM}`;
+  };
+
+  // Horarios visibles en la matriz
+  const horariosVisibles = useMemo(() => {
+    if (isProfesoraView) {
+      // 1. Si la profesora tiene horarios asignados en la configuración de su usuario
+      if (profesoraWorkHours && profesoraWorkHours.length > 0) {
+        const setHoras = new Set(profesoraWorkHours.map(normalizeHour).filter(Boolean));
+        const lista = Array.from(setHoras).sort((a, b) => a.localeCompare(b));
+        if (lista.length > 0) return lista;
+      }
+
+      // 2. Si no tiene horarios configurados en su perfil, pero tiene clases asignadas a su cargo
+      const misClases = clases.filter(
+        (c) => !currentProfesoraId || c.profesora_id === currentProfesoraId
+      );
+      if (misClases.length > 0) {
+        const horasClases = Array.from(
+          new Set(misClases.map((c) => normalizeHour(c.start_time)).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+        if (horasClases.length > 0) return horasClases;
+      }
+    }
+
+    return HORARIOS_ESTANDAR;
+  }, [isProfesoraView, profesoraWorkHours, clases, currentProfesoraId]);
 
   // Filtrar clases del día seleccionado
   const clasesDelDia = clases.filter((c) => c.day_of_week === selectedDay);
 
   // Mapear matriz por horario y reformer dinámico
-  const matrizHorarios = HORARIOS_ESTANDAR.map((hora) => {
+  const matrizHorarios = horariosVisibles.map((hora) => {
     const claseEnHora = clasesDelDia.find(
-      (c) => c.start_time.startsWith(hora) || c.start_time.slice(0, 5) === hora
+      (c) => normalizeHour(c.start_time) === hora
     );
 
     const camillasMap: Record<number, { alumna: any; caId: string; status?: string; is_other_profesora?: boolean } | null> = {};
@@ -160,7 +198,7 @@ export function ReformerMatrixView({
     });
   });
 
-  const totalCapacidadDia = HORARIOS_ESTANDAR.length * effectiveMaxCamillas;
+  const totalCapacidadDia = horariosVisibles.length * effectiveMaxCamillas;
   const nombreDiaActual = DIAS.find((d) => d.value === selectedDay)?.label || 'Lunes';
   const hoyStr = getLocalDateISO();
 
@@ -173,6 +211,12 @@ export function ReformerMatrixView({
         <div className="flex items-center gap-2 flex-wrap">
           {DIAS.map((d) => {
             const isSelected = selectedDay === d.value;
+            const isWorkDay =
+              profesoraWorkDays && profesoraWorkDays.length > 0
+                ? profesoraWorkDays.some((pwd) =>
+                    pwd.toLowerCase().startsWith(d.label.toLowerCase().slice(0, 3))
+                  )
+                : true;
             const countDia = clases
               .filter((c) => c.day_of_week === d.value)
               .reduce((acc, c) => acc + (c.alumnas?.length || 0), 0);
@@ -188,6 +232,9 @@ export function ReformerMatrixView({
                 }`}
               >
                 <span>{d.label}</span>
+                {isProfesoraView && isWorkDay && profesoraWorkDays && profesoraWorkDays.length > 0 && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Día laboral asignado" />
+                )}
                 {countDia > 0 && (
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
@@ -319,7 +366,22 @@ export function ReformerMatrixView({
           ))}
         </div>
 
-        {matrizHorarios.map((row) => (
+        {matrizHorarios.length === 0 ? (
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-12 text-center flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-[var(--color-wood)]/10 text-[var(--color-wood)] border border-[var(--color-wood)]/20 flex items-center justify-center">
+              <Clock className="h-6 w-6" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-[var(--text-primary)]">
+                No tienes turnos configurados para este día
+              </p>
+              <p className="text-xs text-[var(--text-muted)] max-w-sm">
+                No se encontraron horarios asignados en la configuración de tu usuario.
+              </p>
+            </div>
+          </div>
+        ) : (
+          matrizHorarios.map((row) => (
           <div
             key={row.hora}
             className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 sm:p-4 shadow-sm space-y-3 transition-colors hover:border-[var(--border-hover)]"
@@ -831,7 +893,8 @@ export function ReformerMatrixView({
               })}
             </div>
           </div>
-        ))}
+        ))
+        )}
       </div>
     </div>
   );
