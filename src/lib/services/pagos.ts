@@ -71,6 +71,7 @@ export async function registrarPago(pagoData: {
   due_date?: string;
   concept?: string;
   billing_month?: string;
+  period?: string;
   commission_rate?: number;
   notes?: string;
   sede_id?: string;
@@ -94,7 +95,8 @@ export async function registrarPago(pagoData: {
       ? 'INSCRIPCION'
       : (pagoData.payment_type || 'MENSUALIDAD');
 
-    const currentPeriod = normalizePeriodToYearMonth(pagoData.billing_month || today.slice(0, 7));
+    const rawPeriod = pagoData.period || pagoData.billing_month || today.slice(0, 7);
+    const currentPeriod = normalizePeriodToYearMonth(rawPeriod);
 
     // Prevención de doble registro de mensualidad para el mismo período
     if (finalPaymentType === 'MENSUALIDAD' && !pagoData.allow_duplicate) {

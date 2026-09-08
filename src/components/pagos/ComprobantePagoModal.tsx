@@ -214,6 +214,12 @@ export function ComprobantePagoModal({
             <span class="info-val">${pago.concept || 'Mensualidad Pilates Reformer'}</span>
           </div>
 
+          ${pago.period ? `
+          <div class="info-row" style="border-bottom: 1px solid #f1f5f9; padding: 10px 0;">
+            <span class="info-label">Período Abonado:</span>
+            <span class="info-val" style="font-family: monospace; font-weight: 700;">${pago.period}</span>
+          </div>` : ''}
+
           <div class="info-row" style="border-bottom: 1px solid #f1f5f9; padding: 10px 0;">
             <span class="info-label">Método de Pago:</span>
             <span class="info-val">${metodoLabel}</span>
@@ -340,6 +346,17 @@ export function ComprobantePagoModal({
                 {pago.concept || 'Mensualidad Pilates Reformer'}
               </strong>
             </div>
+
+            {pago.period && (
+              <div className="flex items-center justify-between text-xs border-b border-[var(--border-default)] pb-2">
+                <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Período Abonado:
+                </span>
+                <span className="font-mono text-[var(--text-primary)] font-bold">
+                  {pago.period}
+                </span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between text-xs border-b border-[var(--border-default)] pb-2">
               <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
