@@ -223,6 +223,16 @@ export interface CajaMovimiento {
   sede_id: string | null;
   recorded_by: string | null;
   creado_en: string;
+
+  // Campos calculados / relaciones
+  titular?: string | null;
+  alumna?: {
+    id: string;
+    first_name: string;
+    last_name: string | null;
+    dni?: string | null;
+    phone?: string | null;
+  } | null;
 }
 
 export interface Recuperacion {
