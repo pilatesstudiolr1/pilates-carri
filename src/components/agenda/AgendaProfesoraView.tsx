@@ -57,12 +57,17 @@ interface AgendaProfesoraViewProps {
   initialDay?: number;
 }
 
-export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps) {
+export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
   const { profile } = useUser();
   const { selectedSedeId, selectedSede } = useSede();
   const { confirm, alert: alertDialog } = useConfirm();
 
-  const [selectedDay, setSelectedDay] = useState<number>(initialDay);
+  const hoyDiaNum = (() => {
+    const d = new Date().getDay();
+    return d === 0 ? 1 : d;
+  })();
+
+  const [selectedDay, setSelectedDay] = useState<number>(initialDay || hoyDiaNum);
   const [viewMode, setViewMode] = useState<'REFORMER' | 'WEEK'>('REFORMER');
   const [clases, setClases] = useState<Clase[]>([]);
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
@@ -490,14 +495,14 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             onSelectDay={setSelectedDay}
             currentProfesoraId={profile?.id}
             isProfesoraView={true}
+            profesoraWorkHours={filtroSoloMisClases ? profile?.work_hours : undefined}
+            profesoraWorkDays={filtroSoloMisClases ? profile?.work_days : undefined}
             asistencias={asistencias}
             onCobrar={(alumna) => {
               setSelectedAlumnaParaPago(alumna);
               setIsPagoModalOpen(true);
             }}
             onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
-
-
               handleAbrirTurnoModal(day, time, camilla || 1, null)
             }
             onSelectOccupiedSlot={(day: number, time: string, camilla: number, item: any) =>
@@ -514,6 +519,7 @@ export function AgendaProfesoraView({ initialDay = 1 }: AgendaProfesoraViewProps
             selectedDay={selectedDay}
             onSelectClase={handleSelectClaseBlock}
             onSelectEmptySlot={(day: number, time: string) => handleAbrirTurnoModal(day, time, 1, null)}
+            profesoraWorkHours={filtroSoloMisClases ? profile?.work_hours : undefined}
           />
         </div>
       )}

@@ -31,6 +31,7 @@ import {
   Search,
   Trash2,
   ArrowRightLeft,
+  User,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 30;
@@ -223,7 +224,18 @@ export default function CajaPage() {
       const term = search.toLowerCase();
       const conc = (m.concepto || '').toLowerCase();
       const metodo = (m.metodo_pago || '').toLowerCase();
-      if (!conc.includes(term) && !metodo.includes(term)) return false;
+      const tit = (m.titular || '').toLowerCase();
+      const sedeName = (sedes.find((s) => s.id === m.sede_id)?.name || '').toLowerCase();
+      const montoStr = String(m.monto || '');
+
+      const match =
+        conc.includes(term) ||
+        metodo.includes(term) ||
+        tit.includes(term) ||
+        sedeName.includes(term) ||
+        montoStr.includes(term);
+
+      if (!match) return false;
     }
     return true;
   });
@@ -330,7 +342,7 @@ export default function CajaPage() {
           <div className="relative w-full lg:w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <Input
-              placeholder="Buscar concepto o método..."
+              placeholder="Buscar por titular, alumna, concepto o monto..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -388,18 +400,18 @@ export default function CajaPage() {
                 setTipoFilter('INGRESO');
                 setCurrentPage(1);
               }}
-              className={`filter-pill ${tipoFilter === 'INGRESO' ? 'filter-pill-active-success' : ''}`}
+              className={`filter-pill ${tipoFilter === 'INGRESO' ? 'filter-pill-active' : ''}`}
             >
-              <ArrowUpRight className="h-3.5 w-3.5" /> Ingresos
+              Ingresos
             </button>
             <button
               onClick={() => {
                 setTipoFilter('EGRESO');
                 setCurrentPage(1);
               }}
-              className={`filter-pill ${tipoFilter === 'EGRESO' ? 'filter-pill-active-danger' : ''}`}
+              className={`filter-pill ${tipoFilter === 'EGRESO' ? 'filter-pill-active' : ''}`}
             >
-              <ArrowDownLeft className="h-3.5 w-3.5" /> Egresos
+              Egresos
             </button>
           </div>
         </div>
@@ -456,17 +468,31 @@ export default function CajaPage() {
         </div>
       </div>
 
-      {/* 3. TABLA DE MOVIMIENTOS CON BADGES DE ALTO CONTRASTE */}
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
-          <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-[var(--badge-meadow-text)]" /> Movimientos Registrados ({movimientosFiltrados.length})
-          </h2>
-          <span className="text-xs text-[var(--text-secondary)]">
-            Página {currentPage} de {totalPages} (30 por página)
-          </span>
+      {/* Tarjeta Contenedora Principal */}
+      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] shadow-sm overflow-hidden">
+        {/* Encabezado de la Tabla con Contador */}
+        <div className="p-4 sm:p-5 border-b border-[var(--border-default)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[var(--bg-secondary)]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)]">
+              <Receipt className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-[var(--text-primary)] tracking-tight flex items-center gap-2">
+                <span>Movimientos Registrados</span>
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--bg-primary)] border border-[var(--border-default)] text-[var(--text-secondary)]">
+                  {movimientosFiltrados.length}
+                </span>
+              </h3>
+              <p className="text-xs text-[var(--text-secondary)]">
+                {selectedMonth === 'ALL'
+                  ? 'Historial completo de ingresos y egresos de caja'
+                  : `Movimientos del período ${formatMonthLabel(selectedMonth)}`}
+              </p>
+            </div>
+          </div>
         </div>
 
+        {/* 3. TABLA DE MOVIMIENTOS */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Spinner size="lg" />
@@ -483,7 +509,7 @@ export default function CajaPage() {
                 <tr className="border-b border-[var(--border-default)] text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">
                   <th className="py-3 px-4 font-semibold">Tipo</th>
                   <th className="py-3 px-4 font-semibold">Concepto</th>
-                  <th className="py-3 px-4 font-semibold">Sede</th>
+                  <th className="py-3 px-4 font-semibold">Titular / Persona</th>
                   <th className="py-3 px-4 font-semibold">Método de Pago</th>
                   <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Monto</th>
                   <th className="py-3 px-4 font-semibold text-right">Fecha y Hora</th>
@@ -511,10 +537,19 @@ export default function CajaPage() {
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[11px] font-semibold text-[var(--text-secondary)]">
-                        <Building2 className="h-3 w-3 text-[var(--color-wood)]" />
-                        {sedes.find((s) => s.id === mov.sede_id)?.name || 'Sin sede'}
-                      </span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                          {mov.alumna ? (
+                            <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          ) : (
+                            <Building2 className="h-3.5 w-3.5 text-[var(--color-wood)] shrink-0" />
+                          )}
+                          <span>{mov.titular || 'Movimiento de Caja'}</span>
+                        </span>
+                        <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 pl-5">
+                          {sedes.find((s) => s.id === mov.sede_id)?.name || 'Sin sede'}
+                        </span>
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4 capitalize text-[var(--text-secondary)] font-medium">

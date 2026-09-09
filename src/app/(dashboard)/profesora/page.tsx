@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import Link from 'next/link';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
 import { getClasesConAlumnas, addAlumnaToClase, removeAlumnaFromClase } from '@/lib/services/agenda';
@@ -48,7 +47,7 @@ interface AsistenciaState {
   [claseAlumnaId: string]: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED';
 }
 
-type VistaProfesora = 'HUB' | 'MIS_TURNOS' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
+type VistaProfesora = 'HUB' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
 
 
 export default function ProfesoraVistaPage() {
@@ -326,18 +325,7 @@ export default function ProfesoraVistaPage() {
               <span>Mis Cobros</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setVistaActual('MIS_TURNOS')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
-                vistaActual === 'MIS_TURNOS'
-                  ? 'bg-[#001f1f] text-white shadow-2xs dark:bg-emerald-700'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <Clock className="h-3.5 w-3.5" />
-              <span>Mis Turnos</span>
-            </button>
+
 
             <button
               type="button"
@@ -380,9 +368,6 @@ export default function ProfesoraVistaPage() {
               <div className="flex items-center gap-2">
                 <span className="px-3 py-0.5 rounded-full bg-[#cdface] text-[#001f1f] text-[11px] font-black uppercase tracking-wider border border-[#001f1f] shadow-2xs">
                   Pilates Studio
-                </span>
-                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  Panel de Gestión Docente
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-[var(--text-primary)]">
@@ -467,33 +452,7 @@ export default function ProfesoraVistaPage() {
               </div>
             </button>
 
-            {/* 3. Mis Turnos y Asistencia (Hoy) */}
-            <button
-              type="button"
-              onClick={() => setVistaActual('MIS_TURNOS')}
-              className="group p-6 rounded-2xl bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] hover:border-[#001f1f] dark:hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 cursor-pointer"
-            >
-              <div className="flex items-start justify-between">
-                <div className="w-12 h-12 rounded-2xl bg-[#cdface]/50 text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
-                  <CalendarCheck className="h-6 w-6" />
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
-                  {clases.length} {clases.length === 1 ? 'turno hoy' : 'turnos hoy'}
-                </span>
-              </div>
-              <div>
-                <h3 className="text-lg font-black text-[var(--text-primary)]">
-                  Mis Turnos y Asistencias
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
-                  Pasar lista por reformer (presente, ausente, recupera) y gestionar alumnas.
-                </p>
-              </div>
-              <div className="pt-3 border-t border-[var(--border-default)] flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
-                <span>Ingresar a mis turnos</span>
-                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-              </div>
-            </button>
+
 
             {/* 4. Turnos Disponibles */}
             <button
@@ -519,6 +478,31 @@ export default function ProfesoraVistaPage() {
               </div>
               <div className="pt-3 border-t border-[var(--border-default)] flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
                 <span>Consultar disponibilidad</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
+
+            {/* 4. Agenda Semanal */}
+            <button
+              type="button"
+              onClick={() => setVistaActual('AGENDA_SEMANAL')}
+              className="group p-6 rounded-2xl bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] hover:border-[#001f1f] dark:hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 cursor-pointer"
+            >
+              <div className="flex items-start justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-[#cdface]/50 text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                  <CalendarIcon className="h-6 w-6" />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[var(--text-primary)]">
+                  Agenda Semanal
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Acceso directo a la agenda completa para ver turnos y organizar a tus alumnas.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[var(--border-default)] flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
+                <span>Ir a la Agenda</span>
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </button>
@@ -765,259 +749,7 @@ export default function ProfesoraVistaPage() {
         </div>
       )}
 
-      {/* =========================================================================
-          VISTA 3: MIS TURNOS Y ASISTENCIAS DE HOY
-          ========================================================================= */}
-      {vistaActual === 'MIS_TURNOS' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* Header con Selector de Fecha */}
-          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="px-3 py-0.5 rounded-full bg-[#cdface] text-[#001f1f] text-[11px] font-black uppercase tracking-wider border border-[#001f1f] shadow-2xs">
-                  Asistencia
-                </span>
-                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  {clases.length} {clases.length === 1 ? 'Turno' : 'Turnos'} asignados
-                </span>
-              </div>
-              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] flex items-center gap-2">
-                <Clock className="h-6 w-6 text-emerald-600" />
-                <span>Turnos del Día ({formatFechaLarga(selectedDate)})</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
-                Gestioná la asistencia de tus alumnas por reformer y asignaciones.
-              </p>
-            </div>
 
-            {/* Controles de Fecha */}
-            <div className="flex items-center gap-1.5 sm:gap-2 bg-[var(--bg-tertiary)] p-1.5 rounded-xl border border-[var(--border-default)] w-full sm:w-auto overflow-x-auto custom-scrollbar">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => changeDate(-1)}
-                icon={<ChevronLeft className="h-4 w-4" />}
-              >
-                Ayer
-              </Button>
-
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 rounded-lg bg-[var(--bg-secondary)] text-xs font-bold border border-[var(--border-default)] focus:outline-none cursor-pointer"
-              />
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => changeDate(1)}
-                icon={<ChevronRight className="h-4 w-4" />}
-              >
-                Mañana
-              </Button>
-
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-              >
-                Hoy
-              </Button>
-            </div>
-          </div>
-
-          {/* Listado de Turnos */}
-          {loading ? (
-            <div className="p-12 text-center text-xs text-[var(--text-muted)] bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-default)]">
-              Cargando turnos y lista de asistencias...
-            </div>
-          ) : clases.length === 0 ? (
-            <Card padding="lg" className="text-center py-12 space-y-3">
-              <CalendarIcon className="h-10 w-10 text-[var(--text-muted)] mx-auto opacity-50" />
-              <h3 className="text-base font-bold text-[var(--text-primary)]">
-                No hay clases programadas para esta fecha
-              </h3>
-              <p className="text-xs text-[var(--text-muted)] max-w-sm mx-auto">
-                Seleccioná otro día usando el calendario superior para revisar asistencias o registrar cuotas.
-              </p>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-5">
-              {clases.map((clase) => {
-                const maxCap = clase.max_capacity || 6;
-                const alumnasEnClase = clase.clase_alumnas || [];
-                const ocupadasCount = alumnasEnClase.length;
-                const cuposLibres = maxCap - ocupadasCount;
-
-                const camillasMap = new Map<number, any>();
-                alumnasEnClase.forEach((ca: any) => {
-                  if (ca.camilla != null) camillasMap.set(ca.camilla, ca);
-                });
-
-                return (
-                  <Card
-                    key={clase.id}
-                    padding="md"
-                    className="space-y-4 border-2 hover:border-[#001f1f]/60 dark:hover:border-emerald-500/60 transition-all rounded-2xl"
-                  >
-                    {/* Header del Turno */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-[#cdface] text-[#001f1f] border border-[#001f1f]/20 text-sm font-black flex flex-col items-center justify-center shadow-2xs">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-xs font-mono font-bold mt-0.5">{clase.start_time?.slice(0, 5)}</span>
-                        </div>
-
-                        <div>
-                          <h3 className="text-base font-black text-[var(--text-primary)]">
-                            {clase.name || `Turno de ${clase.start_time?.slice(0, 5)} hs`}
-                          </h3>
-                          <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] mt-0.5">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {clase.sede?.name || 'Sede'}
-                            </span>
-                            <span className="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-300">
-                              <BedDouble className="h-3.5 w-3.5" />
-                              {cuposLibres > 0 ? `${cuposLibres} lugares disponibles` : 'Turno completo'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <Badge variant={ocupadasCount >= maxCap ? 'danger' : 'success'}>
-                          {ocupadasCount} / {maxCap} Alumnas
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleAbrirAsignar(clase)}
-                          disabled={ocupadasCount >= maxCap}
-                          icon={<UserPlus className="h-3.5 w-3.5" />}
-                        >
-                          Agendar Alumna
-                        </Button>
-                      </div>
-                    </div>
-
-                    {/* Grilla visual de Reformers del Turno */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 pt-1">
-                      {Array.from({ length: maxCap }, (_, idx) => idx + 1).map((camillaNum) => {
-                        const asignacion = camillasMap.get(camillaNum);
-                        const alumna = asignacion?.alumna;
-
-                        if (asignacion && alumna) {
-                          const currentStatus = asistencias[asignacion.id] || 'PRESENT';
-                          return (
-                            <div
-                              key={camillaNum}
-                              className="p-2.5 rounded-xl border border-[var(--border-default)] bg-[var(--bg-secondary)] flex flex-col justify-between gap-2 shadow-xs"
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-[#cdface] text-[#001f1f] border border-[#001f1f]/20">
-                                  Ref. {camillaNum}
-                                </span>
-                                <button
-                                  onClick={() => handleRemoveAlumnaFromTurno(clase.id, alumna.id, `${alumna.first_name} ${alumna.last_name || ''}`)}
-                                  className="text-[var(--text-muted)] hover:text-red-500 p-0.5 rounded transition-colors cursor-pointer"
-                                  title="Quitar alumna de esta camilla"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-
-                              <div>
-                                <p className="text-xs font-bold text-[var(--text-primary)] truncate">
-                                  {alumna.first_name} {alumna.last_name || ''}
-                                </p>
-                                <p className="text-[10px] text-[var(--text-muted)] truncate">
-                                  {alumna.dni ? `DNI: ${alumna.dni}` : alumna.phone || 'Sin tel'}
-                                </p>
-                              </div>
-
-                              <div className="flex items-center gap-1 pt-1 border-t border-[var(--border-default)]">
-                                <button
-                                  onClick={() => handleMarcarAsistencia(asignacion.id, 'PRESENT')}
-                                  disabled={savingId === asignacion.id}
-                                  className={`flex-1 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                    currentStatus === 'PRESENT'
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-emerald-500/15 text-emerald-600 hover:bg-emerald-600 hover:text-white'
-                                  }`}
-                                  title="Presente"
-                                >
-                                  P
-                                </button>
-                                <button
-                                  onClick={() => handleMarcarAsistencia(asignacion.id, 'ABSENT')}
-                                  disabled={savingId === asignacion.id}
-                                  className={`flex-1 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                    currentStatus === 'ABSENT'
-                                      ? 'bg-red-600 text-white'
-                                      : 'bg-red-500/15 text-red-600 hover:bg-red-600 hover:text-white'
-                                  }`}
-                                  title="Ausente"
-                                >
-                                  A
-                                </button>
-                                <button
-                                  onClick={() => handleMarcarAsistencia(asignacion.id, 'RECOVERY')}
-                                  disabled={savingId === asignacion.id}
-                                  className={`flex-1 py-1 rounded text-[10px] font-bold transition-all cursor-pointer ${
-                                    currentStatus === 'RECOVERY'
-                                      ? 'bg-amber-500 text-white'
-                                      : 'bg-amber-500/15 text-amber-600 hover:bg-amber-500 hover:text-white'
-                                  }`}
-                                  title="Recupera"
-                                >
-                                  R
-                                </button>
-                                <button
-                                  onClick={() => handleAbrirPago(alumna)}
-                                  className="p-1 rounded bg-[var(--bg-tertiary)] hover:bg-[#001f1f] hover:text-white text-[var(--text-muted)] transition-colors cursor-pointer"
-                                  title="Registrar cobro a esta alumna"
-                                >
-                                  <DollarSign className="h-3 w-3" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        // Camilla Disponible
-                        return (
-                          <div
-                            key={camillaNum}
-                            onClick={() => handleAbrirAsignar(clase, camillaNum)}
-                            className="p-2.5 rounded-xl border border-dashed border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/15 flex flex-col justify-between gap-3 text-center transition-all cursor-pointer group"
-                          >
-                            <span className="text-[10px] font-bold uppercase text-emerald-600 dark:text-emerald-400">
-                              Ref. {camillaNum}
-                            </span>
-                            <div className="space-y-0.5">
-                              <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                Disponible
-                              </p>
-                              <p className="text-[10px] text-[var(--text-muted)]">
-                                Libre
-                              </p>
-                            </div>
-                            <span className="text-[10px] font-extrabold text-emerald-700 dark:text-emerald-300 group-hover:underline">
-                              + Agendar
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* =========================================================================
           VISTA 4: AGENDA SEMANAL COMPLETA
@@ -1090,18 +822,18 @@ export default function ProfesoraVistaPage() {
                   <Card
                     key={item.clase_id}
                     padding="md"
-                    className="space-y-3 border border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/60 transition-all rounded-2xl"
+                    className="space-y-3 bg-[var(--bg-secondary)] border border-[var(--border-default)] hover:border-[var(--color-wood)] transition-all rounded-2xl"
                   >
                     <div className="flex items-center justify-between pb-2 border-b border-[var(--border-default)]">
                       <div>
-                        <span className="text-xs font-black uppercase text-emerald-800 dark:text-emerald-300">
+                        <span className="text-xs font-black uppercase text-[var(--color-wood)]">
                           {item.day_name}
                         </span>
                         <h4 className="text-sm font-bold text-[var(--text-primary)]">
                           {item.start_time} hs ({item.clase_nombre})
                         </h4>
                       </div>
-                      <Badge variant="success">
+                      <Badge variant="meadow">
                         {item.libres_count} {item.libres_count === 1 ? 'Libre' : 'Libres'}
                       </Badge>
                     </div>
@@ -1117,32 +849,50 @@ export default function ProfesoraVistaPage() {
                       </p>
                     </div>
 
-                    {/* Lista de Camillas Específicas Libres */}
-                    <div className="pt-2">
-                      <p className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5">
-                        Camillas / Reformers Disponibles:
-                      </p>
-                      <div className="flex flex-wrap gap-1.5">
-                        {item.camillas_libres.map((camillaNum) => (
-                          <button
-                            key={camillaNum}
-                            onClick={() => {
-                              const claseObj = clases.find((c) => c.id === item.clase_id) || {
-                                id: item.clase_id,
-                                name: item.clase_nombre,
-                                start_time: item.start_time,
-                                day_of_week: item.day_of_week,
-                              };
-                              handleAbrirAsignar(claseObj, camillaNum);
-                            }}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
-                            title={`Agendar alumna en Reformer ${camillaNum}`}
-                          >
-                            <BedDouble className="h-3 w-3" />
-                            <span>Reformer {camillaNum}</span>
-                          </button>
-                        ))}
+                    <div className="pt-2 flex flex-col gap-3">
+                      <div>
+                        <p className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5">
+                          Camillas / Reformers Disponibles:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {item.camillas_libres.map((camillaNum) => (
+                            <button
+                              key={camillaNum}
+                              onClick={() => {
+                                const claseObj = item.raw_clase || clases.find((c) => c.id === item.clase_id) || {
+                                  id: item.clase_id,
+                                  name: item.clase_nombre,
+                                  start_time: item.start_time,
+                                  day_of_week: item.day_of_week,
+                                };
+                                handleAbrirAsignar(claseObj, camillaNum);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-[var(--color-wood)] hover:bg-[#8a5a1e] text-white text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              title={`Agendar alumna en Reformer ${camillaNum}`}
+                            >
+                              <BedDouble className="h-3 w-3" />
+                              <span>Reformer {camillaNum}</span>
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={() => {
+                          const claseObj = item.raw_clase || clases.find((c) => c.id === item.clase_id) || {
+                            id: item.clase_id,
+                            name: item.clase_nombre,
+                            start_time: item.start_time,
+                            day_of_week: item.day_of_week,
+                          };
+                          handleAbrirAsignar(claseObj);
+                        }}
+                        icon={<UserPlus className="h-4 w-4" />}
+                        className="w-full sm:w-auto self-start mt-1"
+                      >
+                        Asignar turno
+                      </Button>
                     </div>
                   </Card>
                 ))}

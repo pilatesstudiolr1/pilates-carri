@@ -17,10 +17,64 @@ export async function getMovimientos(options?: {
       query = query.eq('sede_id', options.sedeId);
     }
 
-    const { data, error } = await query;
+    const { data: rawMovs, error } = await query;
 
     if (error) return { data: [], error: error.message };
-    return { data: (data as CajaMovimiento[]) || [], error: null };
+    if (!rawMovs || rawMovs.length === 0) return { data: [], error: null };
+
+    // Extraer pago_ids para resolver el titular / alumna
+    const pagoIds = rawMovs
+      .map((m: any) => {
+        if (m.description && typeof m.description === 'string' && m.description.startsWith('pago_id:')) {
+          return m.description.replace('pago_id:', '').trim();
+        }
+        return null;
+      })
+      .filter(Boolean) as string[];
+
+    const pagoMap: Record<string, any> = {};
+    if (pagoIds.length > 0) {
+      const { data: pagosData } = await supabase
+        .from('pagos')
+        .select('id, alumna_id, concept, period, alumna:alumnas(id, first_name, last_name, dni, phone)')
+        .in('id', pagoIds);
+
+      if (pagosData) {
+        pagosData.forEach((p: any) => {
+          pagoMap[p.id] = p;
+        });
+      }
+    }
+
+    const enriched: CajaMovimiento[] = rawMovs.map((m: any) => {
+      let alumnaObj: any = null;
+      let titularStr: string | null = null;
+
+      if (m.description && m.description.startsWith('pago_id:')) {
+        const pId = m.description.replace('pago_id:', '').trim();
+        const p = pagoMap[pId];
+        if (p?.alumna) {
+          alumnaObj = p.alumna;
+          titularStr = `${p.alumna.first_name || ''} ${p.alumna.last_name || ''}`.trim();
+        }
+      }
+
+      if (!titularStr && m.observations && m.observations.startsWith('Titular:')) {
+        titularStr = m.observations.replace('Titular:', '').trim();
+      }
+
+      if (!titularStr) {
+        titularStr = m.tipo === 'EGRESO' ? 'Gasto de Estudio / Caja' : 'Movimiento de Caja';
+      }
+
+      return {
+        ...m,
+        alumna: alumnaObj,
+        titular: titularStr,
+      };
+    });
+
+    return { data: enriched, error: null };
   } catch (err) {
     return {
       data: [],

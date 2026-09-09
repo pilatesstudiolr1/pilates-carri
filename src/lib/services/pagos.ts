@@ -40,6 +40,29 @@ export async function getPagos(options?: {
 
 import { getLocalDateISO } from '@/lib/utils';
 
+export function normalizePeriodToYearMonth(periodOrMonth?: string | null): string {
+  if (!periodOrMonth) return getLocalDateISO().slice(0, 7);
+  const p = periodOrMonth.trim();
+  if (/^\d{4}-\d{2}$/.test(p)) return p;
+
+  const mesesMap: Record<string, string> = {
+    enero: '01', febrero: '02', marzo: '03', abril: '04',
+    mayo: '05', junio: '06', julio: '07', agosto: '08',
+    septiembre: '09', setiembre: '09', octubre: '10', noviembre: '11', diciembre: '12'
+  };
+
+  const lower = p.toLowerCase();
+  for (const [nombreMes, numMes] of Object.entries(mesesMap)) {
+    if (lower.includes(nombreMes)) {
+      const yearMatch = p.match(/\b\d{4}\b/);
+      const year = yearMatch ? yearMatch[0] : new Date().getFullYear().toString();
+      return `${year}-${numMes}`;
+    }
+  }
+
+  return p;
+}
+
 export async function registrarPago(pagoData: {
   alumna_id: string;
   amount: number;
@@ -48,6 +71,7 @@ export async function registrarPago(pagoData: {
   due_date?: string;
   concept?: string;
   billing_month?: string;
+  period?: string;
   commission_rate?: number;
   notes?: string;
   sede_id?: string;
@@ -71,19 +95,23 @@ export async function registrarPago(pagoData: {
       ? 'INSCRIPCION'
       : (pagoData.payment_type || 'MENSUALIDAD');
 
-    const currentPeriod = pagoData.billing_month || today.slice(0, 7);
+    const rawPeriod = pagoData.period || pagoData.billing_month || today.slice(0, 7);
+    const currentPeriod = normalizePeriodToYearMonth(rawPeriod);
 
     // Prevención de doble registro de mensualidad para el mismo período
     if (finalPaymentType === 'MENSUALIDAD' && !pagoData.allow_duplicate) {
-      const { data: existingPago } = await supabase
+      const { data: existingPagos } = await supabase
         .from('pagos')
-        .select('id, amount, payment_date, concept')
+        .select('id, amount, payment_date, concept, period')
         .eq('alumna_id', pagoData.alumna_id)
-        .eq('payment_type', 'MENSUALIDAD')
-        .eq('period', currentPeriod)
-        .limit(1);
+        .eq('payment_type', 'MENSUALIDAD');
 
-      if (existingPago && existingPago.length > 0) {
+      const isDuplicate = existingPagos?.some((ep) => {
+        const epNorm = normalizePeriodToYearMonth(ep.period);
+        return epNorm === currentPeriod;
+      });
+
+      if (isDuplicate) {
         return {
           data: null,
           error: `Esta alumna ya tiene una mensualidad registrada para el período actual (${currentPeriod}). No se procesó el cobro duplicado.`,
@@ -134,6 +162,18 @@ export async function registrarPago(pagoData: {
 
     // Registrar ingreso automático en Caja Movimientos
     try {
+      let titularName = '';
+      try {
+        const { data: alumData } = await supabase
+          .from('alumnas')
+          .select('first_name, last_name')
+          .eq('id', pagoData.alumna_id)
+          .maybeSingle();
+        if (alumData) {
+          titularName = `${alumData.first_name || ''} ${alumData.last_name || ''}`.trim();
+        }
+      } catch {}
+
       const { error: cajaError } = await supabase.from('caja_movimientos').insert({
         tipo: 'INGRESO',
         concepto: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
@@ -142,6 +182,7 @@ export async function registrarPago(pagoData: {
         sede_id: pagoData.sede_id || null,
         fecha: today,
         description: data?.id ? `pago_id:${data.id}` : null,
+        observations: titularName ? `Titular: ${titularName}` : null,
       });
       if (cajaError) {
         console.warn('Advertencia al registrar movimiento de caja:', cajaError.message);

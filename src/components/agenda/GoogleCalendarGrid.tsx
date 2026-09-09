@@ -10,6 +10,7 @@ interface GoogleCalendarGridProps {
   selectedDay: number;
   onSelectClase: (clase: Clase) => void;
   onSelectEmptySlot: (dayOfWeek: number, startTime: string) => void;
+  profesoraWorkHours?: string[];
 }
 
 const DAYS_HEADER = [
@@ -33,7 +34,22 @@ export function GoogleCalendarGrid({
   selectedDay,
   onSelectClase,
   onSelectEmptySlot,
+  profesoraWorkHours,
 }: GoogleCalendarGridProps) {
+  const visibleHours = useMemo(() => {
+    if (profesoraWorkHours && profesoraWorkHours.length > 0) {
+      const normalized = Array.from(
+        new Set(
+          profesoraWorkHours.map((h) => {
+            const [hh, mm] = h.trim().split(':');
+            return `${(hh || '0').padStart(2, '0')}:${(mm || '00').padEnd(2, '0').slice(0, 2)}`;
+          })
+        )
+      ).sort((a, b) => a.localeCompare(b));
+      if (normalized.length > 0) return normalized;
+    }
+    return HOURS;
+  }, [profesoraWorkHours]);
   const visibleDays = useMemo(() => {
     if (viewMode === 'DAY') {
       return DAYS_HEADER.filter((d) => d.value === selectedDay);
@@ -78,7 +94,7 @@ export function GoogleCalendarGrid({
 
         {/* Hours & Slots Grid */}
         <div className="divide-y divide-[var(--border-default)]">
-          {HOURS.map((hour) => (
+          {visibleHours.map((hour) => (
             <div
               key={hour}
               className="grid min-h-[72px]"

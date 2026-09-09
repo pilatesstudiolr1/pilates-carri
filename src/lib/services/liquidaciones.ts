@@ -147,6 +147,7 @@ export interface DisponibilidadCamillaItem {
   libres_count: number;
   camillas_libres: number[];
   camillas_ocupadas: { camilla: number; alumna_nombre: string; alumna_id?: string; phone?: string; status?: string }[];
+  raw_clase?: any;
 }
 
 const DIAS_MAPA: Record<number, string> = {
@@ -279,7 +280,7 @@ export async function getDisponibilidadCamillas(options?: {
     const supabase = createClient();
     let query = supabase
       .from('clases')
-      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, phone, status, start_date))')
+      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, phone, status, entry_date))')
       .eq('is_active', true);
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -347,6 +348,7 @@ export async function getDisponibilidadCamillas(options?: {
         libres_count: camillasLibres.length,
         camillas_libres: camillasLibres,
         camillas_ocupadas: camillasOcupadas,
+        raw_clase: { ...c, alumnas: c.clase_alumnas },
       };
     });
 

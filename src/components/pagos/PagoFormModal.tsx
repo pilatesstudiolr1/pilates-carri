@@ -60,12 +60,14 @@ export function PagoFormModal({
     amount: number;
     dueDate: string;
     concept: string;
+    period: string;
     paymentMethod: MetodoPago;
   } | null>(null);
 
   // Concepto y duracion del pago
   const [duracionTipo, setDuracionTipo] = useState<'1_MES' | '2_MESES' | '3_MESES' | 'CLASE_SUELTA' | 'INSCRIPCION' | 'OTRO'>('1_MES');
   const [concept, setConcept] = useState('Cuota mensualidad');
+  const [period, setPeriod] = useState(() => getLocalDateISO().slice(0, 7));
 
   const [dueDate, setDueDate] = useState(() => calculateNextDueDate(null, 1));
   const [commissionRate, setCommissionRate] = useState('40');
@@ -81,6 +83,7 @@ export function PagoFormModal({
       setNotes('');
       setDuracionTipo('1_MES');
       setConcept('Cuota mensualidad');
+      setPeriod(getLocalDateISO().slice(0, 7));
       if (defaultCommissionRate != null) {
         setCommissionRate(String(Math.round(defaultCommissionRate * 100)));
       } else {
@@ -273,7 +276,7 @@ export function PagoFormModal({
       due_date: dueDate,
       commission_rate: finalCommissionRate,
       concept: currentConcept,
-      period: getLocalDateISO().slice(0, 7),
+      period: period,
       profesora_id: defaultProfesoraId || selectedAlumna.profesora_id || undefined,
       notes: notes.trim(),
       sede_id: selectedSedeIdCobro || undefined,
@@ -285,6 +288,7 @@ export function PagoFormModal({
         amount: numericAmount,
         dueDate: dueDate,
         concept: currentConcept,
+        period: period,
         paymentMethod: paymentMethod,
       });
     }
@@ -367,6 +371,15 @@ export function PagoFormModal({
               </span>
               <span className="text-[var(--text-primary)] font-semibold capitalize">
                 {paymentConfirmed.paymentMethod.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
+              <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Período Abonado:
+              </span>
+              <span className="text-[var(--text-primary)] font-bold font-mono">
+                {paymentConfirmed.period}
               </span>
             </div>
 
@@ -596,6 +609,15 @@ export function PagoFormModal({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Input
+            label="Mes Abonado *"
+            type="month"
+            value={period}
+            onChange={(e) => setPeriod(e.target.value)}
+            icon={<Calendar className="h-4 w-4 text-[var(--color-wood)]" />}
+            required
+          />
+
+          <Input
             label="Próximo Vencimiento *"
             type="date"
             value={dueDate}
@@ -603,7 +625,9 @@ export function PagoFormModal({
             icon={<Calendar className="h-4 w-4" />}
             required
           />
+        </div>
 
+        <div>
           <Input
             label="Observaciones / Comprobante"
             placeholder="Ej. Transferencia Mercado Pago nro #12345"

@@ -23,7 +23,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && profile?.role === 'PROFESORA') {
-      const allowedForProfesora = ['/profesora', '/portal'];
+      const allowedForProfesora = ['/profesora', '/portal', '/agenda'];
       const isAllowed = allowedForProfesora.some((p) => pathname === p || pathname.startsWith(p + '/'));
       if (!isAllowed) {
         router.replace('/profesora');

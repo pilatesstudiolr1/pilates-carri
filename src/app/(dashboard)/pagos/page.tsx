@@ -10,7 +10,7 @@ import { ComprobantePagoModal } from '@/components/pagos/ComprobantePagoModal';
 import { Alumna, Pago, MetodoPago } from '@/types/database';
 import { getPagos, registrarPago, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
-import { buildAvisoPagoWhatsAppMessage } from '@/lib/utils';
+import { buildAvisoPagoWhatsAppMessage, getLocalDateISO } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
 import { useSede } from '@/hooks/useSede';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -34,12 +34,8 @@ import {
 } from 'lucide-react';
 
 const getMesAbonadoStr = (dateStr?: string) => {
-  const d = dateStr ? new Date(`${dateStr}T12:00:00`) : new Date();
-  const meses = [
-    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-  ];
-  return `${meses[d.getMonth()]} de ${d.getFullYear()}`;
+  if (dateStr) return dateStr.slice(0, 7);
+  return getLocalDateISO().slice(0, 7);
 };
 
 const calculateNextDueDate = (dateStr: string) => {
@@ -91,9 +87,9 @@ export default function PagosPage() {
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('transferencia');
   const [fechaPago, setFechaPago] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    () => getLocalDateISO()
   );
-  const [mesAbonado, setMesAbonado] = useState(getMesAbonadoStr());
+  const [mesAbonado, setMesAbonado] = useState(() => getLocalDateISO().slice(0, 7));
   const [observaciones, setObservaciones] = useState('');
 
   const fetchData = useCallback(async () => {
@@ -135,7 +131,9 @@ export default function PagosPage() {
 
   const handleFechaPagoChange = (newDate: string) => {
     setFechaPago(newDate);
-    setMesAbonado(getMesAbonadoStr(newDate));
+    if (newDate) {
+      setMesAbonado(newDate.slice(0, 7));
+    }
   };
 
   const handleGuardarPago = async (e: React.FormEvent) => {
@@ -432,9 +430,10 @@ export default function PagosPage() {
                 Mes Abonado
               </label>
               <Input
-                placeholder={getMesAbonadoStr()}
+                type="month"
                 value={mesAbonado}
                 onChange={(e) => setMesAbonado(e.target.value)}
+                required
               />
             </div>
 
@@ -650,6 +649,11 @@ export default function PagosPage() {
 
                     <td className="py-3.5 px-3 text-[var(--text-secondary)] font-medium">
                       <div>{pago.concept || 'Mensualidad'}</div>
+                      {pago.period && (
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-mono font-bold block mt-0.5">
+                          Período: {pago.period}
+                        </span>
+                      )}
                       {selectedSedeId === 'ALL' && pago.sede_id && (
                         <span className="text-[10px] text-[var(--text-muted)] font-medium block mt-0.5">
                           {sedes.find((s) => s.id === pago.sede_id)?.name || ''}

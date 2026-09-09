@@ -79,7 +79,7 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
   const filteredItems = useMemo(() => {
     if (userRole === 'PROFESORA') {
       return [
-        { label: 'Panel Docente', href: '/profesora', icon: 'LayoutGrid', section: 'Principal' },
+        { label: 'Panel General', href: '/profesora', icon: 'LayoutGrid', section: 'Principal' },
       ];
     }
 
