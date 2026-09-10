@@ -445,7 +445,7 @@ export default function PagosPage() {
               onClick={() => handleTipoCobroChange('INSCRIPCION')}
               className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
                 tipoCobro === 'INSCRIPCION'
-                  ? 'bg-amber-600 text-white shadow-xs'
+                  ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shadow-xs'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
               }`}
             >
@@ -456,7 +456,7 @@ export default function PagosPage() {
               onClick={() => handleTipoCobroChange('CLASE_SUELTA')}
               className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
                 tipoCobro === 'CLASE_SUELTA'
-                  ? 'bg-indigo-600 text-white shadow-xs'
+                  ? 'bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border border-indigo-500/30 shadow-xs'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
               }`}
             >
@@ -730,9 +730,9 @@ export default function PagosPage() {
                   <button
                     type="button"
                     onClick={() => sendWhatsAppRecordatorio(alum)}
-                    className="px-3.5 py-1.5 rounded-[22px] bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366]/25 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[#25D366]/30 shrink-0"
+                    className="px-3.5 py-1.5 rounded-[22px] bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/25 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-emerald-500/30 shrink-0"
                   >
-                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                    <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> WhatsApp
                   </button>
                 </div>
               </div>
@@ -842,7 +842,7 @@ export default function PagosPage() {
                         <button
                           type="button"
                           onClick={() => sendWhatsAppComprobanteDirecto(pago)}
-                          className="p-1.5 rounded-[8px] bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] transition-colors cursor-pointer"
+                          className="p-1.5 rounded-[8px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 transition-colors cursor-pointer"
                           title="Enviar Comprobante por WhatsApp"
                         >
                           <MessageCircle className="h-4 w-4" />

@@ -251,8 +251,8 @@ export default function WhatsAppPage() {
           </div>
 
           {/* Vista previa final */}
-          <div className="p-3.5 rounded-md bg-[#25D366]/10 border border-[#25D366]/30">
-            <p className="text-[11px] font-bold text-[#25D366] uppercase mb-1">Vista Previa del Mensaje Final:</p>
+          <div className="p-3.5 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+            <p className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase mb-1">Vista Previa del Mensaje Final:</p>
             <p className="text-xs text-[var(--text-primary)] whitespace-pre-wrap">{getMensajeFinal()}</p>
           </div>
 

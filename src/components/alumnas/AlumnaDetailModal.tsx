@@ -28,18 +28,45 @@ function calcularEdad(fechaNacimiento: string | null): number | null {
 
 function getVencimientoEstado(fechaVencimiento: string | null): {
   label: string;
-  color: string;
-  bg: string;
+  badgeClass: string;
+  cardClass: string;
+  textClass: string;
 } {
-  if (!fechaVencimiento) return { label: 'Sin vencimiento', color: 'var(--text-muted)', bg: 'var(--bg-tertiary)' };
+  if (!fechaVencimiento) {
+    return {
+      label: 'Sin vencimiento',
+      badgeClass: 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-default)]',
+      cardClass: 'bg-[var(--bg-tertiary)] border border-[var(--border-default)]',
+      textClass: 'text-[var(--text-muted)]',
+    };
+  }
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const venc = new Date(fechaVencimiento);
   const diffDias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDias < 0) return { label: `Vencida hace ${Math.abs(diffDias)} dias`, color: '#ef4444', bg: '#fecaca' };
-  if (diffDias <= 5) return { label: `Vence en ${diffDias} dias`, color: '#f59e0b', bg: '#fef3c7' };
-  return { label: `Vence: ${fechaVencimiento}`, color: '#22c55e', bg: '#bbf7d0' };
+  if (diffDias < 0) {
+    return {
+      label: `Vencida hace ${Math.abs(diffDias)} días`,
+      badgeClass: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30',
+      cardClass: 'bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/30',
+      textClass: 'text-rose-700 dark:text-rose-300',
+    };
+  }
+  if (diffDias <= 5) {
+    return {
+      label: diffDias === 0 ? 'Vence hoy' : `Vence en ${diffDias} días`,
+      badgeClass: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30',
+      cardClass: 'bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30',
+      textClass: 'text-amber-800 dark:text-amber-300',
+    };
+  }
+  return {
+    label: `Vence: ${fechaVencimiento}`,
+    badgeClass: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30',
+    cardClass: 'bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/30',
+    textClass: 'text-emerald-800 dark:text-emerald-300',
+  };
 }
 
 export function AlumnaDetailModal({
@@ -96,8 +123,7 @@ export function AlumnaDetailModal({
           <div className="flex items-center gap-2 flex-wrap">
             {/* Vencimiento */}
             <span
-              className="text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{ color: vencimientoEstado.color, background: vencimientoEstado.bg + '33' }}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${vencimientoEstado.badgeClass}`}
             >
               <AlertTriangle className="h-3 w-3" />
               {vencimientoEstado.label}
@@ -136,9 +162,9 @@ export function AlumnaDetailModal({
             </div>
           )}
           {alumna.billing_due_date && (
-            <div className="p-3 rounded-lg border text-xs" style={{ borderColor: vencimientoEstado.color + '44', background: vencimientoEstado.bg + '22' }}>
-              <p className="text-[10px] uppercase font-semibold mb-0.5" style={{ color: vencimientoEstado.color }}>Vencimiento Cuota</p>
-              <p className="font-bold" style={{ color: vencimientoEstado.color }}>{alumna.billing_due_date}</p>
+            <div className={`p-3 rounded-lg text-xs ${vencimientoEstado.cardClass}`}>
+              <p className={`text-[10px] uppercase font-semibold mb-0.5 ${vencimientoEstado.textClass}`}>Vencimiento Cuota</p>
+              <p className={`font-bold font-mono ${vencimientoEstado.textClass}`}>{alumna.billing_due_date}</p>
             </div>
           )}
         </div>
