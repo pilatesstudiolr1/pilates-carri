@@ -76,9 +76,10 @@ export default function AgendaPage() {
 
   const fetchAgenda = useCallback(async () => {
     setLoading(true);
+    const effectiveProfesoraId = isProfesora && profile?.id ? profile.id : (profesoraFilter !== 'ALL' ? profesoraFilter : undefined);
     const [clasesRes, profsRes] = await Promise.all([
       getClases({
-        profesoraId: profesoraFilter !== 'ALL' ? profesoraFilter : undefined,
+        profesoraId: effectiveProfesoraId,
         sedeId: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
       }),
       getProfiles({ role: 'PROFESORA', isActive: true }),
@@ -396,6 +397,9 @@ export default function AgendaPage() {
     notes?: string;
     sede_id?: string;
     allow_duplicate?: boolean;
+    split_payment?: any;
+    recorded_by_id?: string;
+    recorded_by_name?: string;
   }): Promise<boolean> => {
     try {
       let res = await registrarPago({
@@ -410,6 +414,9 @@ export default function AgendaPage() {
         profesora_id: pagoData.profesora_id,
         notes: pagoData.notes,
         sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
+        split_payment: pagoData.split_payment,
+        recorded_by_id: pagoData.recorded_by_id || profile?.id,
+        recorded_by_name: pagoData.recorded_by_name || profile?.full_name,
       });
 
       if (res.error && res.error.includes('Ya existe un pago registrado')) {
@@ -432,6 +439,9 @@ export default function AgendaPage() {
             profesora_id: pagoData.profesora_id,
             notes: pagoData.notes,
             sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
+            split_payment: pagoData.split_payment,
+            recorded_by_id: pagoData.recorded_by_id || profile?.id,
+            recorded_by_name: pagoData.recorded_by_name || profile?.full_name,
             allow_duplicate: true,
           });
         } else {
@@ -580,26 +590,28 @@ export default function AgendaPage() {
             </select>
           </div>
 
-          {/* Filtro Profesora */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
-              <User className="h-3.5 w-3.5" /> Profesora:
-            </span>
-            <select
-              value={profesoraFilter}
-              onChange={(e) => setProfesoraFilter(e.target.value)}
-              className="h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none focus:border-[var(--border-focus)] cursor-pointer shadow-2xs"
-            >
-              <option value="ALL">Todas las Profesoras</option>
-              {profesoras
-                .filter((p) => p.role === 'PROFESORA')
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
-                  </option>
-                ))}
-            </select>
-          </div>
+          {/* Filtro Profesora (solo visible para administradores) */}
+          {!isProfesora && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+                <User className="h-3.5 w-3.5" /> Profesora:
+              </span>
+              <select
+                value={profesoraFilter}
+                onChange={(e) => setProfesoraFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none focus:border-[var(--border-focus)] cursor-pointer shadow-2xs"
+              >
+                <option value="ALL">Todas las Profesoras</option>
+                {profesoras
+                  .filter((p) => p.role === 'PROFESORA')
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.full_name || [p.first_name, p.last_name].filter(Boolean).join(' ') || p.email}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

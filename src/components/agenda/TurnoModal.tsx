@@ -363,12 +363,12 @@ export function TurnoModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative w-full max-w-md bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] shadow-2xl overflow-hidden rounded-xl text-[var(--text-primary)] animate-scale-in">
-        {/* HEADER DEL RECUADRO */}
-        <div className="flex items-center justify-between p-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-default)]">
+      <div className="relative w-full max-w-md max-h-[88vh] flex flex-col bg-[var(--bg-secondary)] border border-[var(--border-default)] shadow-2xl overflow-hidden rounded-2xl text-[var(--text-primary)] animate-scale-in">
+        {/* HEADER DEL RECUADRO - Pinned to top */}
+        <div className="shrink-0 flex items-center justify-between p-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-default)]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-[11px] font-mono font-bold uppercase">
+              <span className="px-2.5 py-0.5 rounded-[6px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-[11px] font-mono font-bold uppercase">
                 Reformer {selectedCamilla}
               </span>
               <span className="text-xs font-bold text-[var(--text-secondary)]">
@@ -389,8 +389,8 @@ export function TurnoModal({
           </button>
         </div>
 
-        {/* CONTENIDO DEL RECUADRO */}
-        <div className="p-4 sm:p-5 space-y-4">
+        {/* CONTENIDO DEL RECUADRO - Scrollable */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-4">
           {errorMsg && (
             <div className="p-2.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-600 dark:text-rose-400 text-xs font-semibold">
               {errorMsg}
@@ -711,8 +711,27 @@ export function TurnoModal({
             </div>
           )}
 
-          {/* FOOTER DEL RECUADRO */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[var(--border-default)]">
+        </div>
+
+        {/* FOOTER DEL RECUADRO - Pinned to bottom */}
+        <div className="shrink-0 p-4 sm:px-5 bg-[var(--bg-secondary)] border-t border-[var(--border-default)] flex items-center justify-between gap-2">
+          {isOccupied && onDeleteTurno ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleDelete}
+              disabled={saving}
+              size="sm"
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-500/10"
+              icon={<Trash2 className="h-3.5 w-3.5" />}
+            >
+              Quitar
+            </Button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" onClick={onClose} disabled={saving} size="sm">
               Cancelar
             </Button>

@@ -192,6 +192,9 @@ export interface Pago {
 
   // Relaciones joined
   alumna?: Alumna;
+  profesora?: Profile | null;
+  recorded_by_profile?: Profile | null;
+  cobrado_por?: string | null;
 }
 
 export interface CajaSesion {
@@ -226,6 +229,8 @@ export interface CajaMovimiento {
 
   // Campos calculados / relaciones
   titular?: string | null;
+  period?: string | null;
+  cobrado_por?: string | null;
   alumna?: {
     id: string;
     first_name: string;

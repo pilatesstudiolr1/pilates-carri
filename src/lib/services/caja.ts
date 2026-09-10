@@ -10,7 +10,7 @@ export async function getMovimientos(options?: {
     const supabase = createClient();
     let query = supabase
       .from('caja_movimientos')
-      .select('*')
+      .select('*, profile:profiles!recorded_by(id, full_name)')
       .order('creado_en', { ascending: false });
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -36,7 +36,15 @@ export async function getMovimientos(options?: {
     if (pagoIds.length > 0) {
       const { data: pagosData } = await supabase
         .from('pagos')
-        .select('id, alumna_id, concept, period, alumna:alumnas(id, first_name, last_name, dni, phone)')
+        .select(`
+          id,
+          alumna_id,
+          concept,
+          period,
+          notes,
+          alumna:alumnas(id, first_name, last_name, dni, phone),
+          profesora:profiles!profesora_id(id, full_name)
+        `)
         .in('id', pagoIds);
 
       if (pagosData) {
@@ -49,13 +57,24 @@ export async function getMovimientos(options?: {
     const enriched: CajaMovimiento[] = rawMovs.map((m: any) => {
       let alumnaObj: any = null;
       let titularStr: string | null = null;
+      let periodStr: string | null = null;
+      let cobradoPor: string | null = m.profile?.full_name || null;
 
       if (m.description && m.description.startsWith('pago_id:')) {
         const pId = m.description.replace('pago_id:', '').trim();
         const p = pagoMap[pId];
-        if (p?.alumna) {
-          alumnaObj = p.alumna;
-          titularStr = `${p.alumna.first_name || ''} ${p.alumna.last_name || ''}`.trim();
+        if (p) {
+          if (p.period) periodStr = p.period;
+          if (p.profesora?.full_name) {
+            cobradoPor = p.profesora.full_name;
+          } else if (p.notes) {
+            const match = p.notes.match(/\[Cobrado por:\s*([^\]]+)\]/i);
+            if (match) cobradoPor = match[1].trim();
+          }
+          if (p.alumna) {
+            alumnaObj = p.alumna;
+            titularStr = `${p.alumna.first_name || ''} ${p.alumna.last_name || ''}`.trim();
+          }
         }
       }
 
@@ -71,6 +90,8 @@ export async function getMovimientos(options?: {
         ...m,
         alumna: alumnaObj,
         titular: titularStr,
+        period: periodStr,
+        cobrado_por: cobradoPor || 'Administración',
       };
     });
 

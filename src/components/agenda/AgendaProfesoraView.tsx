@@ -612,7 +612,10 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
             let res = await registrarPago({
               ...pagoData,
               profesora_id: profile?.id || pagoData.profesora_id,
+              recorded_by_id: profile?.id,
+              recorded_by_name: profile?.full_name,
               sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
+              split_payment: pagoData.split_payment,
             });
 
             if (res.error && res.error.includes('Ya existe un pago registrado')) {
@@ -626,7 +629,10 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
                 res = await registrarPago({
                   ...pagoData,
                   profesora_id: profile?.id || pagoData.profesora_id,
+                  recorded_by_id: profile?.id,
+                  recorded_by_name: profile?.full_name,
                   sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
+                  split_payment: pagoData.split_payment,
                   allow_duplicate: true,
                 });
               } else {
@@ -677,7 +683,14 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
                 Alumna: <strong className="text-[var(--text-primary)]">{pagoAvisoExitoso.alumna?.first_name} {pagoAvisoExitoso.alumna?.last_name}</strong>
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
-                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong> ({pagoAvisoExitoso.pago?.payment_method})
+                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong>{' '}
+                {pagoAvisoExitoso.pago?.notes && pagoAvisoExitoso.pago.notes.includes('[Métodos de pago:') ? (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                    ({pagoAvisoExitoso.pago.notes.match(/\[Métodos de pago:\s*([^\]]+)\]/)?.[1] || 'Pago combinado'})
+                  </span>
+                ) : (
+                  <span>({pagoAvisoExitoso.pago?.payment_method})</span>
+                )}
               </p>
               {pagoAvisoExitoso.pago?.due_date && (
                 <p className="text-xs text-[var(--text-secondary)]">
@@ -704,6 +717,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
                     concepto: pago?.concept,
                     fechaPago: pago?.payment_date,
                     vencimientoCuota: pago?.due_date,
+                    notas: pago?.notes,
                   });
 
                   openWhatsAppMessage(phone, mensaje);
