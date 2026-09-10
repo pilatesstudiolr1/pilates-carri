@@ -19,6 +19,7 @@ import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useSede } from '@/hooks/useSede';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 import {
   Users,
@@ -32,6 +33,7 @@ import {
   Plus,
   Calendar,
   CheckCircle2,
+  Search,
 } from 'lucide-react';
 
 function getDayOfWeekToday(): number {
@@ -51,6 +53,7 @@ function formatFecha(fechaStr: string | null): string {
 }
 
 export default function SimplifiedLatticeDashboard() {
+  const { confirm, alert: alertDialog } = useConfirm();
   const { selectedSedeId } = useSede();
 
   // Estados de Datos
@@ -75,8 +78,9 @@ export default function SimplifiedLatticeDashboard() {
   const [cajaMetodo, setCajaMetodo] = useState<MetodoPago>('efectivo');
   const [cajaSaving, setCajaSaving] = useState(false);
 
-  // Tab activo de trabajo
+  // Tab activo de trabajo y filtros
   const [activeTab, setActiveTab] = useState<'turnos' | 'vencimientos' | 'caja'>('turnos');
+  const [searchVencidas, setSearchVencidas] = useState('');
 
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
@@ -224,13 +228,33 @@ export default function SimplifiedLatticeDashboard() {
   };
 
   const handleSavePago = async (pagoData: any) => {
-    const res = await registrarPago(pagoData);
+    let res = await registrarPago(pagoData);
+    if (res.error && res.error.includes('Ya existe un pago registrado')) {
+      const isConfirmed = await confirm({
+        title: 'Pago ya registrado en este período',
+        message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
+        confirmText: 'Sí, registrar de todos modos',
+        variant: 'warning',
+      });
+      if (isConfirmed) {
+        res = await registrarPago({ ...pagoData, allow_duplicate: true });
+      } else {
+        return false;
+      }
+    }
+
     if (!res.error) {
       setIsPagoModalOpen(false);
       setSelectedAlumnaParaCobro(null);
       loadDashboardData();
       return true;
     }
+
+    await alertDialog({
+      title: 'Error al registrar el pago',
+      message: res.error || 'Ocurrió un error inesperado al procesar el cobro',
+      variant: 'danger',
+    });
     return false;
   };
 
@@ -642,66 +666,95 @@ export default function SimplifiedLatticeDashboard() {
             })()}
 
             {/* TAB CONTENT 2: Cuotas Vencidas */}
-            {activeTab === 'vencimientos' && (
-              <div>
-                {vencimientosPendientes.length === 0 ? (
-                  <div className="py-12 text-center text-xs text-[var(--text-secondary)] flex flex-col items-center gap-2">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-500" />
-                    <span>¡Excelente! No hay alumnas con cuotas vencidas pendientes.</span>
+            {activeTab === 'vencimientos' && (() => {
+              const vencimientosFiltrados = vencimientosPendientes.filter((v) => {
+                if (!searchVencidas.trim()) return true;
+                const term = searchVencidas.toLowerCase();
+                return v.name.toLowerCase().includes(term) || (v.phone && v.phone.includes(term));
+              });
+
+              return (
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
+                    <div className="relative w-full sm:w-72">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      <Input
+                        placeholder="Buscar alumna vencida..."
+                        value={searchVencidas}
+                        onChange={(e) => setSearchVencidas(e.target.value)}
+                        className="pl-8 text-xs h-9 w-full"
+                      />
+                    </div>
+                    <span className="text-xs font-bold px-3 py-1 rounded-[22px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                      {vencimientosFiltrados.length} {vencimientosFiltrados.length === 1 ? 'alumna pendiente' : 'alumnas pendientes'}
+                    </span>
                   </div>
-                ) : (
-                  <div className="divide-y divide-[var(--border-default)]">
-                    {vencimientosPendientes.map((v) => (
-                      <div
-                        key={v.id}
-                        className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                      >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
-                              {v.name}
-                            </h4>
-                            <span className="px-2 py-0.2 rounded-[22px] bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[10px] font-medium border border-rose-500/30">
-                              Venció {formatFecha(v.due_date)}
-                            </span>
+
+                  {vencimientosFiltrados.length === 0 ? (
+                    <div className="py-12 text-center text-xs text-[var(--text-secondary)] flex flex-col items-center gap-2">
+                      {searchVencidas.trim() ? (
+                        <span>No se encontraron alumnas vencidas que coincidan con &quot;{searchVencidas}&quot;.</span>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                          <span>¡Excelente! No hay alumnas con cuotas vencidas pendientes.</span>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-[var(--border-default)]">
+                      {vencimientosFiltrados.map((v) => (
+                        <div
+                          key={v.id}
+                          className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-xs sm:text-sm font-medium text-[var(--text-primary)]">
+                                {v.name}
+                              </h4>
+                              <span className="px-2 py-0.2 rounded-[22px] bg-rose-500/15 text-rose-600 dark:text-rose-400 text-[10px] font-medium border border-rose-500/30">
+                                Venció {formatFecha(v.due_date)}
+                              </span>
+                            </div>
+                            {v.phone && (
+                              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                Tel: {v.phone}
+                              </p>
+                            )}
                           </div>
-                          {v.phone && (
-                            <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                              Tel: {v.phone}
-                            </p>
-                          )}
-                        </div>
 
-                        <div className="flex items-center gap-2 self-start sm:self-auto">
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            icon={<CreditCard className="h-3.5 w-3.5" />}
-                            onClick={() => {
-                              if (v.alumnaObj) setSelectedAlumnaParaCobro(v.alumnaObj);
-                              setIsPagoModalOpen(true);
-                            }}
-                          >
-                            Cobrar
-                          </Button>
-
-                          {v.phone && (
+                          <div className="flex items-center gap-2 self-start sm:self-auto">
                             <Button
                               size="sm"
-                              variant="secondary"
-                              icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-500" />}
-                              onClick={() => handleWhatsApp(v.phone, v.name, v.due_date)}
+                              variant="primary"
+                              icon={<CreditCard className="h-3.5 w-3.5" />}
+                              onClick={() => {
+                                if (v.alumnaObj) setSelectedAlumnaParaCobro(v.alumnaObj);
+                                setIsPagoModalOpen(true);
+                              }}
                             >
-                              WhatsApp
+                              Cobrar
                             </Button>
-                          )}
+
+                            {v.phone && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-500" />}
+                                onClick={() => handleWhatsApp(v.phone, v.name, v.due_date)}
+                              >
+                                WhatsApp
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* TAB CONTENT 3: Caja Diaria */}
             {activeTab === 'caja' && (

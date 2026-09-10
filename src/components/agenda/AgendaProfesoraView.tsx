@@ -609,11 +609,31 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
           initialAlumna={selectedAlumnaParaPago}
           defaultProfesoraId={profile?.id}
           onSubmit={async (pagoData) => {
-            const res = await registrarPago({
+            let res = await registrarPago({
               ...pagoData,
               profesora_id: profile?.id || pagoData.profesora_id,
               sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
             });
+
+            if (res.error && res.error.includes('Ya existe un pago registrado')) {
+              const isConfirmed = await confirm({
+                title: 'Pago ya registrado en este período',
+                message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
+                confirmText: 'Sí, registrar de todos modos',
+                variant: 'warning',
+              });
+              if (isConfirmed) {
+                res = await registrarPago({
+                  ...pagoData,
+                  profesora_id: profile?.id || pagoData.profesora_id,
+                  sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
+                  allow_duplicate: true,
+                });
+              } else {
+                return false;
+              }
+            }
+
             if (res.data) {
               const savedPago = res.data;
               const currentAlumna = selectedAlumnaParaPago;

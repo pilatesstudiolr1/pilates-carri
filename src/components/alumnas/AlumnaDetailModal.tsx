@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alumna } from '@/types/database';
-import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock, Trash2, UserX, RotateCcw } from 'lucide-react';
 
 interface AlumnaDetailModalProps {
   isOpen: boolean;
@@ -12,6 +12,8 @@ interface AlumnaDetailModalProps {
   alumna: Alumna | null;
   onEdit?: (alumna: Alumna) => void;
   onDelete?: (alumna: Alumna) => void;
+  onBaja?: (alumna: Alumna) => void;
+  onReactivar?: (alumna: Alumna) => void;
 }
 
 function calcularEdad(fechaNacimiento: string | null): number | null {
@@ -46,6 +48,8 @@ export function AlumnaDetailModal({
   alumna,
   onEdit,
   onDelete,
+  onBaja,
+  onReactivar,
 }: AlumnaDetailModalProps) {
   if (!alumna) return null;
 
@@ -218,10 +222,39 @@ export function AlumnaDetailModal({
 
         {/* Footer */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-[var(--border-default)]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
               Cerrar
             </Button>
+            {alumna.status === 'INACTIVE' ? (
+              onReactivar && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    onClose();
+                    onReactivar(alumna);
+                  }}
+                  className="w-full sm:w-auto text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30"
+                  icon={<RotateCcw className="h-4 w-4 text-emerald-600" />}
+                >
+                  Reactivar Alumna
+                </Button>
+              )
+            ) : (
+              onBaja && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    onClose();
+                    onBaja(alumna);
+                  }}
+                  className="w-full sm:w-auto text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  icon={<UserX className="h-4 w-4" />}
+                >
+                  Dar de Baja
+                </Button>
+              )
+            )}
             {onDelete && (
               <Button
                 variant="ghost"
@@ -229,10 +262,10 @@ export function AlumnaDetailModal({
                   onClose();
                   onDelete(alumna);
                 }}
-                className="w-full sm:w-auto text-red-500 hover:bg-red-500/10"
-                icon={<Trash2 className="h-4 w-4" />}
+                className="w-full sm:w-auto text-rose-500 hover:bg-rose-500/10 text-xs"
+                icon={<Trash2 className="h-3.5 w-3.5" />}
               >
-                Eliminar
+                Eliminar definitivamente
               </Button>
             )}
           </div>

@@ -83,6 +83,7 @@ export default function PagosPage() {
 
   // Formulario Registrar Pago
   const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
+  const [tipoCobro, setTipoCobro] = useState<'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA'>('MENSUALIDAD');
   const [concepto, setConcepto] = useState('Cuota mensualidad');
   const [monto, setMonto] = useState('');
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('transferencia');
@@ -91,6 +92,7 @@ export default function PagosPage() {
   );
   const [mesAbonado, setMesAbonado] = useState(() => getLocalDateISO().slice(0, 7));
   const [observaciones, setObservaciones] = useState('');
+  const [searchVencidas, setSearchVencidas] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -114,17 +116,49 @@ export default function PagosPage() {
     fetchData();
   }, [fetchData]);
 
-  // Al cambiar la alumna seleccionada, autocompletar el monto de su plan
-  const handleAlumnaChange = (alumnaId: string) => {
+  const handleTipoCobroChange = (tipo: 'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA') => {
+    setTipoCobro(tipo);
+    const alum = alumnas.find((a) => a.id === selectedAlumnaId);
+    if (tipo === 'INSCRIPCION') {
+      setConcepto('Matrícula de inscripción inicial');
+      setMonto(alum?.enrollment_amount ? String(alum.enrollment_amount) : '9500');
+    } else if (tipo === 'MENSUALIDAD') {
+      setConcepto(alum?.plan ? `Cuota mensualidad (${alum.plan})` : 'Cuota mensualidad');
+      if (alum?.plan_amount) {
+        setMonto(String(alum.plan_amount));
+      }
+    } else if (tipo === 'CLASE_SUELTA') {
+      setConcepto('Clase suelta individual');
+      setMonto('8000');
+    }
+  };
+
+  // Al cambiar la alumna seleccionada, autocompletar el monto de su plan o inscripción
+  const handleAlumnaChange = (alumnaId: string, overrideTipo?: 'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA') => {
     setSelectedAlumnaId(alumnaId);
     setErrorMsg('');
+    const activeTipo = overrideTipo || tipoCobro;
+    if (overrideTipo) {
+      setTipoCobro(overrideTipo);
+    }
+
     const alum = alumnas.find((a) => a.id === alumnaId);
     if (alum) {
-      if (alum.plan_amount) {
-        setMonto(alum.plan_amount.toString());
-      }
-      if (alum.plan && (concepto === 'Cuota mensualidad' || concepto === 'Mensualidad')) {
-        setConcepto(`Cuota mensualidad (${alum.plan})`);
+      if (activeTipo === 'INSCRIPCION') {
+        setMonto(alum.enrollment_amount ? String(alum.enrollment_amount) : '9500');
+        setConcepto('Matrícula de inscripción inicial');
+      } else if (activeTipo === 'MENSUALIDAD') {
+        if (alum.plan_amount) {
+          setMonto(alum.plan_amount.toString());
+        }
+        if (alum.plan) {
+          setConcepto(`Cuota mensualidad (${alum.plan})`);
+        } else {
+          setConcepto('Cuota mensualidad');
+        }
+      } else if (activeTipo === 'CLASE_SUELTA') {
+        setMonto('8000');
+        setConcepto('Clase suelta individual');
       }
     }
   };
@@ -154,29 +188,57 @@ export default function PagosPage() {
 
     setSubmitting(true);
 
-    const nextDueDate = calculateNextDueDate(fechaPago);
+    const nextDueDate = tipoCobro === 'INSCRIPCION' ? undefined : calculateNextDueDate(fechaPago);
     const alum = alumnas.find((a) => a.id === selectedAlumnaId);
     const activeSede = (selectedSedeId && selectedSedeId !== 'ALL') ? selectedSedeId : (alum?.sede_id || undefined);
 
-    const { data: newPago, error } = await registrarPago({
+    let res = await registrarPago({
       alumna_id: selectedAlumnaId,
       amount: amountNum,
       payment_method: metodoPago,
+      payment_type: tipoCobro,
       due_date: nextDueDate,
-      concept: concepto.trim() || 'Cuota mensualidad',
+      concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
       billing_month: mesAbonado.trim(),
       notes: observaciones.trim() || undefined,
       sede_id: activeSede,
       profesora_id: alum?.profesora_id || undefined,
     });
 
+    if (res.error && res.error.includes('Ya existe un pago registrado')) {
+      setSubmitting(false);
+      const allow = await confirm({
+        title: 'Pago ya registrado en este período',
+        message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
+        confirmText: 'Sí, registrar de todos modos',
+        variant: 'warning',
+      });
+      if (!allow) return;
+
+      setSubmitting(true);
+      res = await registrarPago({
+        alumna_id: selectedAlumnaId,
+        amount: amountNum,
+        payment_method: metodoPago,
+        payment_type: tipoCobro,
+        due_date: nextDueDate,
+        concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
+        billing_month: mesAbonado.trim(),
+        notes: observaciones.trim() || undefined,
+        sede_id: activeSede,
+        profesora_id: alum?.profesora_id || undefined,
+        allow_duplicate: true,
+      });
+    }
+
     setSubmitting(false);
 
-    if (error || !newPago) {
-      setErrorMsg(error || 'Error al registrar el pago');
+    if (res.error || !res.data) {
+      setErrorMsg(res.error || 'Error al registrar el pago');
       return;
     }
 
+    const newPago = res.data;
     setSuccessMsg('Pago registrado e ingresado a caja exitosamente');
     setTimeout(() => setSuccessMsg(''), 6000);
 
@@ -186,7 +248,7 @@ export default function PagosPage() {
       due_date: newPago.due_date || nextDueDate,
       alumna: alum ? {
         ...alum,
-        billing_due_date: nextDueDate,
+        billing_due_date: tipoCobro === 'INSCRIPCION' ? (alum.billing_due_date || null) : (nextDueDate || null),
       } : undefined,
     };
 
@@ -257,9 +319,29 @@ export default function PagosPage() {
     window.open(`https://wa.me/${phoneFormatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
   };
 
-  // Filtrar alumnas vencidas
+  // Filtrar alumnas vencidas con búsqueda en tiempo real
   const hoyStr = new Date().toISOString().split('T')[0];
-  const alumnasVencidas = alumnas.filter((a) => a.billing_due_date && a.billing_due_date < hoyStr);
+  const alumnasVencidas = alumnas.filter((a) => {
+    if (a.status !== 'ACTIVE') return false;
+    const isVencida = Boolean(a.billing_due_date && a.billing_due_date < hoyStr);
+    if (!isVencida) return false;
+    if (!searchVencidas.trim()) return true;
+    const term = searchVencidas.toLowerCase();
+    const nombre = `${a.first_name} ${a.last_name || ''}`.toLowerCase();
+    const dni = a.dni?.toLowerCase() || '';
+    const phone = a.phone?.toLowerCase() || '';
+    const plan = a.plan?.toLowerCase() || '';
+    return nombre.includes(term) || dni.includes(term) || phone.includes(term) || plan.includes(term);
+  });
+
+  // Totales de recaudación por concepto (Mensualidades vs Inscripciones)
+  const totalMensualidades = pagos
+    .filter((p) => p.payment_type === 'MENSUALIDAD' || (!p.payment_type && !p.concept?.toLowerCase().includes('inscri') && !p.concept?.toLowerCase().includes('matr')))
+    .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+  const totalInscripciones = pagos
+    .filter((p) => p.payment_type === 'INSCRIPCION' || p.concept?.toLowerCase().includes('inscri') || p.concept?.toLowerCase().includes('matr'))
+    .reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
 
   // Totales de recaudación por medio de pago (calculados de forma robusta)
   const totalTransferencias = pagos
@@ -344,6 +426,44 @@ export default function PagosPage() {
         </div>
 
         <form onSubmit={handleGuardarPago} className="flex flex-col gap-4">
+          {/* Selector de Tipo de Cobro */}
+          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-[12px] bg-[var(--bg-primary)] border border-[var(--border-default)]">
+            <span className="text-[11px] font-bold text-[var(--text-secondary)] px-2">Tipo de cobro:</span>
+            <button
+              type="button"
+              onClick={() => handleTipoCobroChange('MENSUALIDAD')}
+              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
+                tipoCobro === 'MENSUALIDAD'
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+              }`}
+            >
+              Cuota Mensual
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTipoCobroChange('INSCRIPCION')}
+              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
+                tipoCobro === 'INSCRIPCION'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+              }`}
+            >
+              Inscripción (Matrícula inicial)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTipoCobroChange('CLASE_SUELTA')}
+              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
+                tipoCobro === 'CLASE_SUELTA'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
+              }`}
+            >
+              Clase Suelta / Prueba
+            </button>
+          </div>
+
           {/* Fila 1 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="sm:col-span-2">
@@ -466,7 +586,7 @@ export default function PagosPage() {
       {/* BLOQUE 2: Resumen de Ingresos (Métricas Financieras Consolidadas) */}
       {isAdmin && (
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-5 sm:p-6 shadow-sm space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-[var(--border-default)] pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-default)] pb-4">
             <div className="flex items-center gap-2.5">
               <TrendingUp className="h-5 w-5 text-[var(--badge-meadow-text)] shrink-0" />
               <div>
@@ -479,8 +599,16 @@ export default function PagosPage() {
               </div>
             </div>
 
-            <div className="text-xs font-bold px-3 py-1 rounded-[22px] bg-[var(--bg-primary)] border border-[var(--border-default)] text-[var(--text-primary)] shrink-0">
-              Total Histórico ({pagos.length} cobros)
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="text-xs font-bold px-3 py-1 rounded-[22px] bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
+                Cuotas: <span className="font-mono">${totalMensualidades.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="text-xs font-bold px-3 py-1 rounded-[22px] bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                Inscripciones: <span className="font-mono">${totalInscripciones.toLocaleString('es-AR')}</span>
+              </div>
+              <div className="text-xs font-bold px-3 py-1 rounded-[22px] bg-[var(--bg-primary)] border border-[var(--border-default)] text-[var(--text-primary)] shrink-0">
+                Histórico ({pagos.length} cobros)
+              </div>
             </div>
           </div>
 
@@ -532,7 +660,7 @@ export default function PagosPage() {
 
       {/* BLOQUE 3: Alumnas con Mensualidad Vencida */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-[var(--border-default)] pb-4">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
             <div>
@@ -545,14 +673,27 @@ export default function PagosPage() {
             </div>
           </div>
 
-          <span className="px-3 py-1 rounded-[22px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold shrink-0">
-            {alumnasVencidas.length} pendientes
-          </span>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--text-muted)]" />
+              <Input
+                placeholder="Buscar alumna vencida..."
+                value={searchVencidas}
+                onChange={(e) => setSearchVencidas(e.target.value)}
+                className="pl-8 text-xs h-9 w-full"
+              />
+            </div>
+            <span className="px-3 py-1.5 rounded-[22px] bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 text-xs font-bold shrink-0">
+              {alumnasVencidas.length} pendientes
+            </span>
+          </div>
         </div>
 
         {alumnasVencidas.length === 0 ? (
           <p className="text-xs text-[var(--text-secondary)] py-6 text-center">
-            No hay alumnas registradas con mensualidad vencida en este momento.
+            {searchVencidas.trim()
+              ? 'No se encontraron alumnas vencidas que coincidan con la búsqueda.'
+              : 'No hay alumnas registradas con mensualidad vencida en este momento.'}
           </p>
         ) : (
           <div className="divide-y divide-[var(--border-default)] max-h-80 overflow-y-auto custom-scrollbar">
@@ -575,13 +716,25 @@ export default function PagosPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => sendWhatsAppRecordatorio(alum)}
-                  className="px-3.5 py-1.5 rounded-[22px] bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366]/25 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[#25D366]/30 shrink-0"
-                >
-                  <MessageCircle className="h-3.5 w-3.5" /> Enviar Recordatorio
-                </button>
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleAlumnaChange(alum.id, 'MENSUALIDAD');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="px-3 py-1.5 rounded-[22px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                  >
+                    <CreditCard className="h-3.5 w-3.5" /> Cobrar Cuota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => sendWhatsAppRecordatorio(alum)}
+                    className="px-3.5 py-1.5 rounded-[22px] bg-[#25D366]/15 text-[#25D366] hover:bg-[#25D366]/25 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 border border-[#25D366]/30 shrink-0"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+                  </button>
+                </div>
               </div>
             ))}
           </div>

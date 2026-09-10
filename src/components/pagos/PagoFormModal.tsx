@@ -20,13 +20,14 @@ interface PagoFormModalProps {
     amount: number;
     payment_method: MetodoPago;
     payment_type?: TipoPago;
-    due_date: string;
+    due_date?: string;
     commission_rate: number;
     concept?: string;
     period?: string;
     profesora_id?: string;
     notes?: string;
     sede_id?: string;
+    allow_duplicate?: boolean;
   }) => Promise<boolean>;
   initialAlumna?: Alumna | null;
   defaultProfesoraId?: string;
@@ -273,7 +274,7 @@ export function PagoFormModal({
       amount: numericAmount,
       payment_method: paymentMethod,
       payment_type: isInscripcion ? 'INSCRIPCION' : (duracionTipo === 'CLASE_SUELTA' ? 'CLASE_SUELTA' : 'MENSUALIDAD'),
-      due_date: dueDate,
+      due_date: isInscripcion ? undefined : dueDate,
       commission_rate: finalCommissionRate,
       concept: currentConcept,
       period: period,

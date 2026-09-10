@@ -388,16 +388,17 @@ export default function AgendaPage() {
     amount: number;
     payment_method: MetodoPago;
     payment_type?: TipoPago;
-    due_date: string;
+    due_date?: string;
     commission_rate: number;
     concept?: string;
     period?: string;
     profesora_id?: string;
     notes?: string;
     sede_id?: string;
+    allow_duplicate?: boolean;
   }): Promise<boolean> => {
     try {
-      const res = await registrarPago({
+      let res = await registrarPago({
         alumna_id: pagoData.alumna_id,
         amount: pagoData.amount,
         payment_method: pagoData.payment_method,
@@ -410,6 +411,33 @@ export default function AgendaPage() {
         notes: pagoData.notes,
         sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
       });
+
+      if (res.error && res.error.includes('Ya existe un pago registrado')) {
+        const isConfirmed = await confirm({
+          title: 'Pago ya registrado en este período',
+          message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
+          confirmText: 'Sí, registrar de todos modos',
+          variant: 'warning',
+        });
+        if (isConfirmed) {
+          res = await registrarPago({
+            alumna_id: pagoData.alumna_id,
+            amount: pagoData.amount,
+            payment_method: pagoData.payment_method,
+            payment_type: pagoData.payment_type,
+            due_date: pagoData.due_date,
+            commission_rate: pagoData.commission_rate,
+            concept: pagoData.concept,
+            billing_month: pagoData.period,
+            profesora_id: pagoData.profesora_id,
+            notes: pagoData.notes,
+            sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
+            allow_duplicate: true,
+          });
+        } else {
+          return false;
+        }
+      }
 
       if (res.error) {
         await alertDialog({

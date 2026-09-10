@@ -249,13 +249,14 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     section: 'Principal',
   },
-  {
-    label: 'Estética',
-    href: '/estetica',
-    icon: 'Flower2',
-    roles: ['ADMIN'],
-    section: 'Módulos',
-  },
+  // Seccion de Estetica deshabilitada momentaneamente a pedido del cliente
+  // {
+  //   label: 'Estética',
+  //   href: '/estetica',
+  //   icon: 'Flower2',
+  //   roles: ['ADMIN'],
+  //   section: 'Módulos',
+  // },
   {
     label: 'Liquidación Semanal',
     href: '/liquidaciones-semanales',
