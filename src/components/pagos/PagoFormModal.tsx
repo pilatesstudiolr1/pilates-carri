@@ -9,6 +9,8 @@ import { getAlumnas } from '@/lib/services/alumnas';
 import { METODOS_PAGO } from '@/lib/constants';
 import { formatFechaArg, buildAvisoPagoWhatsAppMessage, openWhatsAppMessage, calculateNextDueDate, getLocalDateISO } from '@/lib/utils';
 import { useSede } from '@/hooks/useSede';
+import { useUser } from '@/hooks/useUser';
+import { AlumnaCombobox } from '@/components/pagos/AlumnaCombobox';
 import { DollarSign, Calendar, CreditCard, FileText, CheckCircle2, Search, X, User, MessageCircle, Building2 } from 'lucide-react';
 
 
@@ -28,6 +30,14 @@ interface PagoFormModalProps {
     notes?: string;
     sede_id?: string;
     allow_duplicate?: boolean;
+    recorded_by_id?: string;
+    recorded_by_name?: string;
+    split_payment?: {
+      method1: MetodoPago;
+      amount1: number;
+      method2: MetodoPago;
+      amount2: number;
+    };
   }) => Promise<boolean>;
   initialAlumna?: Alumna | null;
   defaultProfesoraId?: string;
@@ -46,14 +56,20 @@ export function PagoFormModal({
   disableCommissionEdit = false,
   loading = false,
 }: PagoFormModalProps) {
+  const { profile } = useUser();
   const { sedes, selectedSedeId } = useSede();
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
-  const [alumnaSearch, setAlumnaSearch] = useState('');
   const [selectedAlumna, setSelectedAlumna] = useState<Alumna | null>(null);
   const [selectedSedeIdCobro, setSelectedSedeIdCobro] = useState<string>('');
-  const [showDropdown, setShowDropdown] = useState(false);
   const [amount, setAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<MetodoPago>('efectivo');
+
+  // Estados para Pago Combinado
+  const [isSplitPayment, setIsSplitPayment] = useState(false);
+  const [splitMethod1, setSplitMethod1] = useState<MetodoPago>('transferencia');
+  const [splitAmount1, setSplitAmount1] = useState('');
+  const [splitMethod2, setSplitMethod2] = useState<MetodoPago>('efectivo');
+  const [splitAmount2, setSplitAmount2] = useState('');
 
   // Estado para confirmación exitosa con aviso de WhatsApp
   const [paymentConfirmed, setPaymentConfirmed] = useState<{
@@ -63,6 +79,8 @@ export function PagoFormModal({
     concept: string;
     period: string;
     paymentMethod: MetodoPago;
+    notes?: string;
+    splitDetails?: string;
   } | null>(null);
 
   // Concepto y duracion del pago
@@ -74,14 +92,45 @@ export function PagoFormModal({
   const [commissionRate, setCommissionRate] = useState('40');
   const [notes, setNotes] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleSplitAmount1Change = (val: string) => {
+    setSplitAmount1(val);
+    const total = parseFloat(amount) || 0;
+    const n1 = parseFloat(val) || 0;
+    if (total > 0) {
+      setSplitAmount2(String(Math.max(0, total - n1)));
+    }
+  };
+
+  const handleSplitAmount2Change = (val: string) => {
+    setSplitAmount2(val);
+    const total = parseFloat(amount) || 0;
+    const n2 = parseFloat(val) || 0;
+    if (total > 0) {
+      setSplitAmount1(String(Math.max(0, total - n2)));
+    }
+  };
+
+  const handleAmountChange = (val: string) => {
+    setAmount(val);
+    if (isSplitPayment) {
+      const total = parseFloat(val) || 0;
+      const mitad = Math.round(total / 2);
+      setSplitAmount1(String(mitad));
+      setSplitAmount2(String(total - mitad));
+    }
+  };
 
   useEffect(() => {
     if (open) {
       setPaymentConfirmed(null);
       setErrorMsg('');
-      setAlumnaSearch('');
       setNotes('');
+      setIsSplitPayment(false);
+      setSplitMethod1('transferencia');
+      setSplitAmount1('');
+      setSplitMethod2('efectivo');
+      setSplitAmount2('');
       setDuracionTipo('1_MES');
       setConcept('Cuota mensualidad');
       setPeriod(getLocalDateISO().slice(0, 7));
@@ -93,7 +142,6 @@ export function PagoFormModal({
 
       if (initialAlumna) {
         setSelectedAlumna(initialAlumna);
-        setAlumnaSearch(`${initialAlumna.last_name || ''}, ${initialAlumna.first_name}`);
 
         if (initialAlumna.sede_id) {
           setSelectedSedeIdCobro(initialAlumna.sede_id);
@@ -206,39 +254,35 @@ export function PagoFormModal({
     setAlumnas(data);
   };
 
-  // Filtro local en tiempo real
-  const alumnasFiltradas = alumnaSearch.trim().length >= 1
-    ? alumnas.filter((a) => {
-        const q = alumnaSearch.toLowerCase();
-        const firstName = (a.first_name || '').toLowerCase();
-        const lastName = (a.last_name || '').toLowerCase();
-        const dni = (a.dni || '').toLowerCase();
-        return (
-          firstName.includes(q) ||
-          lastName.includes(q) ||
-          dni.includes(q) ||
-          `${lastName} ${firstName}`.includes(q)
-        );
-      }).slice(0, 8)
-    : [];
 
   const handleSelectAlumna = (alumna: Alumna) => {
     setSelectedAlumna(alumna);
-    setAlumnaSearch(`${alumna.last_name || ''}, ${alumna.first_name}`);
-    setShowDropdown(false);
     if (alumna.sede_id) {
       setSelectedSedeIdCobro(alumna.sede_id);
     }
-    if (alumna.plan_amount && alumna.plan_amount > 0) {
-      setAmount(String(alumna.plan_amount));
+    if (alumna.preferred_payment_method) {
+      setPaymentMethod(alumna.preferred_payment_method as MetodoPago);
     }
-    setDueDate(calculateNextDueDate(alumna.billing_due_date, 1));
+    if (!alumna.enrollment_paid) {
+      setDuracionTipo('INSCRIPCION');
+      setConcept('Matrícula de inscripción inicial');
+      handleAmountChange(alumna.enrollment_amount ? String(alumna.enrollment_amount) : '9500');
+      setCommissionRate('0');
+      setDueDate(getLocalDateISO());
+    } else if (alumna.plan_amount && alumna.plan_amount > 0) {
+      setDuracionTipo('1_MES');
+      setConcept(alumna.plan ? `Cuota mensualidad (${alumna.plan})` : 'Cuota mensualidad (1 Mes)');
+      handleAmountChange(String(alumna.plan_amount));
+      setDueDate(calculateNextDueDate(alumna.billing_due_date, 1));
+    } else {
+      handleAmountChange('');
+      setDueDate(calculateNextDueDate(alumna.billing_due_date, 1));
+    }
   };
 
   const handleClearAlumna = () => {
     setSelectedAlumna(null);
-    setAlumnaSearch('');
-    setAmount('');
+    handleAmountChange('');
     setDueDate(calculateNextDueDate(null, 1));
   };
 
@@ -253,8 +297,37 @@ export function PagoFormModal({
 
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
-      setErrorMsg('El monto del cobro debe ser un numero mayor a cero');
+      setErrorMsg('El monto del cobro debe ser un número mayor a cero');
       return;
+    }
+
+    let finalSplitPayment: any = undefined;
+    let finalNotes = notes.trim();
+    let splitDetailsStr = '';
+
+    if (isSplitPayment) {
+      const num1 = parseFloat(splitAmount1) || 0;
+      const num2 = parseFloat(splitAmount2) || 0;
+      if (num1 <= 0 || num2 <= 0) {
+        setErrorMsg('En el pago combinado, ambos importes deben ser mayores a cero');
+        return;
+      }
+      if (Math.abs((num1 + num2) - numericAmount) > 0.01) {
+        setErrorMsg(`La suma de los métodos ($${(num1 + num2).toLocaleString('es-AR')}) no coincide con el total ($${numericAmount.toLocaleString('es-AR')})`);
+        return;
+      }
+
+      finalSplitPayment = {
+        method1: splitMethod1,
+        amount1: num1,
+        method2: splitMethod2,
+        amount2: num2,
+      };
+
+      const m1Label = splitMethod1 === 'transferencia' ? 'Transferencia' : splitMethod1 === 'efectivo' ? 'Efectivo' : splitMethod1;
+      const m2Label = splitMethod2 === 'transferencia' ? 'Transferencia' : splitMethod2 === 'efectivo' ? 'Efectivo' : splitMethod2;
+      splitDetailsStr = `${m1Label}: $${num1.toLocaleString('es-AR')} | ${m2Label}: $${num2.toLocaleString('es-AR')}`;
+      finalNotes = `${finalNotes} [Métodos de pago: ${splitDetailsStr}]`.trim();
     }
 
     const currentConcept = concept.trim() || 'Cuota mensualidad';
@@ -272,15 +345,18 @@ export function PagoFormModal({
     const success = await onSubmit({
       alumna_id: selectedAlumna.id,
       amount: numericAmount,
-      payment_method: paymentMethod,
+      payment_method: isSplitPayment ? splitMethod1 : paymentMethod,
       payment_type: isInscripcion ? 'INSCRIPCION' : (duracionTipo === 'CLASE_SUELTA' ? 'CLASE_SUELTA' : 'MENSUALIDAD'),
       due_date: isInscripcion ? undefined : dueDate,
       commission_rate: finalCommissionRate,
       concept: currentConcept,
       period: period,
       profesora_id: defaultProfesoraId || selectedAlumna.profesora_id || undefined,
-      notes: notes.trim(),
+      notes: finalNotes,
       sede_id: selectedSedeIdCobro || undefined,
+      recorded_by_id: profile?.id,
+      recorded_by_name: profile?.full_name,
+      split_payment: finalSplitPayment,
     });
 
     if (success) {
@@ -290,7 +366,9 @@ export function PagoFormModal({
         dueDate: dueDate,
         concept: currentConcept,
         period: period,
-        paymentMethod: paymentMethod,
+        paymentMethod: isSplitPayment ? splitMethod1 : paymentMethod,
+        notes: finalNotes,
+        splitDetails: splitDetailsStr,
       });
     }
   };
@@ -306,6 +384,7 @@ export function PagoFormModal({
       metodoPago: paymentConfirmed.paymentMethod,
       fechaPago: new Date().toISOString().slice(0, 10),
       vencimientoCuota: paymentConfirmed.dueDate,
+      notas: paymentConfirmed.notes,
     });
     openWhatsAppMessage(paymentConfirmed.alumna.phone, textMsg);
   };
@@ -368,10 +447,16 @@ export function PagoFormModal({
 
             <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-2">
               <span className="text-[var(--text-secondary)] font-medium flex items-center gap-1.5">
-                <CreditCard className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Medio de Pago:
+                <CreditCard className="h-3.5 w-3.5 text-[var(--text-muted)]" /> {paymentConfirmed.splitDetails ? 'Métodos de Pago:' : 'Medio de Pago:'}
               </span>
-              <span className="text-[var(--text-primary)] font-semibold capitalize">
-                {paymentConfirmed.paymentMethod.replace('_', ' ')}
+              <span className="text-[var(--text-primary)] font-semibold capitalize text-right text-xs">
+                {paymentConfirmed.splitDetails ? (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                    {paymentConfirmed.splitDetails}
+                  </span>
+                ) : (
+                  paymentConfirmed.paymentMethod.replace('_', ' ')
+                )}
               </span>
             </div>
 
@@ -491,77 +576,25 @@ export function PagoFormModal({
           </div>
         </div>
 
-        {/* Buscador de Alumna */}
-        <div ref={dropdownRef} className="relative">
+        {/* Buscador de Alumna por Nombre, Apellido o DNI */}
+        <div>
           <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
             <User className="h-4 w-4 text-[var(--color-wood)]" /> Alumna *
           </label>
-
-          {selectedAlumna ? (
-            <div className="flex items-center justify-between p-3 rounded-md bg-[var(--color-wood)]/10 border border-[var(--color-wood)]/40 text-xs">
-              <div>
-                <p className="font-bold text-[var(--text-primary)]">
-                  {selectedAlumna.last_name}, {selectedAlumna.first_name}
-                </p>
-                <p className="text-[var(--text-muted)]">
-                  DNI: {selectedAlumna.dni}
-                  {selectedAlumna.plan && <span className="ml-2">• Plan: {selectedAlumna.plan}</span>}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={handleClearAlumna}
-                className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="relative">
-              <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
-                <Search className="h-4 w-4" />
-              </div>
-              <input
-                type="text"
-                placeholder="Buscar por nombre, apellido o DNI..."
-                value={alumnaSearch}
-                onChange={(e) => {
-                  setAlumnaSearch(e.target.value);
-                  setShowDropdown(true);
-                }}
-                onFocus={() => setShowDropdown(true)}
-                className="w-full h-10 pl-9 pr-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-sm placeholder:text-[var(--text-muted)]"
-              />
-
-              {/* Dropdown de resultados */}
-              {showDropdown && alumnasFiltradas.length > 0 && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-md shadow-lg overflow-hidden max-h-56 overflow-y-auto">
-                  {alumnasFiltradas.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onClick={() => handleSelectAlumna(a)}
-                      className="w-full px-3 py-2.5 text-left text-xs hover:bg-[var(--bg-tertiary)] transition-colors cursor-pointer border-b border-[var(--border-default)] last:border-b-0"
-                    >
-                      <p className="font-semibold text-[var(--text-primary)]">
-                        {a.last_name}, {a.first_name}
-                      </p>
-                      <p className="text-[var(--text-muted)]">
-                        DNI: {a.dni} • Tel: {a.phone}
-                        {a.plan && <span className="ml-1">• {a.plan}</span>}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {showDropdown && alumnaSearch.trim().length >= 1 && alumnasFiltradas.length === 0 && (
-                <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-md shadow-lg p-3 text-xs text-[var(--text-muted)] text-center">
-                  No se encontraron alumnas con ese criterio
-                </div>
-              )}
-            </div>
-          )}
+          <AlumnaCombobox
+            alumnas={alumnas}
+            selectedAlumnaId={selectedAlumna?.id || ''}
+            onChange={(alumnaId) => {
+              if (!alumnaId) {
+                handleClearAlumna();
+              } else {
+                const found = alumnas.find((a) => a.id === alumnaId);
+                if (found) handleSelectAlumna(found);
+              }
+            }}
+            sedes={sedes}
+            selectedSedeId={selectedSedeIdCobro || 'ALL'}
+          />
         </div>
 
         {/* Aviso de Alumna al Día / Próximo Vencimiento */}
@@ -585,19 +618,22 @@ export function PagoFormModal({
             min="0"
             step="500"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => handleAmountChange(e.target.value)}
             icon={<DollarSign className="h-4 w-4 text-[var(--color-wood)]" />}
             required
           />
 
           <div>
             <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
-              <CreditCard className="h-4 w-4 text-[var(--color-wood)]" /> Metodo de Pago *
+              <CreditCard className="h-4 w-4 text-[var(--color-wood)]" /> Método de Pago *
             </label>
             <select
               value={paymentMethod}
               onChange={(e) => setPaymentMethod(e.target.value as MetodoPago)}
-              className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
+              disabled={isSplitPayment}
+              className={`w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] ${
+                isSplitPayment ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               {METODOS_PAGO.map((m) => (
                 <option key={m.value} value={m.value}>
@@ -606,6 +642,97 @@ export function PagoFormModal({
               ))}
             </select>
           </div>
+        </div>
+
+        {/* SECCIÓN PAGO COMBINADO (FUSIÓN DE PAGO) */}
+        <div className="p-3 bg-[var(--bg-tertiary)]/50 border border-[var(--border-default)] rounded-xl space-y-3">
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={isSplitPayment}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setIsSplitPayment(checked);
+                  if (checked && amount) {
+                    const total = parseFloat(amount) || 0;
+                    const mitad = Math.round(total / 2);
+                    setSplitAmount1(String(mitad));
+                    setSplitAmount2(String(total - mitad));
+                  }
+                }}
+                className="rounded border-[var(--border-default)] text-[var(--btn-primary-bg)] focus:ring-[var(--btn-primary-bg)] cursor-pointer h-4 w-4"
+              />
+              <span className="text-xs font-bold text-[var(--text-primary)]">
+                Pago combinado (Dividir en 2 métodos)
+              </span>
+            </label>
+            {isSplitPayment && (
+              <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                Activo
+              </span>
+            )}
+          </div>
+
+          {isSplitPayment && (
+            <div className="space-y-3 pt-1 border-t border-[var(--border-default)]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">Método 1</label>
+                  <select
+                    value={splitMethod1}
+                    onChange={(e) => setSplitMethod1(e.target.value as MetodoPago)}
+                    className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none"
+                  >
+                    {METODOS_PAGO.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Monto método 1"
+                    value={splitAmount1}
+                    onChange={(e) => handleSplitAmount1Change(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-[var(--text-secondary)]">Método 2</label>
+                  <select
+                    value={splitMethod2}
+                    onChange={(e) => setSplitMethod2(e.target.value as MetodoPago)}
+                    className="w-full h-9 px-2.5 rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border-default)] text-xs font-medium focus:outline-none"
+                  >
+                    {METODOS_PAGO.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Monto método 2"
+                    value={splitAmount2}
+                    onChange={(e) => handleSplitAmount2Change(e.target.value)}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* Modo comentario sutil */}
+              {isSplitPayment && isFinite(parseFloat(amount)) && parseFloat(amount) > 0 && (
+                <div className="p-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-default)] text-[11px] text-[var(--text-secondary)] flex items-center justify-between">
+                  <span>
+                    💡 Cobro dividido: ${(parseFloat(splitAmount1) || 0).toLocaleString('es-AR')} en {splitMethod1} + ${(parseFloat(splitAmount2) || 0).toLocaleString('es-AR')} en {splitMethod2}
+                  </span>
+                  <span className={`font-mono font-bold ${(parseFloat(splitAmount1) || 0) + (parseFloat(splitAmount2) || 0) === parseFloat(amount) ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    Total: ${((parseFloat(splitAmount1) || 0) + (parseFloat(splitAmount2) || 0)).toLocaleString('es-AR')}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

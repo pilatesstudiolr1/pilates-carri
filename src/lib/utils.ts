@@ -90,6 +90,7 @@ export function buildAvisoPagoWhatsAppMessage(data: {
   metodoPago?: string | null;
   fechaPago?: string | null;
   vencimientoCuota?: string | null;
+  notas?: string | null;
 }): string {
   const nombreLimpio = (data.nombreCliente || '').trim();
   const primerNombre = nombreLimpio.split(' ')[0] || 'Alumna';
@@ -98,7 +99,7 @@ export function buildAvisoPagoWhatsAppMessage(data: {
   const montoStr = `$${montoNum.toLocaleString('es-AR')} ARS`;
 
   const metodo = (data.metodoPago || 'efectivo').toLowerCase();
-  const metodoLabel =
+  let metodoLabel =
     metodo === 'transferencia'
       ? 'Transferencia Bancaria'
       : metodo === 'efectivo'
@@ -108,6 +109,13 @@ export function buildAvisoPagoWhatsAppMessage(data: {
       : metodo === 'tarjeta' || metodo === 'debito'
       ? 'Tarjeta de Débito / POS'
       : (data.metodoPago || 'Efectivo');
+
+  if (data.notas && data.notas.includes('[Métodos de pago:')) {
+    const match = data.notas.match(/\[Métodos de pago:\s*([^\]]+)\]/);
+    if (match) {
+      metodoLabel = `Métodos de pago: ${match[1]}`;
+    }
+  }
 
   const fechaPagoStr = data.fechaPago ? formatFechaArg(data.fechaPago) : formatFechaArg(new Date().toISOString());
   const vencimientoStr = data.vencimientoCuota ? formatFechaArg(data.vencimientoCuota) : 'A confirmar';

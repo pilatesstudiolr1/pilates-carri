@@ -34,7 +34,7 @@ export function ComprobantePagoModal({
   const alumnaNombre = alumna ? `${alumna.first_name} ${alumna.last_name || ''}`.trim() : 'Alumna';
   const montoFormateado = `$${(Number(pago.amount) || 0).toLocaleString('es-AR')} ARS`;
 
-  const metodoLabel =
+  let metodoLabel =
     pago.payment_method === 'transferencia'
       ? 'Transferencia Bancaria'
       : pago.payment_method === 'efectivo'
@@ -44,6 +44,13 @@ export function ComprobantePagoModal({
       : pago.payment_method === 'tarjeta'
       ? 'Tarjeta de Débito / POS'
       : (pago.payment_method || 'Pago General');
+
+  if (pago.notes && pago.notes.includes('[Métodos de pago:')) {
+    const match = pago.notes.match(/\[Métodos de pago:\s*([^\]]+)\]/);
+    if (match) {
+      metodoLabel = `Métodos de pago: ${match[1]}`;
+    }
+  }
 
   const handlePrintIsolated = () => {
     const printIframe = document.createElement('iframe');

@@ -708,9 +708,20 @@ export default function ProfesoraVistaPage() {
                             {pago.concept || 'Cuota mensualidad'}
                           </td>
                           <td className="py-3 px-3">
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-primary)] border border-[var(--border-default)] text-[var(--text-primary)]">
-                              {pago.payment_method || 'Efectivo'}
-                            </span>
+                            {pago.notes && pago.notes.includes('[Métodos de pago:') ? (
+                              <div className="flex flex-col gap-0.5">
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 w-fit">
+                                  Pago combinado
+                                </span>
+                                <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                                  {pago.notes.match(/\[Métodos de pago:\s*([^\]]+)\]/)?.[1] || pago.payment_method}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[var(--bg-primary)] border border-[var(--border-default)] text-[var(--text-primary)]">
+                                {pago.payment_method || 'Efectivo'}
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-right font-black text-[var(--text-primary)]">
                             ${(pago.amount || 0).toLocaleString('es-AR')} ARS
@@ -728,6 +739,7 @@ export default function ProfesoraVistaPage() {
                                   concepto: pago.concept,
                                   fechaPago: pago.payment_date,
                                   vencimientoCuota: pago.due_date,
+                                  notas: pago.notes,
                                 });
                                 openWhatsAppMessage(phone, mensaje);
                               }}
@@ -941,7 +953,10 @@ export default function ProfesoraVistaPage() {
           const res = await registrarPago({
             ...data,
             profesora_id: profile?.id || data.profesora_id,
+            recorded_by_id: profile?.id,
+            recorded_by_name: profile?.full_name,
             sede_id: data.sede_id || selectedAlumnaForPago?.sede_id || profile?.sede_id || undefined,
+            split_payment: data.split_payment,
           });
           if (res.data) {
             const savedPago = res.data;
@@ -980,7 +995,14 @@ export default function ProfesoraVistaPage() {
                 Alumna: <strong className="text-[var(--text-primary)]">{pagoAvisoExitoso.alumna?.first_name} {pagoAvisoExitoso.alumna?.last_name}</strong>
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
-                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong> ({pagoAvisoExitoso.pago?.payment_method})
+                Monto: <strong className="text-[var(--text-primary)]">${Number(pagoAvisoExitoso.pago?.amount || 0).toLocaleString('es-AR')} ARS</strong>{' '}
+                {pagoAvisoExitoso.pago?.notes && pagoAvisoExitoso.pago.notes.includes('[Métodos de pago:') ? (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                    ({pagoAvisoExitoso.pago.notes.match(/\[Métodos de pago:\s*([^\]]+)\]/)?.[1] || 'Pago combinado'})
+                  </span>
+                ) : (
+                  <span>({pagoAvisoExitoso.pago?.payment_method})</span>
+                )}
               </p>
               {pagoAvisoExitoso.pago?.due_date && (
                 <p className="text-xs text-[var(--text-secondary)]">
@@ -1003,11 +1025,11 @@ export default function ProfesoraVistaPage() {
                   const mensaje = buildAvisoPagoWhatsAppMessage({
                     nombreCliente: `${alumna?.first_name || ''} ${alumna?.last_name || ''}`.trim(),
                     monto: Number(pago?.amount || 0),
-
                     metodoPago: pago?.payment_method,
                     concepto: pago?.concept,
                     fechaPago: pago?.payment_date,
                     vencimientoCuota: pago?.due_date,
+                    notas: pago?.notes,
                   });
                   openWhatsAppMessage(phone, mensaje);
                   setIsAvisoModalOpen(false);

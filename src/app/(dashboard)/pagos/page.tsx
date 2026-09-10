@@ -31,7 +31,10 @@ import {
   ArrowUpRight,
   Check,
   FileText,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
+import { AlumnaCombobox } from '@/components/pagos/AlumnaCombobox';
 
 const getMesAbonadoStr = (dateStr?: string) => {
   if (dateStr) return dateStr.slice(0, 7);
@@ -94,6 +97,17 @@ export default function PagosPage() {
   const [observaciones, setObservaciones] = useState('');
   const [searchVencidas, setSearchVencidas] = useState('');
 
+  // Pago Combinado
+  const [esPagoCombinado, setEsPagoCombinado] = useState(false);
+  const [metodoPago1, setMetodoPago1] = useState<MetodoPago>('transferencia');
+  const [monto1, setMonto1] = useState('');
+  const [metodoPago2, setMetodoPago2] = useState<MetodoPago>('efectivo');
+  const [monto2, setMonto2] = useState('');
+
+  // Paginación de Historial de Pagos
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(15);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrorMsg('');
@@ -113,23 +127,57 @@ export default function PagosPage() {
   }, [selectedSedeId]);
 
   useEffect(() => {
+    if (profile?.role === 'PROFESORA') {
+      window.location.href = '/profesora';
+    }
+  }, [profile?.role]);
+
+  useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedSedeId]);
+
+  const updateSplitAmounts = (totalStr: string) => {
+    const totalNum = parseFloat(totalStr) || 0;
+    if (totalNum > 0) {
+      const half = Math.round(totalNum / 2);
+      setMonto1(String(half));
+      setMonto2(String(totalNum - half));
+    } else {
+      setMonto1('');
+      setMonto2('');
+    }
+  };
+
+  const handleMontoChange = (val: string) => {
+    setMonto(val);
+    if (esPagoCombinado) {
+      updateSplitAmounts(val);
+    }
+  };
 
   const handleTipoCobroChange = (tipo: 'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA') => {
     setTipoCobro(tipo);
     const alum = alumnas.find((a) => a.id === selectedAlumnaId);
+    let newM = '';
     if (tipo === 'INSCRIPCION') {
       setConcepto('Matrícula de inscripción inicial');
-      setMonto(alum?.enrollment_amount ? String(alum.enrollment_amount) : '9500');
+      newM = alum?.enrollment_amount ? String(alum.enrollment_amount) : '9500';
     } else if (tipo === 'MENSUALIDAD') {
       setConcepto(alum?.plan ? `Cuota mensualidad (${alum.plan})` : 'Cuota mensualidad');
       if (alum?.plan_amount) {
-        setMonto(String(alum.plan_amount));
+        newM = String(alum.plan_amount);
       }
     } else if (tipo === 'CLASE_SUELTA') {
       setConcepto('Clase suelta individual');
-      setMonto('8000');
+      newM = '8000';
+    }
+    if (newM) {
+      setMonto(newM);
+      if (esPagoCombinado) updateSplitAmounts(newM);
     }
   };
 
@@ -144,12 +192,13 @@ export default function PagosPage() {
 
     const alum = alumnas.find((a) => a.id === alumnaId);
     if (alum) {
+      let newM = '';
       if (activeTipo === 'INSCRIPCION') {
-        setMonto(alum.enrollment_amount ? String(alum.enrollment_amount) : '9500');
+        newM = alum.enrollment_amount ? String(alum.enrollment_amount) : '9500';
         setConcepto('Matrícula de inscripción inicial');
       } else if (activeTipo === 'MENSUALIDAD') {
         if (alum.plan_amount) {
-          setMonto(alum.plan_amount.toString());
+          newM = alum.plan_amount.toString();
         }
         if (alum.plan) {
           setConcepto(`Cuota mensualidad (${alum.plan})`);
@@ -157,8 +206,12 @@ export default function PagosPage() {
           setConcepto('Cuota mensualidad');
         }
       } else if (activeTipo === 'CLASE_SUELTA') {
-        setMonto('8000');
+        newM = '8000';
         setConcepto('Clase suelta individual');
+      }
+      if (newM) {
+        setMonto(newM);
+        if (esPagoCombinado) updateSplitAmounts(newM);
       }
     }
   };
@@ -186,16 +239,38 @@ export default function PagosPage() {
       return;
     }
 
+    let splitPaymentData: { method1: MetodoPago; amount1: number; method2: MetodoPago; amount2: number } | undefined = undefined;
+
+    if (esPagoCombinado) {
+      const m1 = parseFloat(monto1);
+      const m2 = parseFloat(monto2);
+      if (isNaN(m1) || m1 <= 0 || isNaN(m2) || m2 <= 0) {
+        setErrorMsg('En el pago combinado, ambos métodos deben tener un importe mayor a 0');
+        return;
+      }
+      if (Math.abs((m1 + m2) - amountNum) > 0.01) {
+        setErrorMsg(`La suma de los dos importes ($${(m1 + m2).toLocaleString('es-AR')}) no coincide con el total ingresado ($${amountNum.toLocaleString('es-AR')})`);
+        return;
+      }
+      splitPaymentData = {
+        method1: metodoPago1,
+        amount1: m1,
+        method2: metodoPago2,
+        amount2: m2,
+      };
+    }
+
     setSubmitting(true);
 
     const nextDueDate = tipoCobro === 'INSCRIPCION' ? undefined : calculateNextDueDate(fechaPago);
     const alum = alumnas.find((a) => a.id === selectedAlumnaId);
     const activeSede = (selectedSedeId && selectedSedeId !== 'ALL') ? selectedSedeId : (alum?.sede_id || undefined);
+    const recordedByName = profile?.full_name || (profile?.role === 'ADMIN' ? 'Administrador' : 'Profesora');
 
     let res = await registrarPago({
       alumna_id: selectedAlumnaId,
       amount: amountNum,
-      payment_method: metodoPago,
+      payment_method: esPagoCombinado ? 'otro' : metodoPago,
       payment_type: tipoCobro,
       due_date: nextDueDate,
       concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
@@ -203,6 +278,9 @@ export default function PagosPage() {
       notes: observaciones.trim() || undefined,
       sede_id: activeSede,
       profesora_id: alum?.profesora_id || undefined,
+      recorded_by_id: profile?.id,
+      recorded_by_name: recordedByName,
+      split_payment: splitPaymentData,
     });
 
     if (res.error && res.error.includes('Ya existe un pago registrado')) {
@@ -219,7 +297,7 @@ export default function PagosPage() {
       res = await registrarPago({
         alumna_id: selectedAlumnaId,
         amount: amountNum,
-        payment_method: metodoPago,
+        payment_method: esPagoCombinado ? 'otro' : metodoPago,
         payment_type: tipoCobro,
         due_date: nextDueDate,
         concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
@@ -227,6 +305,9 @@ export default function PagosPage() {
         notes: observaciones.trim() || undefined,
         sede_id: activeSede,
         profesora_id: alum?.profesora_id || undefined,
+        recorded_by_id: profile?.id,
+        recorded_by_name: recordedByName,
+        split_payment: splitPaymentData,
         allow_duplicate: true,
       });
     }
@@ -258,6 +339,9 @@ export default function PagosPage() {
     setSelectedAlumnaId('');
     setMonto('');
     setObservaciones('');
+    setEsPagoCombinado(false);
+    setMonto1('');
+    setMonto2('');
     fetchData();
   };
 
@@ -315,6 +399,7 @@ export default function PagosPage() {
       metodoPago: pago.payment_method,
       fechaPago: pago.payment_date,
       vencimientoCuota: pago.due_date || alumna?.billing_due_date,
+      notas: pago.notes,
     });
     window.open(`https://wa.me/${phoneFormatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
   };
@@ -377,8 +462,21 @@ export default function PagosPage() {
     const metodo = (p.payment_method || '').toLowerCase();
     const conceptoStr = (p.concept || '').toLowerCase();
     const notas = (p.notes || '').toLowerCase();
-    return nombre.includes(term) || dni.includes(term) || metodo.includes(term) || conceptoStr.includes(term) || notas.includes(term);
+    const cobrado = (p.cobrado_por || '').toLowerCase();
+    return (
+      nombre.includes(term) ||
+      dni.includes(term) ||
+      metodo.includes(term) ||
+      conceptoStr.includes(term) ||
+      notas.includes(term) ||
+      cobrado.includes(term)
+    );
   });
+
+  const totalPages = pageSize === 'ALL' ? 1 : Math.max(1, Math.ceil(pagosFiltrados.length / Number(pageSize)));
+  const paginatedPagos = pageSize === 'ALL'
+    ? pagosFiltrados
+    : pagosFiltrados.slice((currentPage - 1) * Number(pageSize), currentPage * Number(pageSize));
 
   return (
     <div className="flex flex-col gap-8 animate-fade-in text-[var(--text-primary)] max-w-[var(--page-max-width)] mx-auto pb-16">
@@ -470,23 +568,14 @@ export default function PagosPage() {
               <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
                 Alumna *
               </label>
-              <select
-                value={selectedAlumnaId}
-                onChange={(e) => handleAlumnaChange(e.target.value)}
-                className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-semibold cursor-pointer"
+              <AlumnaCombobox
+                alumnas={alumnas}
+                selectedAlumnaId={selectedAlumnaId}
+                onChange={(id) => handleAlumnaChange(id)}
+                sedes={sedes}
+                selectedSedeId={selectedSedeId}
                 required
-              >
-                <option value="">Seleccionar alumna...</option>
-                {alumnas.map((a) => {
-                  const sedeNombre = sedes.find((s) => s.id === a.sede_id)?.name;
-                  return (
-                    <option key={a.id} value={a.id}>
-                      {a.last_name ? `${a.last_name}, ` : ''}{a.first_name} • DNI: {a.dni || 'Sin DNI'} • Tel: {a.phone || 'Sin tel'}
-                      {selectedSedeId === 'ALL' && sedeNombre ? ` • [${sedeNombre}]` : ''}
-                    </option>
-                  );
-                })}
-              </select>
+              />
             </div>
 
             <div>
@@ -509,7 +598,7 @@ export default function PagosPage() {
                 type="number"
                 placeholder="55000"
                 value={monto}
-                onChange={(e) => setMonto(e.target.value)}
+                onChange={(e) => handleMontoChange(e.target.value)}
                 required
               />
             </div>
@@ -517,21 +606,117 @@ export default function PagosPage() {
 
           {/* Fila 2 */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Método de Pago
-              </label>
-              <select
-                value={metodoPago}
-                onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-medium capitalize cursor-pointer"
-              >
-                <option value="transferencia">Transferencia</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="mercado_pago">Mercado Pago</option>
-                <option value="tarjeta">Débito / Tarjeta</option>
-                <option value="otro">Otro</option>
-              </select>
+            <div className={esPagoCombinado ? 'sm:col-span-2' : ''}>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-bold text-[var(--text-secondary)]">
+                  Método de Pago
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !esPagoCombinado;
+                    setEsPagoCombinado(next);
+                    if (next) {
+                      updateSplitAmounts(monto);
+                    }
+                  }}
+                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-[16px] transition-all cursor-pointer ${
+                    esPagoCombinado
+                      ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-xs'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
+                  }`}
+                >
+                  {esPagoCombinado ? '✓ Pago combinado activado' : '+ Pago combinado'}
+                </button>
+              </div>
+
+              {!esPagoCombinado ? (
+                <select
+                  value={metodoPago}
+                  onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
+                  className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-medium capitalize cursor-pointer"
+                >
+                  <option value="transferencia">Transferencia</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="mercado_pago">Mercado Pago</option>
+                  <option value="tarjeta">Débito / Tarjeta</option>
+                  <option value="otro">Otro</option>
+                </select>
+              ) : (
+                <div className="p-3 rounded-[12px] bg-[var(--bg-primary)] border border-amber-500/30 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
+                        Método 1
+                      </span>
+                      <div className="flex gap-2">
+                        <select
+                          value={metodoPago1}
+                          onChange={(e) => setMetodoPago1(e.target.value as MetodoPago)}
+                          className="w-1/2 h-9 px-2 rounded-[8px] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium capitalize"
+                        >
+                          <option value="transferencia">Transferencia</option>
+                          <option value="efectivo">Efectivo</option>
+                          <option value="mercado_pago">Mercado Pago</option>
+                          <option value="tarjeta">Tarjeta</option>
+                        </select>
+                        <Input
+                          type="number"
+                          placeholder="Monto 1"
+                          value={monto1}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setMonto1(val);
+                            const totalNum = parseFloat(monto) || 0;
+                            const m1 = parseFloat(val) || 0;
+                            if (totalNum > 0) {
+                              setMonto2(String(Math.max(0, totalNum - m1)));
+                            }
+                          }}
+                          className="w-1/2 h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
+                        Método 2
+                      </span>
+                      <div className="flex gap-2">
+                        <select
+                          value={metodoPago2}
+                          onChange={(e) => setMetodoPago2(e.target.value as MetodoPago)}
+                          className="w-1/2 h-9 px-2 rounded-[8px] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium capitalize"
+                        >
+                          <option value="efectivo">Efectivo</option>
+                          <option value="transferencia">Transferencia</option>
+                          <option value="mercado_pago">Mercado Pago</option>
+                          <option value="tarjeta">Tarjeta</option>
+                        </select>
+                        <Input
+                          type="number"
+                          placeholder="Monto 2"
+                          value={monto2}
+                          onChange={(e) => setMonto2(e.target.value)}
+                          className="w-1/2 h-9 text-xs font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modo comentario sutil */}
+                  <div className="text-[11px] text-[var(--text-muted)] italic pt-1.5 border-t border-[var(--border-default)] flex items-center justify-between">
+                    <span>
+                      Cobro dividido: ${(parseFloat(monto1) || 0).toLocaleString('es-AR')} ({metodoPago1}) + ${(parseFloat(monto2) || 0).toLocaleString('es-AR')} ({metodoPago2})
+                    </span>
+                    <span className="font-mono font-bold text-[var(--text-primary)] not-italic text-xs">
+                      Total: ${((parseFloat(monto1) || 0) + (parseFloat(monto2) || 0)).toLocaleString('es-AR')}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -557,7 +742,7 @@ export default function PagosPage() {
               />
             </div>
 
-            <div>
+            <div className={esPagoCombinado ? 'sm:col-span-2' : ''}>
               <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
                 Observaciones
               </label>
@@ -790,14 +975,29 @@ export default function PagosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
-                {pagosFiltrados.map((pago) => (
+                {paginatedPagos.map((pago) => (
                   <tr key={pago.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
                     <td className="py-3.5 px-3 font-mono text-[11px] text-[var(--text-secondary)]">
                       {pago.payment_date}
                     </td>
 
-                    <td className="py-3.5 px-3 font-bold capitalize">
-                      {pago.alumna ? `${pago.alumna.first_name} ${pago.alumna.last_name || ''}` : 'Alumna'}
+                    <td className="py-3.5 px-3">
+                      <div className="font-bold capitalize text-xs text-[var(--text-primary)]">
+                        {pago.alumna ? `${pago.alumna.first_name} ${pago.alumna.last_name || ''}` : 'Alumna'}
+                      </div>
+                      {pago.alumna?.dni && (
+                        <span className="text-[10px] text-[var(--text-muted)] font-mono block">
+                          DNI: {pago.alumna.dni}
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <div className="text-[10px] text-[var(--text-secondary)] mt-0.5 flex items-center gap-1 font-medium">
+                          <span className="text-[var(--text-muted)]">Cobrado por:</span>
+                          <span className="font-semibold text-[var(--text-primary)]">
+                            {pago.cobrado_por || pago.profesora?.full_name || 'Administración'}
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-3 text-[var(--text-secondary)] font-medium">
@@ -819,9 +1019,20 @@ export default function PagosPage() {
                     </td>
 
                     <td className="py-3.5 px-3">
-                      <span className="px-2.5 py-0.5 rounded-[22px] bg-[var(--bg-primary)] border border-[var(--border-default)] font-semibold text-[11px] capitalize text-[var(--text-primary)]">
-                        {(pago.payment_method || '').replace('_', ' ')}
-                      </span>
+                      {pago.notes && pago.notes.includes('[Métodos de pago:') ? (
+                        <div className="space-y-0.5">
+                          <span className="px-2.5 py-0.5 rounded-[22px] bg-amber-500/15 border border-amber-500/30 font-bold text-[10px] text-amber-800 dark:text-amber-300 inline-block">
+                            Pago combinado
+                          </span>
+                          <span className="text-[10px] text-[var(--text-secondary)] block font-medium">
+                            {pago.notes.match(/\[Métodos de pago:\s*([^\]]+)\]/)?.[1] || 'Varios métodos'}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-[22px] bg-[var(--bg-primary)] border border-[var(--border-default)] font-semibold text-[11px] capitalize text-[var(--text-primary)]">
+                          {(pago.payment_method || '').replace('_', ' ')}
+                        </span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-3 text-center">
@@ -863,6 +1074,90 @@ export default function PagosPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Barra de Paginación */}
+        {pagosFiltrados.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[var(--border-default)]">
+            <p className="text-xs text-[var(--text-secondary)]">
+              Mostrando <strong className="text-[var(--text-primary)] font-bold">
+                {pageSize === 'ALL' ? 1 : (currentPage - 1) * Number(pageSize) + 1}
+              </strong> a{' '}
+              <strong className="text-[var(--text-primary)] font-bold">
+                {pageSize === 'ALL' ? pagosFiltrados.length : Math.min(currentPage * Number(pageSize), pagosFiltrados.length)}
+              </strong> de{' '}
+              <strong className="text-[var(--text-primary)] font-bold">{pagosFiltrados.length}</strong> cobros registrados
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)]">
+                <span>Filas por página:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const val = e.target.value === 'ALL' ? 'ALL' : Number(e.target.value);
+                    setPageSize(val);
+                    setCurrentPage(1);
+                  }}
+                  className="h-8 px-2 rounded-lg bg-[var(--bg-primary)] border border-[var(--border-default)] text-xs font-semibold cursor-pointer text-[var(--text-primary)] focus:outline-none"
+                >
+                  <option value={15}>15</option>
+                  <option value={30}>30</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value="ALL">Ver todos ({pagosFiltrados.length})</option>
+                </select>
+              </div>
+
+              {pageSize !== 'ALL' && totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    icon={<ChevronLeft className="h-4 w-4" />}
+                  >
+                    Anterior
+                  </Button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                      .map((p, idx, arr) => {
+                        const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                        return (
+                          <div key={p} className="flex items-center">
+                            {showEllipsis && <span className="px-1 text-xs text-[var(--text-muted)]">...</span>}
+                            <button
+                              type="button"
+                              onClick={() => setCurrentPage(p)}
+                              className={`w-8 h-8 rounded-[8px] text-xs font-bold transition-all cursor-pointer ${
+                                currentPage === p
+                                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border-default)]'
+                              }`}
+                            >
+                              {p}
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

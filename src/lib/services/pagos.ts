@@ -11,7 +11,7 @@ export async function getPagos(options?: {
     const supabase = createClient();
     let query = supabase
       .from('pagos')
-      .select('*, alumna:alumnas(id, first_name, last_name, phone, dni, plan, sede_id)')
+      .select('*, alumna:alumnas(id, first_name, last_name, phone, dni, plan, sede_id), profesora:profiles!profesora_id(id, full_name, first_name, last_name, role)')
       .order('payment_date', { ascending: false });
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -29,7 +29,51 @@ export async function getPagos(options?: {
     const { data, error } = await query;
     if (error) return { data: [], error: error.message };
 
-    return { data: (data as Pago[]) || [], error: null };
+    const isForProfesora = Boolean(options?.profesoraId && options.profesoraId !== 'ALL');
+
+    const enriched: Pago[] = ((data as any[]) || [])
+      .filter((p) => {
+        if (!isForProfesora) return true;
+        // Si se consulta para una profesora específica, excluir pagos registrados por administradores u otras personas
+        if (p.notes) {
+          const match = p.notes.match(/\[Cobrado por:\s*([^\]]+)\]/i);
+          if (match) {
+            const recordedByName = match[1].trim().toLowerCase();
+            const profName = (p.profesora?.full_name || '').toLowerCase();
+            // Si tiene autor explícito y no coincide con esta profesora, no le pertenece
+            if (profName && !recordedByName.includes(profName) && !profName.includes(recordedByName)) {
+              return false;
+            }
+          }
+        }
+        return true;
+      })
+      .map((p) => {
+        let cleanNotes = p.notes;
+        if (isForProfesora && cleanNotes) {
+          cleanNotes = cleanNotes.replace(/\[Cobrado por:\s*[^\]]+\]/gi, '').trim() || null;
+        }
+
+        if (isForProfesora) {
+          return {
+            ...p,
+            notes: cleanNotes,
+            cobrado_por: null, // Las profesoras nunca ven quién cobró
+          };
+        }
+
+        let cobradoPor = p.profesora?.full_name || null;
+        if (!cobradoPor && p.notes) {
+          const match = p.notes.match(/\[Cobrado por:\s*([^\]]+)\]/i);
+          if (match) cobradoPor = match[1].trim();
+        }
+        return {
+          ...p,
+          cobrado_por: cobradoPor || 'Administración',
+        };
+      });
+
+    return { data: enriched, error: null };
   } catch (err) {
     return {
       data: [],
@@ -63,6 +107,13 @@ export function normalizePeriodToYearMonth(periodOrMonth?: string | null): strin
   return p;
 }
 
+export interface SplitPaymentData {
+  method1: MetodoPago;
+  amount1: number;
+  method2: MetodoPago;
+  amount2: number;
+}
+
 export async function registrarPago(pagoData: {
   alumna_id: string;
   amount: number;
@@ -76,7 +127,10 @@ export async function registrarPago(pagoData: {
   notes?: string;
   sede_id?: string;
   profesora_id?: string;
+  recorded_by_id?: string;
+  recorded_by_name?: string;
   allow_duplicate?: boolean;
+  split_payment?: SplitPaymentData;
 }): Promise<{ data: Pago | null; error: string | null }> {
   try {
     const supabase = createClient();
@@ -121,21 +175,39 @@ export async function registrarPago(pagoData: {
       }
     }
 
+    // Armar notas con métodos de pago y quién cobró
+    const notesParts: string[] = [];
+    if (pagoData.notes?.trim()) {
+      notesParts.push(pagoData.notes.trim());
+    }
+    if (pagoData.split_payment && !notesParts.some((n) => n.includes('[Métodos de pago:'))) {
+      notesParts.push(
+        `[Métodos de pago: ${(pagoData.split_payment.method1 || '').replace('_', ' ')} $${pagoData.split_payment.amount1.toLocaleString('es-AR')} | ${(pagoData.split_payment.method2 || '').replace('_', ' ')} $${pagoData.split_payment.amount2.toLocaleString('es-AR')}]`
+      );
+    }
+    if (pagoData.recorded_by_name?.trim() && !notesParts.some((n) => n.includes('[Cobrado por:'))) {
+      notesParts.push(`[Cobrado por: ${pagoData.recorded_by_name.trim()}]`);
+    }
+    const finalNotes = notesParts.join(' ') || null;
+
+    const finalMethod = pagoData.split_payment ? 'otro' : pagoData.payment_method;
+    const finalProfesoraId = pagoData.recorded_by_id || pagoData.profesora_id || null;
+
     const { data, error } = await supabase
       .from('pagos')
       .insert({
         alumna_id: pagoData.alumna_id,
         amount: pagoData.amount,
-        payment_method: pagoData.payment_method,
+        payment_method: finalMethod,
         payment_type: finalPaymentType,
         payment_date: today,
         concept: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Inscripción inicial' : 'Cuota mensualidad'),
         period: currentPeriod,
         commission_rate: commRate,
         commission_amount: commAmount,
-        notes: pagoData.notes || null,
+        notes: finalNotes,
         sede_id: pagoData.sede_id || null,
-        profesora_id: pagoData.profesora_id || null,
+        profesora_id: finalProfesoraId,
       })
       .select()
       .single();
@@ -146,7 +218,6 @@ export async function registrarPago(pagoData: {
     try {
       const alumnaUpdate: Record<string, any> = {};
       if (finalPaymentType === 'INSCRIPCION') {
-        // La inscripción es una matrícula única: SOLO marca enrollment_paid y NUNCA altera la cuota ni el vencimiento mensual
         alumnaUpdate.enrollment_paid = true;
       } else {
         if (pagoData.due_date) {
@@ -163,7 +234,7 @@ export async function registrarPago(pagoData: {
       console.warn('Advertencia al actualizar alumna:', errAlum);
     }
 
-    // Registrar ingreso automático en Caja Movimientos
+    // Registrar ingreso(s) automático(s) en Caja Movimientos
     try {
       let titularName = '';
       try {
@@ -177,18 +248,58 @@ export async function registrarPago(pagoData: {
         }
       } catch {}
 
-      const { error: cajaError } = await supabase.from('caja_movimientos').insert({
-        tipo: 'INGRESO',
-        concepto: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
-        monto: pagoData.amount,
-        metodo_pago: pagoData.payment_method,
-        sede_id: pagoData.sede_id || null,
-        fecha: today,
-        description: data?.id ? `pago_id:${data.id}` : null,
-        observations: titularName ? `Titular: ${titularName}` : null,
-      });
-      if (cajaError) {
-        console.warn('Advertencia al registrar movimiento de caja:', cajaError.message);
+      if (pagoData.split_payment) {
+        // Asiento contable doble para cobro dividido
+        const sp = pagoData.split_payment;
+        const movs = [
+          {
+            tipo: 'INGRESO',
+            concepto: `${pagoData.concept || 'Cobro cuota mensualidad'} (Pago combinado 1/2)`,
+            monto: sp.amount1,
+            metodo_pago: sp.method1,
+            sede_id: pagoData.sede_id || null,
+            fecha: today,
+            description: data?.id ? `pago_id:${data.id}` : null,
+            observations: titularName
+              ? `Titular: ${titularName} · Pago combinado (1/2)${pagoData.recorded_by_name ? ` · Cobrado por: ${pagoData.recorded_by_name}` : ''}`
+              : `Pago combinado (1/2)${pagoData.recorded_by_name ? ` · Cobrado por: ${pagoData.recorded_by_name}` : ''}`,
+            recorded_by: pagoData.recorded_by_id || null,
+          },
+          {
+            tipo: 'INGRESO',
+            concepto: `${pagoData.concept || 'Cobro cuota mensualidad'} (Pago combinado 2/2)`,
+            monto: sp.amount2,
+            metodo_pago: sp.method2,
+            sede_id: pagoData.sede_id || null,
+            fecha: today,
+            description: data?.id ? `pago_id:${data.id}` : null,
+            observations: titularName
+              ? `Titular: ${titularName} · Pago combinado (2/2)${pagoData.recorded_by_name ? ` · Cobrado por: ${pagoData.recorded_by_name}` : ''}`
+              : `Pago combinado (2/2)${pagoData.recorded_by_name ? ` · Cobrado por: ${pagoData.recorded_by_name}` : ''}`,
+            recorded_by: pagoData.recorded_by_id || null,
+          },
+        ];
+        const { error: cajaSplitErr } = await supabase.from('caja_movimientos').insert(movs);
+        if (cajaSplitErr) {
+          console.warn('Advertencia al registrar movimientos combinados de caja:', cajaSplitErr.message);
+        }
+      } else {
+        const { error: cajaError } = await supabase.from('caja_movimientos').insert({
+          tipo: 'INGRESO',
+          concepto: pagoData.concept || (finalPaymentType === 'INSCRIPCION' ? 'Cobro inscripción inicial - Alumna' : 'Cobro cuota mensualidad - Alumna'),
+          monto: pagoData.amount,
+          metodo_pago: pagoData.payment_method,
+          sede_id: pagoData.sede_id || null,
+          fecha: today,
+          description: data?.id ? `pago_id:${data.id}` : null,
+          observations: titularName
+            ? `Titular: ${titularName}${pagoData.recorded_by_name ? ` · Cobrado por: ${pagoData.recorded_by_name}` : ''}`
+            : (pagoData.recorded_by_name ? `Cobrado por: ${pagoData.recorded_by_name}` : null),
+          recorded_by: pagoData.recorded_by_id || null,
+        });
+        if (cajaError) {
+          console.warn('Advertencia al registrar movimiento de caja:', cajaError.message);
+        }
       }
     } catch (e) {
       console.warn('Advertencia al registrar movimiento de caja:', e);
@@ -200,6 +311,7 @@ export async function registrarPago(pagoData: {
         due_date: pagoData.due_date,
         commission_rate: (data as any)?.commission_rate ?? commRate,
         commission_amount: (data as any)?.commission_amount ?? commAmount,
+        cobrado_por: pagoData.recorded_by_name || 'Administración',
       } as Pago,
       error: null,
     };

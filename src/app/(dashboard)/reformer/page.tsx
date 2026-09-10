@@ -67,6 +67,8 @@ export default function SimplifiedLatticeDashboard() {
   // Modales de Acción Rápida (Action Hub)
   const [isAlumnaModalOpen, setIsAlumnaModalOpen] = useState(false);
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
+  const [selectedTurnoClase, setSelectedTurnoClase] = useState<Clase | null>(null);
+  const [selectedTurnoPresetTime, setSelectedTurnoPresetTime] = useState<string>('08:00');
   const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
   const [selectedAlumnaParaCobro, setSelectedAlumnaParaCobro] = useState<Alumna | null>(null);
   const [isCajaModalOpen, setIsCajaModalOpen] = useState(false);
@@ -331,7 +333,11 @@ export default function SimplifiedLatticeDashboard() {
             size="sm"
             variant="secondary"
             icon={<Calendar className="h-3.5 w-3.5" />}
-            onClick={() => setIsTurnoModalOpen(true)}
+            onClick={() => {
+              setSelectedTurnoClase(clasesReformerHoy[0] || null);
+              setSelectedTurnoPresetTime(clasesReformerHoy[0]?.start_time?.slice(0, 5) || '08:00');
+              setIsTurnoModalOpen(true);
+            }}
           >
             Agendar Turno
           </Button>
@@ -347,17 +353,15 @@ export default function SimplifiedLatticeDashboard() {
             </Button>
           </Link>
 
-          <Button
-            size="sm"
-            variant="secondary"
-            icon={<CreditCard className="h-3.5 w-3.5" />}
-            onClick={() => {
-              setSelectedAlumnaParaCobro(null);
-              setIsPagoModalOpen(true);
-            }}
-          >
-            Registrar Cobro
-          </Button>
+          <Link href="/pagos">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<CreditCard className="h-3.5 w-3.5" />}
+            >
+              Registrar Cobro
+            </Button>
+          </Link>
 
           <Button
             size="sm"
@@ -608,9 +612,26 @@ export default function SimplifiedLatticeDashboard() {
                                 </h3>
                               </div>
 
-                              <span className="text-xs font-semibold text-[var(--text-secondary)]">
-                                {alumnasEnClase.length} {alumnasEnClase.length === 1 ? 'alumna agendada' : 'alumnas agendadas'}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-[var(--text-secondary)]">
+                                  {alumnasEnClase.length} {alumnasEnClase.length === 1 ? 'alumna agendada' : 'alumnas agendadas'}
+                                </span>
+                                {alumnasEnClase.length < (clase.max_capacity || 6) && (
+                                  <Button
+                                    size="sm"
+                                    className="h-7 text-[11px] px-2.5 py-0"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSelectedTurnoClase(clase);
+                                      setSelectedTurnoPresetTime(horaInicio);
+                                      setIsTurnoModalOpen(true);
+                                    }}
+                                    icon={<Plus className="h-3 w-3" />}
+                                  >
+                                    Agendar
+                                  </Button>
+                                )}
+                              </div>
                             </div>
 
                             {/* Listado Vertical de Nombres */}
@@ -819,17 +840,22 @@ export default function SimplifiedLatticeDashboard() {
       />
 
       {/* MODAL 2: AGENDAR TURNO */}
-      <TurnoModal
-        open={isTurnoModalOpen}
-        onClose={() => setIsTurnoModalOpen(false)}
-        clase={clasesReformerHoy[0] || null}
-        dayName={getNombreDiaHoy()}
-        presetTime="08:00"
-        presetCamilla={1}
-        profesoras={profesoras}
-        profesoraFilter="ALL"
-        onSave={handleSaveTurno}
-      />
+      {isTurnoModalOpen && (
+        <TurnoModal
+          open={isTurnoModalOpen}
+          onClose={() => {
+            setIsTurnoModalOpen(false);
+            setSelectedTurnoClase(null);
+          }}
+          clase={selectedTurnoClase || clasesReformerHoy[0] || null}
+          dayName={getNombreDiaHoy()}
+          presetTime={selectedTurnoPresetTime || clasesReformerHoy[0]?.start_time?.slice(0, 5) || '08:00'}
+          presetCamilla={1}
+          profesoras={profesoras}
+          profesoraFilter="ALL"
+          onSave={handleSaveTurno}
+        />
+      )}
 
       {/* MODAL 3: REGISTRAR COBRO */}
       <PagoFormModal

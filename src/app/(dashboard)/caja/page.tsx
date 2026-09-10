@@ -103,6 +103,12 @@ export default function CajaPage() {
   }, [selectedSedeId, movimientoSedeId]);
 
   useEffect(() => {
+    if (profile?.role === 'PROFESORA') {
+      window.location.href = '/profesora';
+    }
+  }, [profile?.role]);
+
+  useEffect(() => {
     fetchData();
   }, [fetchData]);
 
@@ -225,6 +231,9 @@ export default function CajaPage() {
       const conc = (m.concepto || '').toLowerCase();
       const metodo = (m.metodo_pago || '').toLowerCase();
       const tit = (m.titular || '').toLowerCase();
+      const dni = (m.alumna?.dni || '').toLowerCase();
+      const cobrado = (m.cobrado_por || '').toLowerCase();
+      const period = (m.period || '').toLowerCase();
       const sedeName = (sedes.find((s) => s.id === m.sede_id)?.name || '').toLowerCase();
       const montoStr = String(m.monto || '');
 
@@ -232,6 +241,9 @@ export default function CajaPage() {
         conc.includes(term) ||
         metodo.includes(term) ||
         tit.includes(term) ||
+        dni.includes(term) ||
+        cobrado.includes(term) ||
+        period.includes(term) ||
         sedeName.includes(term) ||
         montoStr.includes(term);
 
@@ -342,7 +354,7 @@ export default function CajaPage() {
           <div className="relative w-full lg:w-72">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
             <Input
-              placeholder="Buscar por titular, alumna, concepto o monto..."
+              placeholder="Buscar por DNI, titular, alumna, concepto o monto..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -508,8 +520,8 @@ export default function CajaPage() {
               <thead>
                 <tr className="border-b border-[var(--border-default)] text-[10px] uppercase tracking-[0.08em] text-[var(--text-secondary)]">
                   <th className="py-3 px-4 font-semibold">Tipo</th>
-                  <th className="py-3 px-4 font-semibold">Concepto</th>
-                  <th className="py-3 px-4 font-semibold">Titular / Persona</th>
+                  <th className="py-3 px-4 font-semibold">Concepto / Período</th>
+                  <th className="py-3 px-4 font-semibold">Alumna / Titular</th>
                   <th className="py-3 px-4 font-semibold">Método de Pago</th>
                   <th className="py-3 px-4 font-bold text-[var(--text-primary)]">Monto</th>
                   <th className="py-3 px-4 font-semibold text-right">Fecha y Hora</th>
@@ -532,8 +544,18 @@ export default function CajaPage() {
                       )}
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-sm">
-                      {mov.concepto}
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-col gap-1">
+                        <span className="font-bold text-sm text-[var(--text-primary)]">
+                          {mov.concepto}
+                        </span>
+                        {mov.period && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-[6px] bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-secondary)] w-fit font-medium">
+                            <Calendar className="h-3 w-3 text-[var(--text-muted)]" />
+                            Período: {mov.period}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -546,9 +568,22 @@ export default function CajaPage() {
                           )}
                           <span>{mov.titular || 'Movimiento de Caja'}</span>
                         </span>
-                        <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 pl-5">
-                          {sedes.find((s) => s.id === mov.sede_id)?.name || 'Sin sede'}
-                        </span>
+                        {mov.alumna?.dni && (
+                          <span className="text-[11px] font-mono font-bold text-[var(--text-secondary)] pl-5">
+                            DNI: {mov.alumna.dni}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 pl-5 text-[10px] text-[var(--text-muted)] flex-wrap">
+                          <span>{sedes.find((s) => s.id === mov.sede_id)?.name || 'Sin sede'}</span>
+                          {isAdmin && mov.cobrado_por && (
+                            <>
+                              <span>•</span>
+                              <span className="text-[var(--text-secondary)] font-medium">
+                                Cobrado por: <strong className="text-[var(--text-primary)]">{mov.cobrado_por}</strong>
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
 
