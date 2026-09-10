@@ -517,11 +517,11 @@ export function TurnoModal({
                     onClick={() => setAsistenciaStatus('PRESENT')}
                     className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       asistenciaStatus === 'PRESENT'
-                        ? 'bg-[#fefce8] dark:bg-[#261f0b] text-[#854d0e] dark:text-[#fde047] border-[#eab308] shadow-xs'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#eab308]'
+                        ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500 shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-amber-500/50'
                     }`}
                   >
-                    <CheckCircle2 className="h-4 w-4 text-[#eab308]" />
+                    <CheckCircle2 className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     <span>✓ Presente</span>
                   </button>
 
@@ -531,11 +531,11 @@ export function TurnoModal({
                     onClick={() => setAsistenciaStatus('ABSENT')}
                     className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       asistenciaStatus === 'ABSENT'
-                        ? 'bg-[#fff1f2] dark:bg-[#271015] text-[#9f1239] dark:text-[#fda4af] border-[#f43f5e] shadow-xs'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#f43f5e]'
+                        ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500 shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-rose-500/50'
                     }`}
                   >
-                    <AlertCircle className="h-4 w-4 text-[#f43f5e]" />
+                    <AlertCircle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
                     <span>✗ Ausente</span>
                   </button>
 
@@ -545,11 +545,11 @@ export function TurnoModal({
                     onClick={() => setAsistenciaStatus('RECOVERY')}
                     className={`p-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer ${
                       asistenciaStatus === 'RECOVERY'
-                        ? 'bg-[#eef2ff] dark:bg-[#13122b] text-[#3730a3] dark:text-[#c7d2fe] border-[#6366f1] shadow-xs'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-[#6366f1]'
+                        ? 'bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border-indigo-500 shadow-xs'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)] hover:border-indigo-500/50'
                     }`}
                   >
-                    <RotateCcw className="h-4 w-4 text-[#6366f1]" />
+                    <RotateCcw className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     <span>↻ Recupera</span>
                   </button>
 

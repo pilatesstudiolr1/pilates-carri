@@ -529,7 +529,7 @@ export function ReformerMatrixView({
                     // La cuota mensual NO fue abonada todavía
                     isAlDia = false;
                     if (alumna.enrollment_paid) {
-                      vencimientoTexto = 'Inscripción paga · Cuota pendiente';
+                      vencimientoTexto = 'Inscripción paga · Cuota mensual pendiente';
                       vencimientoColor = 'text-amber-700 dark:text-amber-400 font-bold';
                     } else {
                       vencimientoTexto = 'Cuota pendiente';

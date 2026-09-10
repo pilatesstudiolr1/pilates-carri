@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Alumna } from '@/types/database';
-import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock, Trash2 } from 'lucide-react';
+import { User, Phone, Mail, Heart, AlertCircle, Calendar, FileText, CheckCircle, XCircle, Cake, AlertTriangle, Clock, Trash2, UserX, RotateCcw } from 'lucide-react';
 
 interface AlumnaDetailModalProps {
   isOpen: boolean;
@@ -12,6 +12,8 @@ interface AlumnaDetailModalProps {
   alumna: Alumna | null;
   onEdit?: (alumna: Alumna) => void;
   onDelete?: (alumna: Alumna) => void;
+  onBaja?: (alumna: Alumna) => void;
+  onReactivar?: (alumna: Alumna) => void;
 }
 
 function calcularEdad(fechaNacimiento: string | null): number | null {
@@ -26,18 +28,45 @@ function calcularEdad(fechaNacimiento: string | null): number | null {
 
 function getVencimientoEstado(fechaVencimiento: string | null): {
   label: string;
-  color: string;
-  bg: string;
+  badgeClass: string;
+  cardClass: string;
+  textClass: string;
 } {
-  if (!fechaVencimiento) return { label: 'Sin vencimiento', color: 'var(--text-muted)', bg: 'var(--bg-tertiary)' };
+  if (!fechaVencimiento) {
+    return {
+      label: 'Sin vencimiento',
+      badgeClass: 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border border-[var(--border-default)]',
+      cardClass: 'bg-[var(--bg-tertiary)] border border-[var(--border-default)]',
+      textClass: 'text-[var(--text-muted)]',
+    };
+  }
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const venc = new Date(fechaVencimiento);
   const diffDias = Math.ceil((venc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDias < 0) return { label: `Vencida hace ${Math.abs(diffDias)} dias`, color: '#ef4444', bg: '#fecaca' };
-  if (diffDias <= 5) return { label: `Vence en ${diffDias} dias`, color: '#f59e0b', bg: '#fef3c7' };
-  return { label: `Vence: ${fechaVencimiento}`, color: '#22c55e', bg: '#bbf7d0' };
+  if (diffDias < 0) {
+    return {
+      label: `Vencida hace ${Math.abs(diffDias)} días`,
+      badgeClass: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30',
+      cardClass: 'bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/30',
+      textClass: 'text-rose-700 dark:text-rose-300',
+    };
+  }
+  if (diffDias <= 5) {
+    return {
+      label: diffDias === 0 ? 'Vence hoy' : `Vence en ${diffDias} días`,
+      badgeClass: 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30',
+      cardClass: 'bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30',
+      textClass: 'text-amber-800 dark:text-amber-300',
+    };
+  }
+  return {
+    label: `Vence: ${fechaVencimiento}`,
+    badgeClass: 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30',
+    cardClass: 'bg-emerald-500/10 dark:bg-emerald-950/30 border border-emerald-500/30',
+    textClass: 'text-emerald-800 dark:text-emerald-300',
+  };
 }
 
 export function AlumnaDetailModal({
@@ -46,6 +75,8 @@ export function AlumnaDetailModal({
   alumna,
   onEdit,
   onDelete,
+  onBaja,
+  onReactivar,
 }: AlumnaDetailModalProps) {
   if (!alumna) return null;
 
@@ -92,8 +123,7 @@ export function AlumnaDetailModal({
           <div className="flex items-center gap-2 flex-wrap">
             {/* Vencimiento */}
             <span
-              className="text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1"
-              style={{ color: vencimientoEstado.color, background: vencimientoEstado.bg + '33' }}
+              className={`text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 ${vencimientoEstado.badgeClass}`}
             >
               <AlertTriangle className="h-3 w-3" />
               {vencimientoEstado.label}
@@ -132,9 +162,9 @@ export function AlumnaDetailModal({
             </div>
           )}
           {alumna.billing_due_date && (
-            <div className="p-3 rounded-lg border text-xs" style={{ borderColor: vencimientoEstado.color + '44', background: vencimientoEstado.bg + '22' }}>
-              <p className="text-[10px] uppercase font-semibold mb-0.5" style={{ color: vencimientoEstado.color }}>Vencimiento Cuota</p>
-              <p className="font-bold" style={{ color: vencimientoEstado.color }}>{alumna.billing_due_date}</p>
+            <div className={`p-3 rounded-lg text-xs ${vencimientoEstado.cardClass}`}>
+              <p className={`text-[10px] uppercase font-semibold mb-0.5 ${vencimientoEstado.textClass}`}>Vencimiento Cuota</p>
+              <p className={`font-bold font-mono ${vencimientoEstado.textClass}`}>{alumna.billing_due_date}</p>
             </div>
           )}
         </div>
@@ -218,10 +248,39 @@ export function AlumnaDetailModal({
 
         {/* Footer */}
         <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-3 border-t border-[var(--border-default)]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="ghost" onClick={onClose} className="w-full sm:w-auto">
               Cerrar
             </Button>
+            {alumna.status === 'INACTIVE' ? (
+              onReactivar && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    onClose();
+                    onReactivar(alumna);
+                  }}
+                  className="w-full sm:w-auto text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 border-emerald-500/30"
+                  icon={<RotateCcw className="h-4 w-4 text-emerald-600" />}
+                >
+                  Reactivar Alumna
+                </Button>
+              )
+            ) : (
+              onBaja && (
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    onClose();
+                    onBaja(alumna);
+                  }}
+                  className="w-full sm:w-auto text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                  icon={<UserX className="h-4 w-4" />}
+                >
+                  Dar de Baja
+                </Button>
+              )
+            )}
             {onDelete && (
               <Button
                 variant="ghost"
@@ -229,10 +288,10 @@ export function AlumnaDetailModal({
                   onClose();
                   onDelete(alumna);
                 }}
-                className="w-full sm:w-auto text-red-500 hover:bg-red-500/10"
-                icon={<Trash2 className="h-4 w-4" />}
+                className="w-full sm:w-auto text-rose-500 hover:bg-rose-500/10 text-xs"
+                icon={<Trash2 className="h-3.5 w-3.5" />}
               >
-                Eliminar
+                Eliminar definitivamente
               </Button>
             )}
           </div>

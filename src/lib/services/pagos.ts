@@ -84,7 +84,9 @@ export async function registrarPago(pagoData: {
 
     const isInscripcion =
       pagoData.payment_type === 'INSCRIPCION' ||
-      (pagoData.concept?.toLowerCase().includes('inscripci') ?? false);
+      (pagoData.concept?.toLowerCase().includes('inscripci') ?? false) ||
+      (pagoData.concept?.toLowerCase().includes('matr') ?? false) ||
+      (pagoData.concept?.toLowerCase().includes('ingreso') ?? false);
 
     const commRate = isInscripcion
       ? 0
@@ -143,12 +145,13 @@ export async function registrarPago(pagoData: {
     // Actualizar datos de la alumna (vencimiento y estado de pago)
     try {
       const alumnaUpdate: Record<string, any> = {};
-      if (pagoData.due_date) {
-        alumnaUpdate.billing_due_date = pagoData.due_date;
-      }
       if (finalPaymentType === 'INSCRIPCION') {
+        // La inscripción es una matrícula única: SOLO marca enrollment_paid y NUNCA altera la cuota ni el vencimiento mensual
         alumnaUpdate.enrollment_paid = true;
       } else {
+        if (pagoData.due_date) {
+          alumnaUpdate.billing_due_date = pagoData.due_date;
+        }
         alumnaUpdate.monthly_paid = true;
       }
 
@@ -283,6 +286,7 @@ export async function deletePago(id: string): Promise<{ error: string | null }> 
             .from('pagos')
             .select('due_date')
             .eq('alumna_id', pago.alumna_id)
+            .eq('payment_type', 'MENSUALIDAD')
             .order('payment_date', { ascending: false })
             .limit(1);
 

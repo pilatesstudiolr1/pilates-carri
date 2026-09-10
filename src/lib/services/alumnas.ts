@@ -148,8 +148,18 @@ export async function updateAlumnaStatus(
     const supabase = createClient();
     const updateData: AlumnaUpdate = {
       status,
-      ...(status === 'INACTIVE' ? { exit_date: new Date().toISOString().split('T')[0], exit_reason: exitReason } : {}),
+      ...(status === 'INACTIVE'
+        ? { exit_date: new Date().toISOString().split('T')[0], exit_reason: exitReason || 'Baja temporal / Inactiva' }
+        : { exit_date: null, exit_reason: null }),
     };
+
+    // Si se da de baja a la alumna, desasignar sus turnos fijos para liberar las camillas en la agenda
+    if (status === 'INACTIVE') {
+      await supabase
+        .from('clase_alumnas')
+        .delete()
+        .eq('alumna_id', id);
+    }
 
     const { error } = await supabase
       .from('alumnas')
@@ -163,6 +173,19 @@ export async function updateAlumnaStatus(
       error: err instanceof Error ? err.message : 'Error al cambiar estado de alumna',
     };
   }
+}
+
+export async function darDeBajaAlumna(
+  id: string,
+  motivo?: string
+): Promise<{ error: string | null }> {
+  return updateAlumnaStatus(id, 'INACTIVE', motivo);
+}
+
+export async function reactivarAlumna(
+  id: string
+): Promise<{ error: string | null }> {
+  return updateAlumnaStatus(id, 'ACTIVE');
 }
 
 export async function deleteAlumna(

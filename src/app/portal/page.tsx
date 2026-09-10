@@ -14,7 +14,6 @@ import {
   UserCheck,
   Layers,
   Receipt,
-  Flower2,
   Calendar,
 } from 'lucide-react';
 
@@ -82,7 +81,7 @@ export default function LatticePortalPage() {
         </div>
 
         {/* Cards Grid — Lattice Pastel Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 max-w-4xl gap-6">
           
           {/* Card: Profesora (Solo si es PROFESORA) */}
           {!loading && profile?.role === 'PROFESORA' && (
@@ -150,29 +149,6 @@ export default function LatticePortalPage() {
                   <div className="pt-4 border-t border-[var(--surface-lavender-border)] flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
                       Gestionar Comisiones
-                    </span>
-                    <div className="w-8 h-8 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] flex items-center justify-center transition-transform group-hover:translate-x-1">
-                      <ArrowRight className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Card 3: Centro de Estética */}
-              <Link href="/estetica" className="group block">
-                <div className="surface-blush rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
-                  <div className="flex items-center gap-3.5">
-                    <div className="w-11 h-11 rounded-full bg-[var(--color-plum)] text-white dark:text-[#001f1f] flex items-center justify-center">
-                      <Flower2 className="h-5 w-5" />
-                    </div>
-                    <h2 className="text-lg font-medium text-[var(--text-primary)] tracking-tight">
-                      Centro de Estética
-                    </h2>
-                  </div>
-
-                  <div className="pt-4 border-t border-[var(--surface-blush-border)] flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
-                      Ingresar a Estética
                     </span>
                     <div className="w-8 h-8 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] flex items-center justify-center transition-transform group-hover:translate-x-1">
                       <ArrowRight className="h-4 w-4" />

@@ -100,7 +100,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         return {
           icon: <Info className="h-6 w-6 text-[var(--color-wood)]" />,
           iconBg: 'bg-[var(--color-wood)]/15 border-[var(--color-wood)]/30',
-          buttonClass: 'bg-[#131927] hover:bg-[#1a2337] text-white shadow-xs',
+          buttonClass: 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 shadow-xs font-semibold',
         };
     }
   };

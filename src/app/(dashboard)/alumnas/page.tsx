@@ -10,7 +10,7 @@ import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
 import { Alumna, AlumnaInsert, AlumnaStatus, MetodoPago } from '@/types/database';
-import { getAlumnas, updateAlumna, createAlumna, deleteAlumna } from '@/lib/services/alumnas';
+import { getAlumnas, updateAlumna, createAlumna, deleteAlumna, darDeBajaAlumna, reactivarAlumna } from '@/lib/services/alumnas';
 import { addAlumnaToClase } from '@/lib/services/agenda';
 import { registrarPago } from '@/lib/services/pagos';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -29,6 +29,8 @@ import {
   Clock,
   CheckCircle2,
   UserPlus,
+  UserX,
+  RotateCcw,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 30;
@@ -186,11 +188,55 @@ function AlumnasPageContent() {
     return true;
   };
 
+  const handleDarDeBajaAlumna = async (alumna: Alumna) => {
+    const isOk = await confirm({
+      title: 'Dar de Baja a Alumna',
+      message: `¿Estás segura de dar de baja a ${alumna.first_name} ${alumna.last_name || ''}? La alumna pasará a estado Inactiva liberando sus turnos en la agenda, pero conservando toda su ficha médica e historial para cuando regrese.`,
+      confirmText: 'Sí, dar de baja',
+      variant: 'warning',
+    });
+    if (!isOk) return;
+
+    const { error } = await darDeBajaAlumna(alumna.id);
+    if (error) {
+      await alertDialog({ title: 'Error al dar de baja', message: error, variant: 'danger' });
+    } else {
+      await alertDialog({
+        title: 'Alumna dada de baja',
+        message: `${alumna.first_name} ${alumna.last_name || ''} ahora está inactiva y sus turnos fueron liberados. Podrás reactivarla con un clic cuando vuelva.`,
+        variant: 'success',
+      });
+      fetchAlumnas();
+    }
+  };
+
+  const handleReactivarAlumna = async (alumna: Alumna) => {
+    const isOk = await confirm({
+      title: 'Reactivar Alumna',
+      message: `¿Deseas reactivar a ${alumna.first_name} ${alumna.last_name || ''}? Volverá a figurar como Activa en el estudio y podrás asignarle sus turnos sin tener que volver a cargarla.`,
+      confirmText: 'Sí, reactivar alumna',
+      variant: 'success',
+    });
+    if (!isOk) return;
+
+    const { error } = await reactivarAlumna(alumna.id);
+    if (error) {
+      await alertDialog({ title: 'Error al reactivar', message: error, variant: 'danger' });
+    } else {
+      await alertDialog({
+        title: 'Alumna reactivada',
+        message: `${alumna.first_name} ${alumna.last_name || ''} ha sido reactivada con éxito.`,
+        variant: 'success',
+      });
+      fetchAlumnas();
+    }
+  };
+
   const handleDeleteAlumna = async (alumna: Alumna) => {
     const isOk = await confirm({
-      title: 'Eliminar Alumna',
-      message: `¿Estás segura de eliminar a ${alumna.first_name} ${alumna.last_name || ''} del sistema? Esta acción no se puede deshacer y también la quitará de todos los turnos asignados.`,
-      confirmText: 'Sí, eliminar',
+      title: 'Eliminar Alumna Definitivamente',
+      message: `⚠️ ¿Estás segura de eliminar permanentemente a ${alumna.first_name} ${alumna.last_name || ''}? Se borrará todo su historial, fichas médicas y pagos de la base de datos de forma irreversible. (Si la alumna solo dejó de asistir, se recomienda usar "Dar de Baja" para poder reactivarla cuando vuelva).`,
+      confirmText: 'Sí, eliminar definitivamente',
       variant: 'danger',
     });
     if (!isOk) return;
@@ -485,10 +531,27 @@ function AlumnasPageContent() {
                               >
                                 <Edit2 className="h-3.5 w-3.5" />
                               </button>
+                              {a.status === 'INACTIVE' ? (
+                                <button
+                                  onClick={() => handleReactivarAlumna(a)}
+                                  className="p-2 rounded-[8px] bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition-colors cursor-pointer"
+                                  title="Reactivar Alumna (Vuelve a Activa)"
+                                >
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleDarDeBajaAlumna(a)}
+                                  className="p-2 rounded-[8px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 border border-amber-500/30 transition-colors cursor-pointer"
+                                  title="Dar de Baja (Pasa a Inactiva sin borrar ficha)"
+                                >
+                                  <UserX className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleDeleteAlumna(a)}
                                 className="p-2 rounded-[8px] bg-[var(--bg-tertiary)] hover:bg-rose-500/20 text-[var(--text-secondary)] hover:text-rose-500 border border-[var(--border-default)] transition-colors cursor-pointer"
-                                title="Eliminar Alumna"
+                                title="Eliminar Alumna Definitivamente"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -587,6 +650,16 @@ function AlumnasPageContent() {
             setSelectedAlumna(a);
             setIsDetailOpen(false);
             setActiveTab('NEW');
+          }}
+          onBaja={(a) => {
+            setIsDetailOpen(false);
+            setSelectedAlumna(null);
+            handleDarDeBajaAlumna(a);
+          }}
+          onReactivar={(a) => {
+            setIsDetailOpen(false);
+            setSelectedAlumna(null);
+            handleReactivarAlumna(a);
           }}
           onDelete={(a) => {
             setIsDetailOpen(false);
