@@ -26,7 +26,14 @@ import { ToastProvider } from '@/components/providers/ToastProvider';
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="es" className={`${inter.variable} h-full`}>
+    <html lang="es" className={`${inter.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('pilates_theme');if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.setAttribute('data-theme','dark');}else{document.documentElement.classList.remove('dark');document.documentElement.setAttribute('data-theme','light');}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full bg-[var(--bg-primary)] text-[var(--text-primary)] antialiased">
         <ToastProvider>
           {children}

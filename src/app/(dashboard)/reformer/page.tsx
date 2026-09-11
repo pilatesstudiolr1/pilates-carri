@@ -19,6 +19,7 @@ import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useSede } from '@/hooks/useSede';
+import { useUser } from '@/hooks/useUser';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 import {
@@ -34,6 +35,8 @@ import {
   Calendar,
   CheckCircle2,
   Search,
+  User,
+  Building2,
 } from 'lucide-react';
 
 function getDayOfWeekToday(): number {
@@ -55,6 +58,9 @@ function formatFecha(fechaStr: string | null): string {
 export default function SimplifiedLatticeDashboard() {
   const { confirm, alert: alertDialog } = useConfirm();
   const { selectedSedeId } = useSede();
+  const { profile } = useUser();
+  const isAdmin = profile?.role === 'ADMIN';
+  const isProfesora = profile?.role === 'PROFESORA';
 
   // Estados de Datos
   const [alumnasReformer, setAlumnasReformer] = useState<Alumna[]>([]);
@@ -87,12 +93,13 @@ export default function SimplifiedLatticeDashboard() {
   const loadDashboardData = useCallback(async () => {
     setLoading(true);
     const hoyNum = getDayOfWeekToday();
+    const effectiveProfId = isProfesora && profile?.id ? profile.id : undefined;
 
     const [alumnasRes, pagosRes, movRes, clasesRes, profsRes] = await Promise.all([
-      getAlumnas({ limit: 500, sedeId: selectedSedeId }),
-      getPagos({ status: 'ALL', sedeId: selectedSedeId }),
-      getMovimientos({ sedeId: selectedSedeId }),
-      getClasesConAlumnas({ dayOfWeek: hoyNum, sedeId: selectedSedeId }),
+      getAlumnas({ limit: 500, sedeId: selectedSedeId, profesoraId: effectiveProfId }),
+      getPagos({ status: 'ALL', sedeId: selectedSedeId, profesoraId: effectiveProfId }),
+      getMovimientos({ sedeId: selectedSedeId, recordedBy: effectiveProfId }),
+      getClasesConAlumnas({ dayOfWeek: hoyNum, sedeId: selectedSedeId, profesoraId: effectiveProfId }),
       getProfiles({ role: 'PROFESORA', isActive: true }),
     ]);
 
@@ -102,7 +109,7 @@ export default function SimplifiedLatticeDashboard() {
     setClasesReformerHoy(clasesRes.data || []);
     setProfesoras((profsRes.data || []).filter((p) => p.role === 'PROFESORA'));
     setLoading(false);
-  }, [selectedSedeId]);
+  }, [selectedSedeId, isProfesora, profile?.id]);
 
   useEffect(() => {
     loadDashboardData();
@@ -565,6 +572,11 @@ export default function SimplifiedLatticeDashboard() {
                   Ver historial de pagos <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               )}
+              {isAdmin && activeTab === 'caja' && (
+                <Link href="/caja" className="text-xs font-medium text-[var(--text-primary)] hover:underline flex items-center gap-1">
+                  Ver libro de caja completo <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              )}
             </div>
 
             {/* TAB CONTENT 1: Agenda de Hoy (Solo Listado Agrupado por Hora) */}
@@ -792,14 +804,15 @@ export default function SimplifiedLatticeDashboard() {
                           <th className="py-2.5 px-3">Fecha</th>
                           <th className="py-2.5 px-3">Tipo</th>
                           <th className="py-2.5 px-3">Concepto</th>
+                          <th className="py-2.5 px-3">{isAdmin ? 'Cobrado a / Realizado por' : 'Cobrado a'}</th>
                           <th className="py-2.5 px-3">Método</th>
                           <th className="py-2.5 px-3 text-right">Monto</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--border-default)]">
-                        {movimientosStudio.slice(0, 10).map((m) => (
+                        {movimientosStudio.slice(0, 25).map((m) => (
                           <tr key={m.id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
-                            <td className="py-2.5 px-3 font-mono text-[11px]">{formatFecha(m.fecha)}</td>
+                            <td className="py-2.5 px-3 font-mono text-[11px] whitespace-nowrap">{formatFecha(m.fecha)}</td>
                             <td className="py-2.5 px-3">
                               <span
                                 className={`inline-block px-2.5 py-0.5 rounded-[22px] text-[10px] font-extrabold uppercase text-white shadow-xs ${
@@ -811,14 +824,42 @@ export default function SimplifiedLatticeDashboard() {
                                 {m.tipo}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 font-medium text-[var(--text-primary)]">{m.concepto}</td>
-                            <td className="py-2.5 px-3 capitalize text-[var(--text-secondary)]">{m.metodo_pago}</td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-[var(--text-primary)]">{m.concepto}</span>
+                                {m.period && (
+                                  <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                                    Período: {m.period}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-bold text-xs text-[var(--text-primary)] flex items-center gap-1.5">
+                                  {m.alumna || (m.tipo === 'INGRESO' && m.titular && !m.titular.toLowerCase().includes('caja')) ? (
+                                    <User className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  ) : (
+                                    <Building2 className="h-3.5 w-3.5 text-[var(--color-wood)] shrink-0" />
+                                  )}
+                                  <span>{m.titular || (m.tipo === 'EGRESO' ? 'Gasto del Estudio' : 'Movimiento de Caja')}</span>
+                                </span>
+                                {isAdmin && m.cobrado_por && (
+                                  <span className="text-[10px] text-[var(--text-muted)] pl-5">
+                                    Realizado por: <strong className="text-[var(--text-secondary)] font-medium">{m.cobrado_por}</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 capitalize text-[var(--text-secondary)] font-medium">
+                              {(m.metodo_pago || '').replace('_', ' ')}
+                            </td>
                             <td
-                              className={`py-2.5 px-3 text-right font-medium ${
+                              className={`py-2.5 px-3 text-right font-mono font-bold ${
                                 m.tipo === 'INGRESO' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
                               }`}
                             >
-                              {m.tipo === 'INGRESO' ? '+' : '-'}${m.monto.toLocaleString()}
+                              {m.tipo === 'INGRESO' ? '+' : '-'}${m.monto.toLocaleString('es-AR')}
                             </td>
                           </tr>
                         ))}

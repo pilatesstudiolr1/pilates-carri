@@ -13,8 +13,9 @@ import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useToast } from '@/components/ui/Toast';
 import { Clase, Profile, Alumna, MetodoPago, TipoPago } from '@/types/database';
-import { getClases, createClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
+import { getClases, createClase, updateClase, addAlumnaToClase, removeAlumnaFromClase, deleteClase } from '@/lib/services/agenda';
 import { getProfiles } from '@/lib/services/profesoras';
 import { registrarPago } from '@/lib/services/pagos';
 import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Sparkles, Building2 } from 'lucide-react';
@@ -34,7 +35,8 @@ const DIAS = [
 
 export default function AgendaPage() {
   const { confirm, alert: alertDialog } = useConfirm();
-  const { selectedSedeId, setSelectedSedeId, sedes } = useSede();
+  const toast = useToast();
+  const { selectedSedeId, setSelectedSedeId, sedes, selectedSede } = useSede();
   const { profile } = useUser();
   const isProfesora = profile?.role === 'PROFESORA';
 
@@ -219,6 +221,100 @@ export default function AgendaPage() {
       fetchAgenda();
       setIsDetailModalOpen(false);
     }
+  };
+
+  const handleIncrementCapacity = async (claseId: string) => {
+    const targetClase = clases.find((c) => c.id === claseId);
+    if (!targetClase) return;
+
+    const currentCap = targetClase.max_capacity || (selectedSede?.max_camillas || 6);
+    if (currentCap >= 12) {
+      await alertDialog({
+        title: 'Límite alcanzado',
+        message: 'El cupo máximo permitido por turno es de 12 lugares.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const newCap = currentCap + 1;
+    const { error } = await updateClase(claseId, { max_capacity: newCap });
+    if (error) {
+      await alertDialog({
+        title: 'Error al ampliar cupo',
+        message: `No se pudo ampliar el cupo del turno: ${error}`,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    if (selectedClase && selectedClase.id === claseId) {
+      setSelectedClase({
+        ...selectedClase,
+        max_capacity: newCap,
+      });
+    }
+
+    toast.success(`Se habilitó el lugar extra (Cupo ${newCap}) para este turno.`, 'Lugar Extra habilitado');
+    fetchAgenda();
+  };
+
+  const handleDecrementCapacity = async (claseId: string, targetSlot?: number) => {
+    const targetClase = clases.find((c) => c.id === claseId);
+    if (!targetClase) return;
+
+    const currentCap = targetClase.max_capacity || (selectedSede?.max_camillas || 6);
+    if (currentCap <= 1) {
+      await alertDialog({
+        title: 'Límite alcanzado',
+        message: 'No es posible reducir más el cupo de este turno.',
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const slotToCheck = targetSlot || currentCap;
+    const ocupante = (targetClase.alumnas || []).find((ca: any) => ca.camilla === slotToCheck);
+    if (ocupante) {
+      const nombreAlumna = ocupante.alumna
+        ? `${ocupante.alumna.first_name || ''} ${ocupante.alumna.last_name || ''}`.trim()
+        : 'una alumna';
+      await alertDialog({
+        title: 'Lugar Ocupado',
+        message: `No se puede eliminar este lugar extra porque está ocupado por ${nombreAlumna}. Primero debes desasignarla o reubicarla de este turno.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const isOk = await confirm({
+      title: 'Quitar Lugar Extra',
+      message: `¿Estás seguro de que deseas eliminar este lugar extra del turno de las ${targetClase.start_time.slice(0, 5)} hs? El cupo volverá a ${currentCap - 1}.`,
+      confirmText: 'Sí, quitar',
+      variant: 'danger',
+    });
+    if (!isOk) return;
+
+    const newCap = currentCap - 1;
+    const { error } = await updateClase(claseId, { max_capacity: newCap });
+    if (error) {
+      await alertDialog({
+        title: 'Error al reducir cupo',
+        message: `No se pudo quitar el lugar extra: ${error}`,
+        variant: 'danger',
+      });
+      return;
+    }
+
+    if (selectedClase && selectedClase.id === claseId) {
+      setSelectedClase({
+        ...selectedClase,
+        max_capacity: newCap,
+      });
+    }
+
+    toast.success('Lugar extra eliminado correctamente del turno.', 'Turno actualizado');
+    fetchAgenda();
   };
 
   const handleAbrirTurnoModal = (
@@ -636,6 +732,8 @@ export default function AgendaPage() {
           isProfesoraView={isProfesora}
           profesoraWorkHours={isProfesora ? profile?.work_hours : undefined}
           profesoraWorkDays={isProfesora ? profile?.work_days : undefined}
+          onIncrementCapacity={handleIncrementCapacity}
+          onDecrementCapacity={handleDecrementCapacity}
           onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
             handleAbrirTurnoModal(day, time, camilla || 1, null)
           }
@@ -711,6 +809,7 @@ export default function AgendaPage() {
           profesoras={profesoras}
           initialDayOfWeek={presetDay}
           initialStartTime={presetTime}
+          initialCapacity={selectedSede?.max_camillas || 6}
           loading={submitting}
         />
       )}
@@ -730,6 +829,8 @@ export default function AgendaPage() {
           }}
           onRemoveAlumna={(claseId, alumnaId) => handleRemoveAlumna(claseId, alumnaId)}
           onDeleteClase={(claseId) => handleDeleteClase(claseId)}
+          onIncrementCapacity={handleIncrementCapacity}
+          onDecrementCapacity={handleDecrementCapacity}
         />
       )}
 

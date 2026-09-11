@@ -5,33 +5,46 @@ import { useState, useEffect } from 'react';
 export type Theme = 'light' | 'dark';
 
 export function useTheme() {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      const savedTheme = localStorage.getItem('pilates_theme') as Theme | null;
-      if (savedTheme) return savedTheme;
-    }
-    return 'light';
-  });
+  const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
+    // Sincronizar estado inicial en el cliente
+    const saved = localStorage.getItem('pilates_theme') as Theme | null;
+    const isDarkClass = document.documentElement.classList.contains('dark');
+    const initialTheme: Theme = saved || (isDarkClass ? 'dark' : 'light');
+    setTheme(initialTheme);
+
+    const handleThemeChange = () => {
+      const current = (localStorage.getItem('pilates_theme') as Theme | null) ||
+        (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      setTheme(current);
+    };
+
+    window.addEventListener('storage', handleThemeChange);
+    window.addEventListener('theme-change', handleThemeChange);
+
+    return () => {
+      window.removeEventListener('storage', handleThemeChange);
+      window.removeEventListener('theme-change', handleThemeChange);
+    };
+  }, []);
 
   const toggleTheme = () => {
-    const nextTheme: Theme = theme === 'light' ? 'dark' : 'light';
+    const isCurrentlyDark = document.documentElement.classList.contains('dark');
+    const nextTheme: Theme = isCurrentlyDark ? 'light' : 'dark';
+
     setTheme(nextTheme);
     localStorage.setItem('pilates_theme', nextTheme);
     document.documentElement.setAttribute('data-theme', nextTheme);
+
     if (nextTheme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    // Notificar a todos los demás componentes que usan el hook
+    window.dispatchEvent(new Event('theme-change'));
   };
 
   return { theme, toggleTheme };

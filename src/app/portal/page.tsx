@@ -35,12 +35,20 @@ export default function LatticePortalPage() {
       <header className="w-full max-w-6xl mx-auto flex items-center justify-between gap-4 pb-8 border-b border-[var(--border-default)]">
         <div className="flex items-center gap-3">
           <Image
-            src={theme === 'dark' ? '/media/LOGO BLANCO.webp' : '/media/LOGO.webp'}
+            src="/media/LOGO BLANCO.webp"
             alt="Pilates Studio Logo"
             width={180}
             height={48}
             priority
-            className="h-10 sm:h-12 w-auto object-contain"
+            className="h-10 sm:h-12 w-auto object-contain hidden dark:block"
+          />
+          <Image
+            src="/media/LOGO.webp"
+            alt="Pilates Studio Logo"
+            width={180}
+            height={48}
+            priority
+            className="h-10 sm:h-12 w-auto object-contain block dark:hidden"
           />
         </div>
 

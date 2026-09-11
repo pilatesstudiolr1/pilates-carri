@@ -5,7 +5,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Clase } from '@/types/database';
-import { Clock, UserCheck, MapPin, Plus, UserX, CheckCircle, XCircle, Trash2, BedDouble } from 'lucide-react';
+import { Clock, UserCheck, MapPin, Plus, UserX, CheckCircle, XCircle, Trash2, BedDouble, X } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 interface ClaseDetailModalProps {
@@ -15,6 +15,8 @@ interface ClaseDetailModalProps {
   onOpenAssignModal: (clase: Clase) => void;
   onRemoveAlumna: (claseId: string, alumnaId: string, nombreAlumna: string) => Promise<void>;
   onDeleteClase?: (claseId: string) => Promise<void>;
+  onIncrementCapacity?: (claseId: string) => Promise<void>;
+  onDecrementCapacity?: (claseId: string) => Promise<void>;
 }
 
 export function ClaseDetailModal({
@@ -24,10 +26,14 @@ export function ClaseDetailModal({
   onOpenAssignModal,
   onRemoveAlumna,
   onDeleteClase,
+  onIncrementCapacity,
+  onDecrementCapacity,
 }: ClaseDetailModalProps) {
   const { confirm } = useConfirm();
   const [asistencias, setAsistencias] = useState<Record<string, boolean>>({});
   const [deleting, setDeleting] = useState(false);
+  const [incrementing, setIncrementing] = useState(false);
+  const [decrementing, setDecrementing] = useState(false);
 
   if (!clase) return null;
 
@@ -77,9 +83,45 @@ export function ClaseDetailModal({
             </p>
           </div>
 
-          <Badge variant={isFull ? 'danger' : count >= 4 ? 'success' : 'warning'}>
-            {count} / {clase.max_capacity} Alumnas
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={isFull ? 'danger' : count >= 4 ? 'success' : 'warning'}>
+              {count} / {clase.max_capacity} Alumnas
+            </Badge>
+
+            {onIncrementCapacity && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setIncrementing(true);
+                  await onIncrementCapacity(clase.id);
+                  setIncrementing(false);
+                }}
+                disabled={incrementing || (clase.max_capacity || 6) >= 12}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                title="Añadir +1 lugar extra a este turno"
+              >
+                <Plus className="h-3 w-3" />
+                <span>{incrementing ? '...' : '+1 lugar'}</span>
+              </button>
+            )}
+
+            {onDecrementCapacity && (clase.max_capacity || 6) > 1 && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setDecrementing(true);
+                  await onDecrementCapacity(clase.id);
+                  setDecrementing(false);
+                }}
+                disabled={decrementing || incrementing}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1 transition-all cursor-pointer disabled:opacity-50"
+                title="Quitar lugar extra de este turno"
+              >
+                <X className="h-3 w-3" />
+                <span>{decrementing ? '...' : 'Quitar extra'}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Lista de Alumnas Inscriptas y Asistencia */}

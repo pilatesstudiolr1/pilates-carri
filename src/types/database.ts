@@ -132,7 +132,7 @@ export interface Clase {
   day_of_week: number; // 1=Lunes, 6=Sabado
   start_time: string;
   end_time: string;
-  max_capacity: number; // 4 a 6
+  max_capacity: number; // 1 a 12 (configurable por turno y sobrecupos)
   is_active: boolean;
   created_at: string;
 
@@ -147,7 +147,7 @@ export interface ClaseAlumna {
   id: string;
   clase_id: string;
   alumna_id: string;
-  camilla: number | null; // 1 a 6 (camilla asignada)
+  camilla: number | null; // 1 a 12 (camilla asignada)
   status: EstadoClaseAlumna;
   created_at: string;
 

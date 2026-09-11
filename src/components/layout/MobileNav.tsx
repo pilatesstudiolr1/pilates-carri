@@ -139,12 +139,20 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
           <div className="flex items-center justify-between h-[var(--header-height)] px-4">
             <Link href="/portal" onClick={onClose} className="flex items-center gap-2 overflow-hidden">
               <Image
-                src={theme === 'dark' ? '/media/LOGO BLANCO.webp' : '/media/LOGO.webp'}
+                src="/media/LOGO BLANCO.webp"
                 alt="Pilates Studio Logo"
                 width={140}
                 height={38}
                 priority
-                className="h-8 w-auto object-contain"
+                className="h-8 w-auto object-contain hidden dark:block"
+              />
+              <Image
+                src="/media/LOGO.webp"
+                alt="Pilates Studio Logo"
+                width={140}
+                height={38}
+                priority
+                className="h-8 w-auto object-contain block dark:hidden"
               />
             </Link>
             <button
@@ -185,15 +193,15 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
                           'text-xs font-medium',
                           'transition-all duration-150',
                           isActive
-                            ? 'bg-[var(--color-meadow)] text-[var(--color-forest-ink)] border border-[var(--color-forest-ink)] shadow-2xs font-semibold'
-                            : 'text-[var(--color-lichen-gray)] hover:text-[var(--color-forest-ink)] hover:bg-[var(--color-parchment)]'
+                            ? 'bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)] border border-[var(--badge-meadow-border)] shadow-2xs font-semibold'
+                            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
                         )}
                       >
                         {Icon && (
                           <Icon
                             className={cn(
                               'shrink-0 h-4 w-4',
-                              isActive ? 'text-[var(--color-forest-ink)]' : 'text-[var(--color-stone)]'
+                              isActive ? 'text-[var(--badge-meadow-text)]' : 'text-[var(--text-muted)]'
                             )}
                           />
                         )}

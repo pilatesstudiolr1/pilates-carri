@@ -21,6 +21,7 @@ interface ClaseFormModalProps {
   profesoras: Profile[];
   initialDayOfWeek?: number;
   initialStartTime?: string;
+  initialCapacity?: number;
   loading?: boolean;
 }
 
@@ -40,14 +41,15 @@ export function ClaseFormModal({
   profesoras,
   initialDayOfWeek,
   initialStartTime,
+  initialCapacity = 6,
   loading = false,
 }: ClaseFormModalProps) {
   const [name, setName] = useState('Clase Reformer');
-  const [profesoraId, setProfesoraId] = useState<string>('');
   const [dayOfWeek, setDayOfWeek] = useState<number>(1);
   const [startTime, setStartTime] = useState('08:00');
   const [endTime, setEndTime] = useState('09:00');
-  const [maxCapacity, setMaxCapacity] = useState<number>(6);
+  const [profesoraId, setProfesoraId] = useState('');
+  const [maxCapacity, setMaxCapacity] = useState<number>(initialCapacity || 6);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
@@ -63,16 +65,19 @@ export function ClaseFormModal({
       if (profesoras.length > 0 && !profesoraId) {
         setProfesoraId(profesoras[0].id);
       }
+      if (initialCapacity) {
+        setMaxCapacity(initialCapacity);
+      }
     }
-  }, [open, initialDayOfWeek, initialStartTime, profesoras, profesoraId]);
+  }, [open, initialDayOfWeek, initialStartTime, initialCapacity, profesoras, profesoraId]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    if (maxCapacity < 4 || maxCapacity > 6) {
-      setErrorMsg('La capacidad de la clase debe estar entre 4 y 6 alumnas.');
+    if (maxCapacity < 1 || maxCapacity > 12) {
+      setErrorMsg('La capacidad de la clase debe ser entre 1 y 12 alumnas.');
       return;
     }
 
@@ -171,16 +176,25 @@ export function ClaseFormModal({
 
           <div>
             <label className="text-sm font-medium text-[var(--text-secondary)] block mb-1.5 flex items-center gap-1.5">
-              <Users className="h-4 w-4 text-[var(--color-wood)]" /> Cupo Max (4-6) *
+              <Users className="h-4 w-4 text-[var(--color-wood)]" /> Cupo de Alumnas *
             </label>
             <select
               value={maxCapacity}
               onChange={(e) => setMaxCapacity(Number(e.target.value))}
               className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
             >
-              <option value={4}>4 Alumnas</option>
-              <option value={5}>5 Alumnas</option>
-              <option value={6}>6 Alumnas (Máximo)</option>
+              <option value={1}>1 Alumna (Clase Privada)</option>
+              <option value={2}>2 Alumnas (Dúo)</option>
+              <option value={3}>3 Alumnas</option>
+              <option value={4}>4 Alumnas (Estándar Centro)</option>
+              <option value={5}>5 Alumnas (+1 Sobrecupo Centro)</option>
+              <option value={6}>6 Alumnas (Estándar Norte)</option>
+              <option value={7}>7 Alumnas (+1 Sobrecupo Norte)</option>
+              <option value={8}>8 Alumnas (Sobrecupo)</option>
+              <option value={9}>9 Alumnas (Sobrecupo)</option>
+              <option value={10}>10 Alumnas (Sobrecupo)</option>
+              <option value={11}>11 Alumnas (Sobrecupo)</option>
+              <option value={12}>12 Alumnas (Máximo)</option>
             </select>
           </div>
         </div>
