@@ -17,8 +17,10 @@ import {
   User,
   Lock,
   CreditCard,
+  X,
 } from 'lucide-react';
-
+import { useSede } from '@/hooks/useSede';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -45,8 +47,6 @@ const HORARIOS_ESTANDAR = [
   '22:00',
 ];
 
-import { useSede } from '@/hooks/useSede';
-
 interface ReformerMatrixViewProps {
   clases: Clase[];
   selectedDay: number;
@@ -68,6 +68,8 @@ interface ReformerMatrixViewProps {
   isProfesoraView?: boolean;
   profesoraWorkHours?: string[];
   profesoraWorkDays?: string[];
+  onIncrementCapacity?: (claseId: string) => Promise<void>;
+  onDecrementCapacity?: (claseId: string, targetSlot?: number) => Promise<void>;
 }
 
 function formatFechaCorta(fechaStr?: string | null): string {
@@ -79,7 +81,6 @@ function formatFechaCorta(fechaStr?: string | null): string {
   }
   return clean;
 }
-
 
 export function ReformerMatrixView({
   clases,
@@ -96,10 +97,45 @@ export function ReformerMatrixView({
   isProfesoraView = false,
   profesoraWorkHours,
   profesoraWorkDays,
+  onIncrementCapacity,
+  onDecrementCapacity,
 }: ReformerMatrixViewProps) {
+  const { alert: alertDialog } = useConfirm();
   const { selectedSede } = useSede();
-  const effectiveMaxCamillas = maxCamillas || (selectedSede?.max_camillas ? selectedSede.max_camillas : 6);
-  const camillasList = Array.from({ length: effectiveMaxCamillas }, (_, i) => i + 1);
+
+  // Capacidad estándar de camillas físicas de la sede (4 en Centro, 6 en Barrio Vargas)
+  // La grilla principal y los encabezados SIEMPRE respetan estrictamente esta capacidad base.
+  const baseCamillas = maxCamillas || (selectedSede?.max_camillas ? selectedSede.max_camillas : 6);
+
+  // Filtrar clases del día seleccionado
+  const clasesDelDia = useMemo(() => {
+    return clases.filter((c) => c.day_of_week === selectedDay);
+  }, [clases, selectedDay]);
+
+  // Lista inmutable de columnas de la grilla principal (1 a baseCamillas)
+  const camillasList = useMemo(() => {
+    return Array.from({ length: baseCamillas }, (_, i) => i + 1);
+  }, [baseCamillas]);
+
+  // Clase fija de columnas para la grilla de filas en desktop
+  const gridColsClass = useMemo(() => {
+    switch (baseCamillas) {
+      case 4: return 'lg:grid-cols-[100px_repeat(4,1fr)]';
+      case 5: return 'lg:grid-cols-[100px_repeat(5,1fr)]';
+      case 6: return 'lg:grid-cols-[100px_repeat(6,1fr)]';
+      default: return 'lg:grid-cols-[100px_repeat(6,1fr)]';
+    }
+  }, [baseCamillas]);
+
+  // Clase fija de columnas para la barra de títulos de columnas
+  const headerGridColsClass = useMemo(() => {
+    switch (baseCamillas) {
+      case 4: return 'grid-cols-[100px_repeat(4,1fr)]';
+      case 5: return 'grid-cols-[100px_repeat(5,1fr)]';
+      case 6: return 'grid-cols-[100px_repeat(6,1fr)]';
+      default: return 'grid-cols-[100px_repeat(6,1fr)]';
+    }
+  }, [baseCamillas]);
 
   const [fechaAsistencia, setFechaAsistencia] = useState<string>(
     () => getLocalDateISO()
@@ -118,14 +154,12 @@ export function ReformerMatrixView({
   // Horarios visibles en la matriz
   const horariosVisibles = useMemo(() => {
     if (isProfesoraView) {
-      // 1. Si la profesora tiene horarios asignados en la configuración de su usuario
       if (profesoraWorkHours && profesoraWorkHours.length > 0) {
         const setHoras = new Set(profesoraWorkHours.map(normalizeHour).filter(Boolean));
         const lista = Array.from(setHoras).sort((a, b) => a.localeCompare(b));
         if (lista.length > 0) return lista;
       }
 
-      // 2. Si no tiene horarios configurados en su perfil, pero tiene clases asignadas a su cargo
       const misClases = clases.filter(
         (c) => !currentProfesoraId || c.profesora_id === currentProfesoraId
       );
@@ -140,25 +174,24 @@ export function ReformerMatrixView({
     return HORARIOS_ESTANDAR;
   }, [isProfesoraView, profesoraWorkHours, clases, currentProfesoraId]);
 
-  // Filtrar clases del día seleccionado
-  const clasesDelDia = clases.filter((c) => c.day_of_week === selectedDay);
-
   // Mapear matriz por horario y reformer dinámico
   const matrizHorarios = horariosVisibles.map((hora) => {
     const claseEnHora = clasesDelDia.find(
       (c) => normalizeHour(c.start_time) === hora
     );
 
+    const rowMaxCap = claseEnHora?.max_capacity || baseCamillas;
+
     const camillasMap: Record<number, { alumna: any; caId: string; status?: string; is_other_profesora?: boolean } | null> = {};
-    camillasList.forEach((num) => {
-      camillasMap[num] = null;
-    });
+    for (let i = 1; i <= 12; i++) {
+      camillasMap[i] = null;
+    }
 
     if (claseEnHora && claseEnHora.alumnas) {
       if (Array.isArray(claseEnHora.alumnas)) {
         claseEnHora.alumnas.forEach((item: any, idx: number) => {
           const camillaNum = item.camilla || idx + 1;
-          if (camillaNum >= 1 && camillaNum <= effectiveMaxCamillas) {
+          if (camillaNum >= 1 && camillaNum <= 12) {
             camillasMap[camillaNum] = {
               alumna: item.alumna || item,
               caId: item.id || `ca-${idx}`,
@@ -177,6 +210,7 @@ export function ReformerMatrixView({
       clase: claseEnHora || null,
       camillasMap,
       ocupadosHora,
+      rowMaxCap,
     };
   });
 
@@ -198,10 +232,699 @@ export function ReformerMatrixView({
     });
   });
 
-  const totalCapacidadDia = horariosVisibles.length * effectiveMaxCamillas;
+  const totalCapacidadDia = matrizHorarios.reduce(
+    (acc, r) => acc + (r.clase?.max_capacity || baseCamillas),
+    0
+  );
   const nombreDiaActual = DIAS.find((d) => d.value === selectedDay)?.label || 'Lunes';
   const hoyStr = getLocalDateISO();
 
+  // Handler para quitar un sobrecupo con confirmación segura
+  const handleQuitarLugarExtra = async (clase: Clase, camillaNum: number, alumnaNombre?: string) => {
+    if (alumnaNombre) {
+      await alertDialog({
+        title: 'Lugar Extra Ocupado',
+        message: `Este lugar extra está ocupado por la alumna "${alumnaNombre}". Para eliminar este lugar extra, primero debes reubicar o desasignar a la alumna de este turno.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
+    if (onDecrementCapacity) {
+      await onDecrementCapacity(clase.id, camillaNum);
+    }
+  };
+
+  // Helper para botón de cobro / al día
+  const renderBotonCobroOAlDia = (
+    alumna: any,
+    isAlDia: boolean,
+    row: typeof matrizHorarios[0],
+    refNum: number,
+    item: any,
+    btnCustomColor?: string
+  ) => {
+    if (isAlDia) {
+      return (
+        <div className="w-full py-1 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs">
+          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+          <span>Cuota al día</span>
+        </div>
+      );
+    }
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onCobrar) {
+            onCobrar(alumna);
+          } else if (onSelectOccupiedSlot) {
+            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+          }
+        }}
+        className={`w-full py-1 px-2 rounded-lg ${btnCustomColor || 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 shadow-2xs transition-transform active:scale-95 cursor-pointer`}
+      >
+        <CreditCard className="h-3.5 w-3.5" />
+        <span>Cobrar Cuota</span>
+      </button>
+    );
+  };
+
+  // Renderizar casillero estándar de la grilla principal (Reformer 1 a baseCamillas)
+  const renderSlot = (refNum: number, row: typeof matrizHorarios[0]) => {
+    const item = row.camillasMap[refNum];
+
+    // CASO 1: LUGAR OCUPADO POR ALUMNA
+    if (item && item.alumna) {
+      const alumna = item.alumna;
+      const alumnaNombre =
+        `${alumna.first_name || ''} ${alumna.last_name || ''}`.trim() || 'Alumna';
+      const phone = alumna.phone || '';
+      const statusAsistencia = asistencias[item.caId];
+
+      // Vista de profesora y alumna ajena
+      const isOtherProfesora =
+        item.is_other_profesora ||
+        (isProfesoraView &&
+          currentProfesoraId &&
+          alumna.profesora_id &&
+          alumna.profesora_id !== currentProfesoraId);
+
+      if (isProfesoraView && isOtherProfesora) {
+        return (
+          <div
+            key={refNum}
+            className="p-3 rounded-xl bg-[var(--bg-tertiary)]/60 border-2 border-dashed border-[var(--border-default)] flex flex-col justify-between min-h-[110px] text-left opacity-75 select-none"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
+              </div>
+              <span className="font-bold text-[12px] text-[var(--text-muted)] leading-tight flex items-center gap-1.5 mt-0.5">
+                <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Ocupado
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)] block mt-1 font-medium italic">
+                Otra profesora
+              </span>
+            </div>
+            <div className="mt-2 text-[10px] text-[var(--text-muted)] font-mono">
+              No asignada a tu cargo
+            </div>
+          </div>
+        );
+      }
+
+      // Cálculo de vencimiento y estado de cuota
+      const dueDate = alumna.billing_due_date;
+      let vencimientoTexto = 'Sin vencimiento';
+      let vencimientoColor = 'text-[var(--text-muted)]';
+      let isAlDia = false;
+
+      if (alumna.monthly_paid) {
+        if (dueDate) {
+          const cleanDue = dueDate.slice(0, 10);
+          const [y, m, d] = cleanDue.split('-').map(Number);
+          if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            const vencObj = new Date(y, m - 1, d);
+            const [hy, hm, hd] = hoyStr.split('-').map(Number);
+            const hoyObj = new Date(hy, hm - 1, hd);
+            const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDias < 0) {
+              vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
+              vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+              isAlDia = false;
+            } else if (diffDias <= 5) {
+              vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
+              vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
+              isAlDia = true;
+            } else {
+              vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
+              vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+              isAlDia = true;
+            }
+          }
+        } else {
+          isAlDia = true;
+          vencimientoTexto = 'Cuota al día';
+          vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+        }
+      } else {
+        isAlDia = false;
+        if (alumna.enrollment_paid) {
+          vencimientoTexto = 'Inscripción paga · Cuota mensual pendiente';
+          vencimientoColor = 'text-amber-700 dark:text-amber-400 font-bold';
+        } else {
+          vencimientoTexto = 'Cuota pendiente';
+          vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+        }
+      }
+
+      const isClaseIndividualOInscripcion =
+        alumna.plan === 'Solo Inscripción / Clase de prueba' ||
+        (alumna.plan && alumna.plan.toLowerCase().includes('individual')) ||
+        (alumna.plan && alumna.plan.toLowerCase().includes('prueba')) ||
+        (alumna.plan && alumna.plan.toLowerCase().includes('inscripci')) ||
+        (alumna.enrollment_paid && (!alumna.plan_amount || alumna.plan_amount === 0));
+
+      // CASO MORADO: Clase individual o sólo inscripción
+      if (isClaseIndividualOInscripcion) {
+        return (
+          <div
+            key={refNum}
+            onClick={() => {
+              if (onSelectOccupiedSlot) {
+                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+              } else if (row.clase) {
+                onSelectClase(row.clase);
+              }
+            }}
+            className="p-3 rounded-xl bg-[#faf5ff] dark:bg-[#1e102d] border-2 border-[#9333ea] dark:border-[#a855f7] hover:border-[#7e22ce] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#7e22ce] dark:text-[#d8b4fe] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                <div className="flex items-center gap-1">
+                  {statusAsistencia === 'PRESENT' && (
+                    <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-950 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
+                      ✓ Presente
+                    </span>
+                  )}
+                  {statusAsistencia === 'ABSENT' && (
+                    <span className="px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-950 text-rose-900 dark:text-rose-200 text-[9px] font-bold">
+                      ✗ Ausente
+                    </span>
+                  )}
+                  {statusAsistencia === 'RECOVERY' && (
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-200 text-[9px] font-bold">
+                      ↻ Recupera
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <span className="font-extrabold text-[13px] text-[#581c87] dark:text-[#f3e8ff] leading-tight block">
+                {alumnaNombre}
+              </span>
+
+              <div className="flex items-center gap-1 flex-wrap mt-0.5">
+                <span className={`text-[10px] ${vencimientoColor}`}>
+                  {vencimientoTexto}
+                </span>
+                {!statusAsistencia && (
+                  <span className="text-[10px] text-[#7e22ce] dark:text-[#d8b4fe] font-medium">
+                    • Sin marcar
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2 space-y-1.5">
+              <span className="text-[11px] text-[#7e22ce] dark:text-[#c4b5fd] font-mono block truncate">
+                {phone || 'Sin tel'}
+              </span>
+              {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item, 'bg-purple-600 hover:bg-purple-700')}
+            </div>
+          </div>
+        );
+      }
+
+      // Evaluar si es pendiente de inicio
+      const fechaInicio = alumna.billing_start_date || alumna.start_date || alumna.entry_date;
+      const fechaReferencia = fechaAsistencia || hoyStr;
+      const isPendienteInicio =
+        (fechaInicio && fechaInicio > fechaReferencia) ||
+        alumna.status === 'PENDING' ||
+        item.status === 'PENDING';
+
+      if (isPendienteInicio) {
+        return (
+          <div
+            key={refNum}
+            onClick={() => {
+              if (onSelectOccupiedSlot) {
+                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+              } else if (row.clase) {
+                onSelectClase(row.clase);
+              }
+            }}
+            className="p-3 rounded-xl bg-[#f5f3ff] dark:bg-[#231c3b] border-2 border-[#c084fc] hover:border-[#a855f7] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#6b21a8] dark:text-[#d8b4fe] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+              </div>
+
+              <span className="font-extrabold text-[13px] text-[#4c1d95] dark:text-[#f3e8ff] leading-tight block">
+                {alumnaNombre}
+              </span>
+
+              <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+
+              <div className="mt-1.5 inline-block px-2 py-0.5 rounded-md bg-[#ede9fe] dark:bg-[#4c1d95] text-[#5b21b6] dark:text-[#ddd6fe] text-[10px] font-bold">
+                Pendiente de inicio {fechaInicio ? `– Comienza ${formatFechaCorta(fechaInicio)}` : ''}
+              </div>
+            </div>
+
+            <div className="mt-2 space-y-1.5">
+              <span className="text-[11px] font-medium text-[#6b21a8] dark:text-[#c4b5fd] block truncate">
+                {phone || 'Sin teléfono'}
+              </span>
+              {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item, 'bg-purple-700 hover:bg-purple-800')}
+            </div>
+          </div>
+        );
+      }
+
+      // Estilo Presente (Amarillo)
+      if (statusAsistencia === 'PRESENT') {
+        return (
+          <div
+            key={refNum}
+            onClick={() => {
+              if (onSelectOccupiedSlot) {
+                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+              } else if (row.clase) {
+                onSelectClase(row.clase);
+              }
+            }}
+            className="p-3 rounded-xl bg-[#fefce8] dark:bg-[#261f0b] border-2 border-[#eab308] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#854d0e] dark:text-[#fde047] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                <span className="px-1.5 py-0.5 rounded bg-[#fef08a] dark:bg-[#4d3e10] text-[#854d0e] dark:text-[#fde047] text-[9px] font-bold">
+                  ✓ Presente
+                </span>
+              </div>
+              <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                {alumnaNombre}
+              </span>
+              <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              <div className="text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
+                {phone || 'Asistencia confirmada'}
+              </div>
+              {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item)}
+            </div>
+          </div>
+        );
+      }
+
+      // Estilo Ausente (Rojo)
+      if (statusAsistencia === 'ABSENT') {
+        return (
+          <div
+            key={refNum}
+            onClick={() => {
+              if (onSelectOccupiedSlot) {
+                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+              } else if (row.clase) {
+                onSelectClase(row.clase);
+              }
+            }}
+            className="p-3 rounded-xl bg-[#fff1f2] dark:bg-[#271015] border-2 border-[#f43f5e] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#9f1239] dark:text-[#fda4af] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                <span className="px-1.5 py-0.5 rounded bg-[#fecdd3] dark:bg-[#4c0519] text-[#9f1239] dark:text-[#fda4af] text-[9px] font-bold">
+                  ✗ Ausente
+                </span>
+              </div>
+              <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                {alumnaNombre}
+              </span>
+              <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              <div className="text-[11px] font-medium text-[#9f1239] dark:text-[#fda4af] truncate">
+                {phone || 'Falta registrada'}
+              </div>
+              {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item)}
+            </div>
+          </div>
+        );
+      }
+
+      // Estilo Recupera (Índigo)
+      if (statusAsistencia === 'RECOVERY') {
+        return (
+          <div
+            key={refNum}
+            onClick={() => {
+              if (onSelectOccupiedSlot) {
+                onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+              } else if (row.clase) {
+                onSelectClase(row.clase);
+              }
+            }}
+            className="p-3 rounded-xl bg-[#eef2ff] dark:bg-[#13122b] border-2 border-[#6366f1] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#3730a3] dark:text-[#c7d2fe] mb-1">
+                <span className="lg:hidden">REF {refNum}</span>
+                <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
+                <span className="px-1.5 py-0.5 rounded bg-[#e0e7ff] dark:bg-[#312e81] text-[#3730a3] dark:text-[#c7d2fe] text-[9px] font-bold">
+                  ↻ Recupera
+                </span>
+              </div>
+              <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
+                {alumnaNombre}
+              </span>
+              <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              <div className="text-[11px] font-medium text-[#3730a3] dark:text-[#c7d2fe] truncate">
+                {phone || 'Turno recuperatorio'}
+              </div>
+              {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item)}
+            </div>
+          </div>
+        );
+      }
+
+      // Estilo Estándar / Sin Marcar
+      return (
+        <div
+          key={refNum}
+          onClick={() => {
+            if (onSelectOccupiedSlot) {
+              onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+            } else if (row.clase) {
+              onSelectClase(row.clase);
+            }
+          }}
+          className="p-3 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--border-default)] hover:border-[var(--color-wood)] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] mb-1">
+              <span className="lg:hidden">REF {refNum}</span>
+              <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
+            </div>
+
+            <span className="font-bold text-[13px] text-[var(--text-primary)] leading-tight block">
+              {alumnaNombre}
+            </span>
+
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+              <span className={`text-[10px] ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+              {!statusAsistencia && (
+                <span className="text-[10px] text-[var(--text-muted)] font-medium">
+                  • Sin marcar
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2 space-y-1.5">
+            <span className="text-[11px] text-[var(--text-secondary)] font-mono block truncate">
+              {phone || 'Sin tel'}
+            </span>
+            {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item)}
+          </div>
+        </div>
+      );
+    }
+
+    // CASO 2: LUGAR DISPONIBLE ESTÁNDAR
+    return (
+      <button
+        key={refNum}
+        type="button"
+        onClick={() => {
+          if (row.clase && onOpenAssignModal) {
+            onOpenAssignModal(row.clase, refNum);
+          } else if (onSelectEmptySlot) {
+            onSelectEmptySlot(selectedDay, row.hora, refNum);
+          }
+        }}
+        className="p-3 rounded-xl bg-[#f4fdf8] dark:bg-[#0c1f17] hover:bg-[#e8fbf0] dark:hover:bg-[#122e23] border-2 border-dashed border-[#16a34a] dark:border-[#22c55e] transition-all cursor-pointer flex flex-col justify-between items-center text-center min-h-[110px] shadow-2xs group relative"
+      >
+        <div className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#166534] dark:text-[#86efac]">
+          <span>REF {refNum}</span>
+          <Plus className="h-3.5 w-3.5 text-[#16a34a] dark:text-[#4ade80] transition-transform group-hover:scale-125" />
+        </div>
+
+        <div className="my-auto py-1">
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wide text-[#14532d] dark:text-[#86efac] block">
+            DISPONIBLE
+          </span>
+        </div>
+
+        <span className="text-[10px] text-[#16a34a] dark:text-[#4ade80] font-bold">
+          + Asignar
+        </span>
+      </button>
+    );
+  };
+
+  // Renderizar casillero de sobrecupo (renderizado POR DEBAJO de la fila, en azul pizarra/cielo no saturado)
+  const renderExtraSlot = (refNum: number, row: typeof matrizHorarios[0]) => {
+    const item = row.camillasMap[refNum];
+
+    // CASO 1: LUGAR EXTRA OCUPADO POR ALUMNA
+    if (item && item.alumna) {
+      const alumna = item.alumna;
+      const alumnaNombre =
+        `${alumna.first_name || ''} ${alumna.last_name || ''}`.trim() || 'Alumna';
+      const phone = alumna.phone || '';
+      const statusAsistencia = asistencias[item.caId];
+
+      const isOtherProfesora =
+        item.is_other_profesora ||
+        (isProfesoraView &&
+          currentProfesoraId &&
+          alumna.profesora_id &&
+          alumna.profesora_id !== currentProfesoraId);
+
+      if (isProfesoraView && isOtherProfesora) {
+        return (
+          <div
+            key={refNum}
+            className="p-3 rounded-xl bg-[var(--bg-tertiary)]/60 border-2 border-dashed border-[var(--border-default)] flex flex-col justify-between min-h-[110px] text-left opacity-75 select-none"
+          >
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1">
+                <span>REF {refNum} EXTRA</span>
+                {onDecrementCapacity && row.clase && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuitarLugarExtra(row.clase!, refNum, alumnaNombre);
+                    }}
+                    className="p-1 rounded-md bg-rose-500/10 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors cursor-pointer"
+                    title="Quitar este lugar extra"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <span className="font-bold text-[12px] text-[var(--text-muted)] leading-tight flex items-center gap-1.5 mt-0.5">
+                <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Ocupado
+              </span>
+              <span className="text-[10px] text-[var(--text-muted)] block mt-1 font-medium italic">
+                Otra profesora
+              </span>
+            </div>
+            <div className="mt-2 text-[10px] text-[var(--text-muted)] font-mono">
+              No asignada a tu cargo
+            </div>
+          </div>
+        );
+      }
+
+      const dueDate = alumna.billing_due_date;
+      let vencimientoTexto = 'Sin vencimiento';
+      let vencimientoColor = 'text-[var(--text-muted)]';
+      let isAlDia = false;
+
+      if (alumna.monthly_paid) {
+        if (dueDate) {
+          const cleanDue = dueDate.slice(0, 10);
+          const [y, m, d] = cleanDue.split('-').map(Number);
+          if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+            const vencObj = new Date(y, m - 1, d);
+            const [hy, hm, hd] = hoyStr.split('-').map(Number);
+            const hoyObj = new Date(hy, hm - 1, hd);
+            const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
+
+            if (diffDias < 0) {
+              vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
+              vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+              isAlDia = false;
+            } else if (diffDias <= 5) {
+              vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
+              vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
+              isAlDia = true;
+            } else {
+              vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
+              vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+              isAlDia = true;
+            }
+          }
+        } else {
+          isAlDia = true;
+          vencimientoTexto = 'Cuota al día';
+          vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
+        }
+      } else {
+        isAlDia = false;
+        if (alumna.enrollment_paid) {
+          vencimientoTexto = 'Inscripción paga · Cuota mensual pendiente';
+          vencimientoColor = 'text-amber-700 dark:text-amber-400 font-bold';
+        } else {
+          vencimientoTexto = 'Cuota pendiente';
+          vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
+        }
+      }
+
+      return (
+        <div
+          key={refNum}
+          onClick={() => {
+            if (onSelectOccupiedSlot) {
+              onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+            } else if (row.clase) {
+              onSelectClase(row.clase);
+            }
+          }}
+          className="p-3 rounded-xl bg-[#f0f7fb] dark:bg-[#0c1b26] border-2 border-sky-400/80 dark:border-sky-500/70 hover:border-sky-500 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+        >
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-sky-800 dark:text-sky-300 mb-1">
+              <div className="flex items-center gap-1.5">
+                <span>REF {refNum}</span>
+                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-800 dark:text-sky-200 border border-sky-500/30">
+                  Lugar Extra
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {statusAsistencia === 'PRESENT' && (
+                  <span className="px-1.5 py-0.5 rounded bg-yellow-200 dark:bg-yellow-950 text-yellow-900 dark:text-yellow-200 text-[9px] font-bold">
+                    ✓ Presente
+                  </span>
+                )}
+                {statusAsistencia === 'ABSENT' && (
+                  <span className="px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-950 text-rose-900 dark:text-rose-200 text-[9px] font-bold">
+                    ✗ Ausente
+                  </span>
+                )}
+                {statusAsistencia === 'RECOVERY' && (
+                  <span className="px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-200 text-[9px] font-bold">
+                    ↻ Recupera
+                  </span>
+                )}
+                {onDecrementCapacity && row.clase && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuitarLugarExtra(row.clase!, refNum, alumnaNombre);
+                    }}
+                    className="p-1 rounded-md bg-rose-500/10 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors cursor-pointer shadow-2xs ml-1"
+                    title="Quitar este lugar extra"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <span className="font-extrabold text-[13px] text-[var(--text-primary)] leading-tight block">
+              {alumnaNombre}
+            </span>
+
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+              <span className={`text-[10px] ${vencimientoColor}`}>
+                {vencimientoTexto}
+              </span>
+              {!statusAsistencia && (
+                <span className="text-[10px] text-sky-700 dark:text-sky-300 font-medium">
+                  • Sin marcar
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2 space-y-1.5">
+            <span className="text-[11px] text-[var(--text-secondary)] font-mono block truncate">
+              {phone || 'Sin tel'}
+            </span>
+            {renderBotonCobroOAlDia(alumna, isAlDia, row, refNum, item, 'bg-sky-700 hover:bg-sky-800 dark:bg-sky-600 dark:hover:bg-sky-700')}
+          </div>
+        </div>
+      );
+    }
+
+    // CASO 2: LUGAR EXTRA DISPONIBLE
+    return (
+      <button
+        key={refNum}
+        type="button"
+        onClick={() => {
+          if (row.clase && onOpenAssignModal) {
+            onOpenAssignModal(row.clase, refNum);
+          } else if (onSelectEmptySlot) {
+            onSelectEmptySlot(selectedDay, row.hora, refNum);
+          }
+        }}
+        className="p-3 rounded-xl bg-[#f0f9ff] dark:bg-[#0b1b26] hover:bg-[#e0f2fe] dark:hover:bg-[#102436] border-2 border-dashed border-sky-400 dark:border-sky-500/70 hover:border-sky-600 dark:hover:border-sky-400 transition-all cursor-pointer flex flex-col justify-between items-center text-center min-h-[110px] shadow-2xs group relative"
+      >
+        <div className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-sky-800 dark:text-sky-300">
+          <div className="flex items-center gap-1">
+            <span>REF {refNum}</span>
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-sky-500/15 text-sky-800 dark:text-sky-200 border border-sky-500/30">
+              Lugar Extra
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {onDecrementCapacity && row.clase && (
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleQuitarLugarExtra(row.clase!, refNum);
+                }}
+                className="p-1 rounded-md bg-rose-500/10 hover:bg-rose-600 text-rose-600 hover:text-white transition-colors cursor-pointer shadow-2xs z-10"
+                title="Quitar este lugar extra"
+              >
+                <X className="h-3.5 w-3.5" />
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="my-auto py-1">
+          <span className="text-xs sm:text-[13px] font-black uppercase tracking-wide text-sky-900 dark:text-sky-200 block">
+            DISPONIBLE EXTRA
+          </span>
+        </div>
+
+        <span className="text-[10px] text-sky-700 dark:text-sky-400 font-bold">
+          + Asignar
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-6 text-[var(--text-primary)] w-full">
@@ -300,6 +1023,12 @@ export function ReformerMatrixView({
             <RotateCcw className="h-3 w-3 text-[#4f46e5] dark:text-[#a5b4fc]" />
             <span>Recupera</span>
           </div>
+
+          {/* Lugar Extra */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-[#f0f9ff] dark:bg-[#0b1b26] text-sky-800 dark:text-sky-300 border border-sky-400 font-bold text-[11px]">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500 shrink-0" />
+            <span>Lugar Extra</span>
+          </div>
         </div>
       </div>
 
@@ -347,7 +1076,7 @@ export function ReformerMatrixView({
         </div>
       </div>
 
-      {/* 4. MATRIZ DE TURNOS CON ENCABEZADOS DE COLUMNA (Estilo Captura 2) */}
+      {/* 4. MATRIZ DE TURNOS CON ENCABEZADOS DE COLUMNA */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight">
@@ -358,8 +1087,8 @@ export function ReformerMatrixView({
           </span>
         </div>
 
-        {/* Barra de Encabezados de Columnas (Hora + Reformer 1 a N) */}
-        <div className={`hidden lg:grid ${effectiveMaxCamillas === 4 ? 'grid-cols-[100px_repeat(4,1fr)]' : 'grid-cols-[100px_repeat(6,1fr)]'} gap-2.5 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl text-xs font-black uppercase tracking-wider text-[var(--text-secondary)] text-center`}>
+        {/* Barra de Encabezados de Columnas Fijas (Hora + Reformer 1 a baseCamillas) */}
+        <div className={`hidden lg:grid ${headerGridColsClass} gap-2.5 px-3 py-2 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-xl text-xs font-black uppercase tracking-wider text-[var(--text-secondary)] text-center`}>
           <div className="text-left pl-2">Hora</div>
           {camillasList.map((num) => (
             <div key={num}>Reformer {num}</div>
@@ -382,518 +1111,136 @@ export function ReformerMatrixView({
           </div>
         ) : (
           matrizHorarios.map((row) => (
-          <div
-            key={row.hora}
-            className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 sm:p-4 shadow-sm space-y-3 transition-colors hover:border-[var(--border-hover)]"
-          >
-            {/* Header del Horario para Mobile */}
-            <div className="flex lg:hidden items-center justify-between border-b border-[var(--border-default)] pb-2.5">
-              <div className="flex items-center gap-2.5">
-                <span className="px-3.5 py-1 rounded-[22px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-xs font-mono font-bold">
-                  {row.hora} hs
-                </span>
-                {row.clase?.profesora ? (
-                  <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <User className="h-3 w-3" />
-                    Profe {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
+            <div
+              key={row.hora}
+              className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 sm:p-4 shadow-sm space-y-3 transition-colors hover:border-[var(--border-hover)]"
+            >
+              {/* Header del Horario para Mobile */}
+              <div className="flex lg:hidden items-center justify-between border-b border-[var(--border-default)] pb-2.5">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-3.5 py-1 rounded-[22px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-xs font-mono font-bold">
+                    {row.hora} hs
                   </span>
-                ) : (
-                  <span className="text-[10px] text-[var(--text-muted)] italic">
-                    Sin profe asignada
-                  </span>
-                )}
-              </div>
+                  {row.clase?.profesora ? (
+                    <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 bg-amber-500/15 border border-amber-500/25 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      Profe {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-[var(--text-muted)] italic">
+                      Sin profe asignada
+                    </span>
+                  )}
+                </div>
 
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-bold text-[var(--text-primary)]">
-                  {row.ocupadosHora} / {effectiveMaxCamillas} ocupados
-                </span>
-                <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    row.ocupadosHora >= effectiveMaxCamillas
-                      ? 'bg-[#ef4444]'
-                      : row.ocupadosHora > 0
-                      ? 'bg-[#f59e0b]'
-                      : 'bg-[#22c55e]'
-                  }`}
-                />
-              </div>
-            </div>
-
-            {/* Fila Grid de Horario + Reformers */}
-            <div className={`grid grid-cols-2 sm:grid-cols-3 ${effectiveMaxCamillas === 4 ? 'lg:grid-cols-[100px_repeat(4,1fr)]' : 'lg:grid-cols-[100px_repeat(6,1fr)]'} gap-2.5 items-stretch`}>
-              {/* Bloque Hora en desktop */}
-              <div className="hidden lg:flex flex-col justify-center items-start pl-2">
-                <span className="px-3 py-1.5 rounded-xl bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-sm font-mono font-black shadow-2xs">
-                  {row.hora}
-                </span>
-                <span className="text-[10px] text-[var(--text-muted)] font-semibold mt-1">
-                  {row.ocupadosHora}/{effectiveMaxCamillas} ocupados
-                </span>
-                {row.clase?.profesora ? (
-                  <span
-                    className="text-[10px] font-extrabold text-[var(--color-wood)] truncate max-w-[90px] mt-0.5 flex items-center gap-0.5"
-                    title={`Profesora: ${row.clase.profesora.full_name || row.clase.profesora.first_name}`}
-                  >
-                    <User className="h-2.5 w-2.5 shrink-0 text-amber-600" />
-                    {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
-                  </span>
-                ) : (
-                  <span className="text-[9px] text-[var(--text-muted)] italic mt-0.5">
-                    Sin profe
-                  </span>
-                )}
-              </div>
-
-              {camillasList.map((refNum) => {
-                const item = row.camillasMap[refNum];
-
-                // CASO 1: LUGAR OCUPADO POR ALUMNA (ESTILO CAPTURA 2)
-                if (item && item.alumna) {
-                  const alumna = item.alumna;
-                  const alumnaNombre =
-                    `${alumna.first_name || ''} ${alumna.last_name || ''}`.trim() || 'Alumna';
-                  const phone = alumna.phone || '';
-                  const statusAsistencia = asistencias[item.caId];
-
-                  // 0. Si es vista de profesora y la alumna pertenece a otra profesora, enmascarar slot
-                  const isOtherProfesora =
-                    item.is_other_profesora ||
-                    (isProfesoraView &&
-                      currentProfesoraId &&
-                      alumna.profesora_id &&
-                      alumna.profesora_id !== currentProfesoraId);
-
-                  if (isProfesoraView && isOtherProfesora) {
-                    return (
-                      <div
-                        key={refNum}
-                        className="p-3 rounded-xl bg-[var(--bg-tertiary)]/60 border-2 border-dashed border-[var(--border-default)] flex flex-col justify-between min-h-[110px] text-left opacity-75 select-none"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-muted)] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
-                          </div>
-                          <span className="font-bold text-[12px] text-[var(--text-muted)] leading-tight flex items-center gap-1.5 mt-0.5">
-                            <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" /> Ocupado
-                          </span>
-                          <span className="text-[10px] text-[var(--text-muted)] block mt-1 font-medium italic">
-                            Otra profesora
-                          </span>
-                        </div>
-                        <div className="mt-2 text-[10px] text-[var(--text-muted)] font-mono">
-                          No asignada a tu cargo
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Cálculo de vencimiento y estado de cuota
-                  const hoyStr = getLocalDateISO();
-                  const dueDate = alumna.billing_due_date;
-                  let vencimientoTexto = 'Sin vencimiento';
-                  let vencimientoColor = 'text-[var(--text-muted)]';
-                  let isAlDia = false;
-
-                  if (alumna.monthly_paid) {
-                    if (dueDate) {
-                      const cleanDue = dueDate.slice(0, 10);
-                      const [y, m, d] = cleanDue.split('-').map(Number);
-                      if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-                        const vencObj = new Date(y, m - 1, d);
-                        const [hy, hm, hd] = hoyStr.split('-').map(Number);
-                        const hoyObj = new Date(hy, hm - 1, hd);
-                        const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
-
-                        if (diffDias < 0) {
-                          vencimientoTexto = `Venció: ${formatFechaCorta(dueDate)}`;
-                          vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
-                          isAlDia = false;
-                        } else if (diffDias <= 5) {
-                          vencimientoTexto = diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`;
-                          vencimientoColor = 'text-amber-600 dark:text-amber-400 font-bold';
-                          isAlDia = true;
-                        } else {
-                          vencimientoTexto = `Vence: ${formatFechaCorta(dueDate)}`;
-                          vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
-                          isAlDia = true;
-                        }
-                      }
-                    } else {
-                      isAlDia = true;
-                      vencimientoTexto = 'Cuota al día';
-                      vencimientoColor = 'text-emerald-700 dark:text-emerald-400 font-semibold';
-                    }
-                  } else {
-                    // La cuota mensual NO fue abonada todavía
-                    isAlDia = false;
-                    if (alumna.enrollment_paid) {
-                      vencimientoTexto = 'Inscripción paga · Cuota mensual pendiente';
-                      vencimientoColor = 'text-amber-700 dark:text-amber-400 font-bold';
-                    } else {
-                      vencimientoTexto = 'Cuota pendiente';
-                      vencimientoColor = 'text-rose-600 dark:text-rose-400 font-bold';
-                    }
-                  }
-
-                  const renderBotonCobroOAlDia = (btnCustomColor?: string) => {
-                    if (isAlDia) {
-                      return (
-                        <div className="w-full py-1 px-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-[11px] font-bold flex items-center justify-center gap-1 shadow-2xs">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
-                          <span>Cuota al día</span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onCobrar) {
-                            onCobrar(alumna);
-                          } else if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          }
-                        }}
-                        className={`w-full py-1 px-2 rounded-lg ${btnCustomColor || 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 shadow-2xs transition-transform active:scale-95 cursor-pointer`}
-                      >
-                        <CreditCard className="h-3.5 w-3.5" />
-                        <span>Cobrar Cuota</span>
-                      </button>
-                    );
-                  };
-
-                  // Evaluar si es clase individual, clase de prueba o solo inscripción
-                  const isClaseIndividualOInscripcion =
-                    alumna.plan === 'Solo Inscripción / Clase de prueba' ||
-                    (alumna.plan && alumna.plan.toLowerCase().includes('individual')) ||
-                    (alumna.plan && alumna.plan.toLowerCase().includes('prueba')) ||
-                    (alumna.plan && alumna.plan.toLowerCase().includes('inscripci')) ||
-                    (alumna.enrollment_paid && (!alumna.plan_amount || alumna.plan_amount === 0));
-
-                  // CASO MORADO: Clase individual o sólo inscripción
-                  if (isClaseIndividualOInscripcion) {
-                    return (
-                      <div
-                        key={refNum}
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-xl bg-[#faf5ff] dark:bg-[#1e102d] border-2 border-[#9333ea] hover:border-[#7e22ce] dark:border-[#a855f7] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#7e22ce] dark:text-[#d8b4fe] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
-                            {statusAsistencia === 'PRESENT' && (
-                              <span className="px-1.5 py-0.5 rounded bg-purple-200 dark:bg-purple-950 text-purple-900 dark:text-purple-200 text-[9px] font-bold">
-                                ✓ Presente
-                              </span>
-                            )}
-                            {statusAsistencia === 'ABSENT' && (
-                              <span className="px-1.5 py-0.5 rounded bg-rose-200 dark:bg-rose-950 text-rose-900 dark:text-rose-200 text-[9px] font-bold">
-                                ✗ Ausente
-                              </span>
-                            )}
-                            {statusAsistencia === 'RECOVERY' && (
-                              <span className="px-1.5 py-0.5 rounded bg-indigo-200 dark:bg-indigo-950 text-indigo-900 dark:text-indigo-200 text-[9px] font-bold">
-                                ↻ Recupera
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Nombre de la Alumna en negrita */}
-                          <span className="font-extrabold text-[13px] text-[#581c87] dark:text-[#f3e8ff] leading-tight block">
-                            {alumnaNombre}
-                          </span>
-
-                          {/* Vencimiento y subtítulo */}
-                          <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                            <span className={`text-[10px] ${vencimientoColor}`}>
-                              {vencimientoTexto}
-                            </span>
-                            {!statusAsistencia && (
-                              <span className="text-[10px] text-[#7e22ce] dark:text-[#d8b4fe] font-medium">
-                                • Sin marcar
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="mt-2 space-y-1.5">
-                          <span className="text-[11px] text-[#7e22ce] dark:text-[#c4b5fd] font-mono block truncate">
-                            {phone || 'Sin tel'}
-                          </span>
-
-                          {renderBotonCobroOAlDia('bg-purple-600 hover:bg-purple-700')}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Evaluar si es pendiente de inicio (fecha futura)
-                  const fechaInicio = alumna.billing_start_date || alumna.start_date || alumna.entry_date;
-                  const fechaReferencia = fechaAsistencia || hoyStr;
-                  const isPendienteInicio =
-                    (fechaInicio && fechaInicio > fechaReferencia) ||
-                    alumna.status === 'PENDING' ||
-                    item.status === 'PENDING';
-
-                  // Estilo violeta para pendiente de inicio
-                  if (isPendienteInicio) {
-                    return (
-                      <div
-                        key={refNum}
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-xl bg-[#f5f3ff] dark:bg-[#231c3b] border-2 border-[#c084fc] hover:border-[#a855f7] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#6b21a8] dark:text-[#d8b4fe] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="hidden lg:inline text-[9px] opacity-75">Reformer {refNum}</span>
-                          </div>
-
-                          {/* Nombre en negrita */}
-                          <span className="font-extrabold text-[13px] text-[#4c1d95] dark:text-[#f3e8ff] leading-tight block">
-                            {alumnaNombre}
-                          </span>
-
-                          {/* Vencimiento */}
-                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
-                            {vencimientoTexto}
-                          </span>
-
-                          {/* Badge Violeta Pendiente de Inicio */}
-                          <div className="mt-1.5 inline-block px-2 py-0.5 rounded-md bg-[#ede9fe] dark:bg-[#4c1d95] text-[#5b21b6] dark:text-[#ddd6fe] text-[10px] font-bold">
-                            Pendiente de inicio {fechaInicio ? `– Comienza ${formatFechaCorta(fechaInicio)}` : ''}
-                          </div>
-                        </div>
-
-                        {/* Teléfono y Acción de Cobro */}
-                        <div className="mt-2 space-y-1.5">
-                          <span className="text-[11px] font-medium text-[#6b21a8] dark:text-[#c4b5fd] block truncate">
-                            {phone || 'Sin teléfono'}
-                          </span>
-
-                          {renderBotonCobroOAlDia('bg-purple-700 hover:bg-purple-800')}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Estilo Presente (Amarillo)
-                  if (statusAsistencia === 'PRESENT') {
-                    return (
-                      <div
-                        key={refNum}
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-xl bg-[#fefce8] dark:bg-[#261f0b] border-2 border-[#eab308] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#854d0e] dark:text-[#fde047] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-[#fef08a] dark:bg-[#4d3e10] text-[#854d0e] dark:text-[#fde047] text-[9px] font-bold">
-                              ✓ Presente
-                            </span>
-                          </div>
-                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
-                            {alumnaNombre}
-                          </span>
-                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
-                            {vencimientoTexto}
-                          </span>
-                        </div>
-                        <div className="mt-2 space-y-1.5">
-                          <div className="text-[11px] font-medium text-[#854d0e] dark:text-[#fde047] truncate">
-                            {phone || 'Asistencia confirmada'}
-                          </div>
-
-                          {renderBotonCobroOAlDia()}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Estilo Ausente (Rojo)
-                  if (statusAsistencia === 'ABSENT') {
-                    return (
-                      <div
-                        key={refNum}
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-xl bg-[#fff1f2] dark:bg-[#271015] border-2 border-[#f43f5e] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#9f1239] dark:text-[#fda4af] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-[#fecdd3] dark:bg-[#4c0519] text-[#9f1239] dark:text-[#fda4af] text-[9px] font-bold">
-                              ✗ Ausente
-                            </span>
-                          </div>
-                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
-                            {alumnaNombre}
-                          </span>
-                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
-                            {vencimientoTexto}
-                          </span>
-                        </div>
-                        <div className="mt-2 space-y-1.5">
-                          <div className="text-[11px] font-medium text-[#9f1239] dark:text-[#fda4af] truncate">
-                            {phone || 'Falta registrada'}
-                          </div>
-                          {renderBotonCobroOAlDia()}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Estilo Recupera (Índigo)
-                  if (statusAsistencia === 'RECOVERY') {
-                    return (
-                      <div
-                        key={refNum}
-                        onClick={() => {
-                          if (onSelectOccupiedSlot) {
-                            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                          } else if (row.clase) {
-                            onSelectClase(row.clase);
-                          }
-                        }}
-                        className="p-3 rounded-xl bg-[#eef2ff] dark:bg-[#13122b] border-2 border-[#6366f1] hover:brightness-95 transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#3730a3] dark:text-[#c7d2fe] mb-1">
-                            <span className="lg:hidden">REF {refNum}</span>
-                            <span className="px-1.5 py-0.5 rounded bg-[#e0e7ff] dark:bg-[#312e81] text-[#3730a3] dark:text-[#c7d2fe] text-[9px] font-bold">
-                              ↻ Recupera
-                            </span>
-                          </div>
-                          <span className="font-extrabold text-[13px] text-[#1e1b18] dark:text-[#ffffff] leading-tight block">
-                            {alumnaNombre}
-                          </span>
-                          <span className={`text-[10px] block mt-0.5 ${vencimientoColor}`}>
-                            {vencimientoTexto}
-                          </span>
-                        </div>
-                        <div className="mt-2 space-y-1.5">
-                          <div className="text-[11px] font-medium text-[#3730a3] dark:text-[#c7d2fe] truncate">
-                            {phone || 'Turno recuperatorio'}
-                          </div>
-                          {renderBotonCobroOAlDia()}
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  // Estilo Estándar / Sin Marcar
-                  return (
-                    <div
-                      key={refNum}
-                      onClick={() => {
-                        if (onSelectOccupiedSlot) {
-                          onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-                        } else if (row.clase) {
-                          onSelectClase(row.clase);
-                        }
+                <div className="flex items-center gap-2 text-xs">
+                  {onIncrementCapacity && row.clase && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIncrementCapacity(row.clase!.id);
                       }}
-                      className="p-3 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--border-default)] hover:border-[var(--color-wood)] transition-all cursor-pointer flex flex-col justify-between min-h-[110px] text-left shadow-2xs group relative"
+                      disabled={(row.clase.max_capacity || baseCamillas) >= 12}
+                      className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5 transition-all cursor-pointer disabled:opacity-50"
+                      title="Añadir +1 lugar extra a este turno"
                     >
-                      <div>
-                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[var(--text-secondary)] mb-1">
-                          <span className="lg:hidden">REF {refNum}</span>
-                          <span className="hidden lg:inline text-[9px] opacity-60">Reformer {refNum}</span>
-                        </div>
+                      <Plus className="h-2.5 w-2.5" />
+                      <span>+1 lugar</span>
+                    </button>
+                  )}
+                  <span className="font-bold text-[var(--text-primary)]">
+                    {row.ocupadosHora} / {row.clase?.max_capacity || baseCamillas} ocupados
+                  </span>
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      row.ocupadosHora >= (row.clase?.max_capacity || baseCamillas)
+                        ? 'bg-[#ef4444]'
+                        : row.ocupadosHora > 0
+                        ? 'bg-[#f59e0b]'
+                        : 'bg-[#22c55e]'
+                    }`}
+                  />
+                </div>
+              </div>
 
-                        {/* Nombre de la Alumna en negrita */}
-                        <span className="font-bold text-[13px] text-[var(--text-primary)] leading-tight block">
-                          {alumnaNombre}
-                        </span>
+              {/* Fila Grid de Horario + Reformers Base (1 a baseCamillas) */}
+              <div className={`grid grid-cols-2 sm:grid-cols-3 ${gridColsClass} gap-2.5 items-stretch`}>
+                {/* Bloque Hora en desktop */}
+                <div className="hidden lg:flex flex-col justify-center items-start pl-2">
+                  <span className="px-3 py-1.5 rounded-xl bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] text-sm font-mono font-black shadow-2xs">
+                    {row.hora}
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] font-semibold mt-1">
+                    {row.ocupadosHora}/{row.clase?.max_capacity || baseCamillas} ocupados
+                  </span>
+                  {row.clase?.profesora ? (
+                    <span
+                      className="text-[10px] font-extrabold text-[var(--color-wood)] truncate max-w-[90px] mt-0.5 flex items-center gap-0.5"
+                      title={`Profesora: ${row.clase.profesora.full_name || row.clase.profesora.first_name}`}
+                    >
+                      <User className="h-2.5 w-2.5 shrink-0 text-amber-600" />
+                      {row.clase.profesora.first_name || row.clase.profesora.full_name?.split(' ')[0]}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-[var(--text-muted)] italic mt-0.5">
+                      Sin profe
+                    </span>
+                  )}
 
-                        {/* Vencimiento y Subtítulo: Sin marcar */}
-                        <div className="flex items-center gap-1 flex-wrap mt-0.5">
-                          <span className={`text-[10px] ${vencimientoColor}`}>
-                            {vencimientoTexto}
-                          </span>
-                          {!statusAsistencia && (
-                            <span className="text-[10px] text-[var(--text-muted)] font-medium">
-                              • Sin marcar
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                  {onIncrementCapacity && row.clase && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onIncrementCapacity(row.clase!.id);
+                      }}
+                      disabled={(row.clase.max_capacity || baseCamillas) >= 12}
+                      className="mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-0.5 transition-all cursor-pointer disabled:opacity-50"
+                      title="Añadir +1 lugar extra a este turno"
+                    >
+                      <Plus className="h-2.5 w-2.5" />
+                      <span>+1 lugar</span>
+                    </button>
+                  )}
+                </div>
 
-                      <div className="mt-2 space-y-1.5">
-                        {/* Teléfono */}
-                        <span className="text-[11px] text-[var(--text-secondary)] font-mono block truncate">
-                          {phone || 'Sin tel'}
-                        </span>
+                {/* Renderizar casilleros base (Reformer 1 a baseCamillas) */}
+                {camillasList.map((refNum) => renderSlot(refNum, row))}
+              </div>
 
-                        {/* Botón dinámico Cobrar / Al día */}
-                        {renderBotonCobroOAlDia()}
-                      </div>
-                    </div>
-                  );
-                }
-
-
-                // CASO 2: LUGAR DISPONIBLE
-                return (
-                  <button
-                    key={refNum}
-                    type="button"
-                    onClick={() => {
-                      if (row.clase && onOpenAssignModal) {
-                        onOpenAssignModal(row.clase, refNum);
-                      } else if (onSelectEmptySlot) {
-                        onSelectEmptySlot(selectedDay, row.hora, refNum);
-                      }
-                    }}
-                    className="p-3 rounded-xl bg-[#f4fdf8] dark:bg-[#0c1f17] hover:bg-[#e8fbf0] dark:hover:bg-[#122e23] border-2 border-dashed border-[#16a34a] dark:border-[#22c55e] transition-all cursor-pointer flex flex-col justify-between items-center text-center min-h-[110px] shadow-2xs group"
-                  >
-                    <div className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#166534] dark:text-[#86efac]">
-                      <span>REF {refNum}</span>
-                      <Plus className="h-3.5 w-3.5 text-[#16a34a] dark:text-[#4ade80] transition-transform group-hover:scale-125" />
-                    </div>
-
-                    <div className="my-auto py-1">
-                      <span className="text-xs sm:text-[13px] font-black uppercase tracking-wide text-[#14532d] dark:text-[#86efac] block">
-                        DISPONIBLE
+              {/* SECCIÓN LUGAR EXTRA POR DEBAJO (Solo si este turno específico tiene cupo mayor al base) */}
+              {row.clase && (row.clase.max_capacity || baseCamillas) > baseCamillas && (
+                <div className="pt-3 border-t border-[var(--border-default)]/60">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-sky-800 dark:text-sky-300 bg-sky-500/10 dark:bg-sky-950/50 border border-sky-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                        Lugar Extra ({(row.clase.max_capacity || baseCamillas) - baseCamillas})
+                      </span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-medium hidden sm:inline">
+                        Excepción exclusiva de este turno ({row.hora} hs)
                       </span>
                     </div>
+                  </div>
 
-                    <span className="text-[10px] text-[#16a34a] dark:text-[#4ade80] font-bold">
-                      + Asignar
-                    </span>
-                  </button>
-                );
-              })}
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 ${gridColsClass} gap-2.5 items-stretch`}>
+                    {/* Espaciador alineado con la columna de hora en desktop */}
+                    <div className="hidden lg:flex flex-col justify-center items-end pr-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-sky-700 dark:text-sky-400">
+                        Extra
+                      </span>
+                    </div>
+                    {/* Renderizar cada slot extra */}
+                    {Array.from(
+                      { length: (row.clase.max_capacity || baseCamillas) - baseCamillas },
+                      (_, i) => baseCamillas + i + 1
+                    ).map((refNum) => renderExtraSlot(refNum, row))}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))
+          ))
         )}
       </div>
     </div>

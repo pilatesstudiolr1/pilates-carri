@@ -50,7 +50,7 @@ export function AsignarTurnoFijoModal({
   };
 
   const claseSeleccionada = clases.find((c) => c.id === selectedClaseId);
-  const maxCamillas = claseSeleccionada?.sede?.max_camillas || claseSeleccionada?.max_capacity || 6;
+  const maxCamillas = claseSeleccionada?.max_capacity || claseSeleccionada?.sede?.max_camillas || 6;
 
   // Camillas ya ocupadas en el turno seleccionado
   const camillaOcupadas = claseSeleccionada?.alumnas

@@ -148,15 +148,23 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
         <div className="flex items-center justify-between h-[var(--header-height)] px-4">
           <Link href="/portal" className="flex items-center gap-2.5 overflow-hidden group">
             <Image
-              src={theme === 'dark' ? '/media/LOGO BLANCO.webp' : '/media/LOGO.webp'}
+              src="/media/LOGO BLANCO.webp"
               alt="Pilates Studio Logo"
               width={140}
               height={38}
               priority
-              className="h-8 w-auto object-contain transition-transform group-hover:scale-102"
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-102 hidden dark:block"
+            />
+            <Image
+              src="/media/LOGO.webp"
+              alt="Pilates Studio Logo"
+              width={140}
+              height={38}
+              priority
+              className="h-8 w-auto object-contain transition-transform group-hover:scale-102 block dark:hidden"
             />
           </Link>
-          <span className="text-[10px] font-medium tracking-[0.08em] uppercase px-2 py-0.5 rounded-[22px] bg-[var(--color-meadow)] text-[var(--color-forest-ink)] border border-[var(--color-forest-ink)]">
+          <span className="text-[10px] font-semibold tracking-[0.08em] uppercase px-2.5 py-0.5 rounded-[22px] bg-[var(--badge-meadow-bg)] text-[var(--badge-meadow-text)] border border-[var(--badge-meadow-border)] shadow-2xs">
             {sidebarHeaderTitle}
           </span>
         </div>

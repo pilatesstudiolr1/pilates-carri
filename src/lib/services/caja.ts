@@ -5,6 +5,7 @@ import { deletePago } from '@/lib/services/pagos';
 
 export async function getMovimientos(options?: {
   sedeId?: string;
+  recordedBy?: string;
 }): Promise<{ data: CajaMovimiento[]; error: string | null }> {
   try {
     const supabase = createClient();
@@ -15,6 +16,10 @@ export async function getMovimientos(options?: {
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
       query = query.eq('sede_id', options.sedeId);
+    }
+
+    if (options?.recordedBy) {
+      query = query.eq('recorded_by', options.recordedBy);
     }
 
     const { data: rawMovs, error } = await query;
