@@ -191,9 +191,13 @@ function AlumnasPageContent() {
 
   const handleDarDeBajaAlumna = async (alumna: Alumna) => {
     const isOk = await confirm({
-      title: 'Dar de Baja a Alumna',
-      message: `¿Estás segura de dar de baja a ${alumna.first_name} ${alumna.last_name || ''}? La alumna pasará a estado Inactiva liberando sus turnos en la agenda, pero conservando toda su ficha médica e historial para cuando regrese.`,
-      confirmText: 'Sí, dar de baja',
+      title: 'Dar de Baja a Alumna (Liberar Turnos)',
+      message: `¿Estás segura de dar de baja a ${alumna.first_name} ${alumna.last_name || ''}?
+
+Al darla de baja, pasará a estado Inactiva y SE LIBERARÁN AUTOMÁTICAMENTE SUS TURNOS Y CAMILLAS en la agenda para que queden disponibles. Toda su ficha médica e historial se conservarán.
+
+⚠️ Importante: Si la alumna solo venció su plan o adeuda la cuota pero seguirá viniendo a clases, NO la des de baja. Déjala Activa y cobra su cuota.`,
+      confirmText: 'Sí, dar de baja y liberar turnos',
       variant: 'warning',
     });
     if (!isOk) return;

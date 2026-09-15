@@ -219,4 +219,56 @@ export function calculateNextDueDate(
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Retorna el día de la semana correspondiente (1 = Lunes, ..., 6 = Sábado, 7 = Domingo)
+ */
+export function getDayOfWeekFromDate(dateStr: string): number {
+  if (!dateStr) return 1;
+  const clean = dateStr.slice(0, 10);
+  const [y, m, d] = clean.split('-').map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return 1;
+  const date = new Date(y, m - 1, d);
+  const jsDay = date.getDay(); // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+/**
+ * Calcula la fecha ISO (YYYY-MM-DD) para un día específico de la semana (1 = Lunes, ..., 6 = Sábado)
+ * basándose en una fecha de referencia dentro de esa misma semana.
+ */
+export function getDateOfWeekDay(referenceDateStr: string, targetDayOfWeek: number): string {
+  if (!referenceDateStr) return getLocalDateISO();
+  const clean = referenceDateStr.slice(0, 10);
+  const [y, m, d] = clean.split('-').map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return getLocalDateISO();
+
+  const refDate = new Date(y, m - 1, d);
+  const currentDayOfWeek = refDate.getDay() === 0 ? 7 : refDate.getDay();
+  const diffDays = targetDayOfWeek - currentDayOfWeek;
+  refDate.setDate(refDate.getDate() + diffDays);
+
+  const ry = refDate.getFullYear();
+  const rm = String(refDate.getMonth() + 1).padStart(2, '0');
+  const rd = String(refDate.getDate()).padStart(2, '0');
+  return `${ry}-${rm}-${rd}`;
+}
+
+/**
+ * Suma o resta días a una fecha ISO en formato YYYY-MM-DD
+ */
+export function addDaysToDate(dateStr: string, days: number): string {
+  if (!dateStr) return getLocalDateISO();
+  const clean = dateStr.slice(0, 10);
+  const [y, m, d] = clean.split('-').map(Number);
+  if (isNaN(y) || isNaN(m) || isNaN(d)) return getLocalDateISO();
+
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  const ry = date.getFullYear();
+  const rm = String(date.getMonth() + 1).padStart(2, '0');
+  const rd = String(date.getDate()).padStart(2, '0');
+  return `${ry}-${rm}-${rd}`;
+}
+
+
 

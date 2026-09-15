@@ -21,7 +21,7 @@ import { Calendar, Plus, LayoutGrid, BedDouble, User, MessageCircle, Clock, Spar
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
-import { getLocalDateISO } from '@/lib/utils';
+import { getLocalDateISO, getDayOfWeekFromDate, getDateOfWeekDay } from '@/lib/utils';
 
 const DIAS = [
   { value: 1, label: 'Lunes' },
@@ -41,7 +41,10 @@ export default function AgendaPage() {
 
   const [viewMode, setViewMode] = useState<'REFORMER' | 'WEEK' | 'DISPONIBILIDAD'>('REFORMER');
 
-  const [selectedDay, setSelectedDay] = useState<number>(1);
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateISO());
+  const [selectedDay, setSelectedDay] = useState<number>(() => {
+    return getDayOfWeekFromDate(getLocalDateISO());
+  });
   const [profesoraFilter, setProfesoraFilter] = useState<string>('ALL');
 
   useEffect(() => {
@@ -101,15 +104,15 @@ export default function AgendaPage() {
     }
   }, []);
 
-  // Fetch asistencias para la fecha de hoy
-  const fetchAsistencias = useCallback(async () => {
+  // Fetch asistencias para la fecha especificada
+  const fetchAsistencias = useCallback(async (targetDate?: string) => {
     try {
       const supabase = createClient();
-      const fechaHoy = getLocalDateISO();
+      const fechaAUsar = targetDate || selectedDate || getLocalDateISO();
       const { data } = await supabase
         .from('asistencias')
         .select('clase_alumna_id, status')
-        .eq('date', fechaHoy);
+        .eq('date', fechaAUsar);
 
       if (data) {
         const map: Record<string, string> = {};
@@ -121,12 +124,25 @@ export default function AgendaPage() {
     } catch (err) {
       console.error('Error cargando asistencias:', err);
     }
-  }, []);
-
+  }, [selectedDate]);
 
   useEffect(() => {
-    fetchAsistencias();
-  }, [fetchAsistencias]);
+    fetchAsistencias(selectedDate);
+  }, [fetchAsistencias, selectedDate]);
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    const day = getDayOfWeekFromDate(newDate);
+    setSelectedDay(day);
+    fetchAsistencias(newDate);
+  };
+
+  const handleSelectDay = (day: number) => {
+    setSelectedDay(day);
+    const newDate = getDateOfWeekDay(selectedDate, day);
+    setSelectedDate(newDate);
+    fetchAsistencias(newDate);
+  };
 
   const handleCreateClase = async (data: {
     name: string;
@@ -345,6 +361,7 @@ export default function AgendaPage() {
     observaciones?: string;
     asistenciaStatus?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED';
     profesoraId?: string | null;
+    selectedDate?: string;
   }): Promise<boolean> => {
     try {
       let targetClaseId = data.claseId;
@@ -386,9 +403,10 @@ export default function AgendaPage() {
 
       await addAlumnaToClase(targetClaseId, data.alumnaId, data.camilla);
 
+      const fechaAsistencia = data.selectedDate || selectedDate || getLocalDateISO();
+
       if (data.asistenciaStatus) {
         const supabase = (await import('@/lib/supabase/client')).createClient();
-        const fechaHoy = getLocalDateISO();
 
         const { data: caData } = await supabase
           .from('clase_alumnas')
@@ -403,14 +421,14 @@ export default function AgendaPage() {
               .from('asistencias')
               .delete()
               .eq('clase_alumna_id', caData.id)
-              .eq('date', fechaHoy);
+              .eq('date', fechaAsistencia);
           } else {
             // Guardado seguro: verificar si ya existe registro para esa clase_alumna_id y fecha
             const { data: existingAsis } = await supabase
               .from('asistencias')
               .select('id')
               .eq('clase_alumna_id', caData.id)
-              .eq('date', fechaHoy)
+              .eq('date', fechaAsistencia)
               .maybeSingle();
 
             if (existingAsis?.id) {
@@ -426,7 +444,7 @@ export default function AgendaPage() {
                 .from('asistencias')
                 .insert({
                   clase_alumna_id: caData.id,
-                  date: fechaHoy,
+                  date: fechaAsistencia,
                   status: data.asistenciaStatus,
                   notes: data.observaciones || null,
                 });
@@ -458,7 +476,7 @@ export default function AgendaPage() {
         }
       }
 
-      await Promise.all([fetchAgenda(), fetchAsistencias()]);
+      await Promise.all([fetchAgenda(), fetchAsistencias(fechaAsistencia)]);
       return true;
     } catch (err: any) {
       await alertDialog({
@@ -628,7 +646,9 @@ export default function AgendaPage() {
         <ReformerMatrixView
           clases={clases}
           selectedDay={selectedDay}
-          onSelectDay={setSelectedDay}
+          onSelectDay={handleSelectDay}
+          selectedDate={selectedDate}
+          onDateChange={handleDateChange}
           currentProfesoraId={isProfesora && profile?.id ? profile.id : undefined}
           isProfesoraView={isProfesora}
           profesoraWorkHours={isProfesora ? profile?.work_hours : undefined}
@@ -672,6 +692,7 @@ export default function AgendaPage() {
         dayName={turnoModalDayName}
         presetTime={presetTime}
         presetCamilla={presetCamilla}
+        selectedDate={selectedDate}
         alumnaAsignada={selectedAlumnaAsignada}
         initialAsistenciaStatus={selectedAlumnaAsignada?.caId ? asistencias[selectedAlumnaAsignada.caId] : undefined}
         profesoras={profesoras}
