@@ -249,6 +249,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     roles: ['ADMIN'],
     section: 'Principal',
   },
+  {
+    label: 'Alumnas Inactivas',
+    href: '/alumnas-inactivas',
+    icon: 'UserX',
+    roles: ['ADMIN'],
+    section: 'Principal',
+  },
   // Seccion de Estetica deshabilitada momentaneamente a pedido del cliente
   // {
   //   label: 'Estética',
@@ -268,6 +275,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     label: 'Pagos',
     href: '/pagos',
     icon: 'CreditCard',
+    roles: ['ADMIN'],
+    section: 'Gestión',
+  },
+  {
+    label: 'Cobros Históricos',
+    href: '/cobros-historicos',
+    icon: 'History',
     roles: ['ADMIN'],
     section: 'Gestión',
   },

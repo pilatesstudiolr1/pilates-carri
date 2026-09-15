@@ -40,31 +40,36 @@ export default function DashboardLayout({
   }
 
   const userRole = profile?.role || 'ADMIN';
+  const isNoSidebar = pathname.startsWith('/cobros-historicos');
 
   return (
     <ToastProvider>
       <ConfirmProvider>
         <SedeProvider>
           <div className="min-h-screen">
-            {/* Desktop Sidebar */}
-            <div className="hidden lg:block">
-              <Sidebar userRole={userRole} profile={profile} />
-            </div>
+            {/* Desktop Sidebar (oculto en páginas que no llevan sidebar) */}
+            {!isNoSidebar && (
+              <div className="hidden lg:block">
+                <Sidebar userRole={userRole} profile={profile} />
+              </div>
+            )}
 
             {/* Mobile Nav */}
-            <MobileNav
-              open={mobileNavOpen}
-              onClose={() => setMobileNavOpen(false)}
-              userRole={userRole}
-            />
+            {!isNoSidebar && (
+              <MobileNav
+                open={mobileNavOpen}
+                onClose={() => setMobileNavOpen(false)}
+                userRole={userRole}
+              />
+            )}
 
             {/* Main content */}
-            <div className="lg:pl-[var(--sidebar-width)] transition-all duration-[var(--transition-slow)]">
+            <div className={isNoSidebar ? "w-full transition-all duration-[var(--transition-slow)]" : "lg:pl-[var(--sidebar-width)] transition-all duration-[var(--transition-slow)]"}>
               <Header
                 profile={profile}
-                onMenuClick={() => setMobileNavOpen(true)}
+                onMenuClick={isNoSidebar ? undefined : () => setMobileNavOpen(true)}
               />
-              <main className="p-3 sm:p-4 md:p-6">
+              <main className={isNoSidebar ? "p-4 sm:p-6 md:p-8 max-w-7xl mx-auto w-full" : "p-3 sm:p-4 md:p-6"}>
                 {children}
               </main>
             </div>

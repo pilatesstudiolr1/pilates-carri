@@ -840,6 +840,17 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
                     <option value="otro">Otro</option>
                   </select>
                 </div>
+
+                {/* Advertencia de registro de pago automático */}
+                <div className="sm:col-span-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                  <div>
+                    <p className="font-bold">Se registrará un pago de inscripción automáticamente</p>
+                    <p className="text-[11px] opacity-90 mt-0.5">
+                      Al guardar la alumna con esta casilla activada, se generará un cobro de <strong>${Number(montoInscripcion || 0).toLocaleString('es-AR')} ARS</strong> por inscripción en el módulo de Pagos y en la Caja del estudio. No es necesario volver a cobrarlo manualmente desde el módulo de Pagos.
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
           </div>

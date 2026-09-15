@@ -17,7 +17,6 @@ import { Alumna, Pago, CajaMovimiento, Clase, MetodoPago, AlumnaInsert, Profile 
 
 import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
-import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -75,8 +74,6 @@ export default function SimplifiedLatticeDashboard() {
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [selectedTurnoClase, setSelectedTurnoClase] = useState<Clase | null>(null);
   const [selectedTurnoPresetTime, setSelectedTurnoPresetTime] = useState<string>('08:00');
-  const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
-  const [selectedAlumnaParaCobro, setSelectedAlumnaParaCobro] = useState<Alumna | null>(null);
   const [isCajaModalOpen, setIsCajaModalOpen] = useState(false);
 
   // Estado del Modal de Caja Rápido
@@ -233,37 +230,6 @@ export default function SimplifiedLatticeDashboard() {
         return true;
       }
     }
-    return false;
-  };
-
-  const handleSavePago = async (pagoData: any) => {
-    let res = await registrarPago(pagoData);
-    if (res.error && res.error.includes('Ya existe un pago registrado')) {
-      const isConfirmed = await confirm({
-        title: 'Pago ya registrado en este período',
-        message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
-        confirmText: 'Sí, registrar de todos modos',
-        variant: 'warning',
-      });
-      if (isConfirmed) {
-        res = await registrarPago({ ...pagoData, allow_duplicate: true });
-      } else {
-        return false;
-      }
-    }
-
-    if (!res.error) {
-      setIsPagoModalOpen(false);
-      setSelectedAlumnaParaCobro(null);
-      loadDashboardData();
-      return true;
-    }
-
-    await alertDialog({
-      title: 'Error al registrar el pago',
-      message: res.error || 'Ocurrió un error inesperado al procesar el cobro',
-      variant: 'danger',
-    });
     return false;
   };
 
@@ -763,8 +729,8 @@ export default function SimplifiedLatticeDashboard() {
                               variant="primary"
                               icon={<CreditCard className="h-3.5 w-3.5" />}
                               onClick={() => {
-                                if (v.alumnaObj) setSelectedAlumnaParaCobro(v.alumnaObj);
-                                setIsPagoModalOpen(true);
+                                const alumnaId = v.alumnaObj?.id || v.id;
+                                window.location.href = `/pagos?alumnaId=${alumnaId}`;
                               }}
                             >
                               Cobrar
@@ -897,17 +863,6 @@ export default function SimplifiedLatticeDashboard() {
           onSave={handleSaveTurno}
         />
       )}
-
-      {/* MODAL 3: REGISTRAR COBRO */}
-      <PagoFormModal
-        open={isPagoModalOpen}
-        onClose={() => {
-          setIsPagoModalOpen(false);
-          setSelectedAlumnaParaCobro(null);
-        }}
-        onSubmit={handleSavePago}
-        initialAlumna={selectedAlumnaParaCobro}
-      />
 
       {/* MODAL 4: REGISTRAR MOVIMIENTO DE CAJA */}
       <Modal

@@ -3,7 +3,7 @@ import { Alumna, AlumnaInsert, AlumnaUpdate, AlumnaStatus } from '@/types/databa
 
 export async function getAlumnas(options?: {
   search?: string;
-  status?: AlumnaStatus | 'ALL';
+  status?: AlumnaStatus | 'ALL' | 'ACTIVE_AND_SUSPENDED';
   vencimientoFilter?: 'ALL' | 'OVERDUE' | 'UPCOMING';
   limit?: number;
   offset?: number;
@@ -24,7 +24,9 @@ export async function getAlumnas(options?: {
       query = query.eq('profesora_id', options.profesoraId);
     }
 
-    if (options?.status && options.status !== 'ALL') {
+    if (options?.status === 'ACTIVE_AND_SUSPENDED') {
+      query = query.in('status', ['ACTIVE', 'SUSPENDED']);
+    } else if (options?.status && options.status !== 'ALL') {
       query = query.eq('status', options.status);
     }
 

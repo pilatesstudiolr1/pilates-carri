@@ -10,7 +10,6 @@ import { TurnoModal } from '@/components/agenda/TurnoModal';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
-import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { Modal } from '@/components/ui/Modal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { Clase, Profile } from '@/types/database';
@@ -83,8 +82,6 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
-  const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
-  const [selectedAlumnaParaPago, setSelectedAlumnaParaPago] = useState<any | null>(null);
   const [pagoAvisoExitoso, setPagoAvisoExitoso] = useState<{ pago: any; alumna: any } | null>(null);
   const [isAvisoModalOpen, setIsAvisoModalOpen] = useState(false);
 
@@ -598,8 +595,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
             onIncrementCapacity={handleIncrementCapacity}
             onDecrementCapacity={handleDecrementCapacity}
             onCobrar={(alumna) => {
-              setSelectedAlumnaParaPago(alumna);
-              setIsPagoModalOpen(true);
+              window.location.href = `/profesora?tab=COBROS&alumnaId=${alumna.id}`;
             }}
             onSelectEmptySlot={(day: number, time: string, camilla?: number) =>
               handleAbrirTurnoModal(day, time, camilla || 1, null)
@@ -694,71 +690,6 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
         initialStartTime={presetTime}
         loading={submitting}
       />
-
-      {/* Modal de Cobro Directo */}
-      {isPagoModalOpen && (
-        <PagoFormModal
-          open={isPagoModalOpen}
-          onClose={() => {
-            setIsPagoModalOpen(false);
-            setSelectedAlumnaParaPago(null);
-            fetchAgenda();
-            fetchAsistencias();
-          }}
-          initialAlumna={selectedAlumnaParaPago}
-          defaultProfesoraId={profile?.id}
-          onSubmit={async (pagoData) => {
-            let res = await registrarPago({
-              ...pagoData,
-              profesora_id: profile?.id || pagoData.profesora_id,
-              recorded_by_id: profile?.id,
-              recorded_by_name: profile?.full_name,
-              sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
-              split_payment: pagoData.split_payment,
-            });
-
-            if (res.error && res.error.includes('Ya existe un pago registrado')) {
-              const isConfirmed = await confirm({
-                title: 'Pago ya registrado en este período',
-                message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
-                confirmText: 'Sí, registrar de todos modos',
-                variant: 'warning',
-              });
-              if (isConfirmed) {
-                res = await registrarPago({
-                  ...pagoData,
-                  profesora_id: profile?.id || pagoData.profesora_id,
-                  recorded_by_id: profile?.id,
-                  recorded_by_name: profile?.full_name,
-                  sede_id: pagoData.sede_id || selectedAlumnaParaPago?.sede_id || profile?.sede_id || undefined,
-                  split_payment: pagoData.split_payment,
-                  allow_duplicate: true,
-                });
-              } else {
-                return false;
-              }
-            }
-
-            if (res.data) {
-              const savedPago = res.data;
-              const currentAlumna = selectedAlumnaParaPago;
-              setIsPagoModalOpen(false);
-              setSelectedAlumnaParaPago(null);
-              setPagoAvisoExitoso({ pago: savedPago, alumna: currentAlumna });
-              setIsAvisoModalOpen(true);
-              await Promise.all([fetchAgenda(), fetchAsistencias()]);
-              return true;
-            } else {
-              await alertDialog({
-                title: 'Error al cobrar',
-                message: res.error || 'No se pudo registrar el pago',
-                variant: 'danger',
-              });
-              return false;
-            }
-          }}
-        />
-      )}
 
       {/* Modal de Aviso y Comprobante WhatsApp para Alumna */}
       {isAvisoModalOpen && pagoAvisoExitoso && (
