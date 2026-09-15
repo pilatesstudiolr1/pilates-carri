@@ -393,6 +393,29 @@ body {
 }
 
 /* ==========================================================================
+   SELECT & OPTION DARK MODE SUPPORT
+   ========================================================================== */
+select {
+  color-scheme: light;
+}
+
+[data-theme="dark"] select,
+.dark select {
+  color-scheme: dark !important;
+}
+
+select option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] select option,
+.dark select option {
+  background-color: #141c1c !important;
+  color: #f2f7f7 !important;
+}
+
+/* ==========================================================================
    PRINT STYLES FOR COMPROBANTES
    ========================================================================== */
 @media print {

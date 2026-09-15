@@ -20,9 +20,13 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { sedes, selectedSedeId, setSelectedSedeId, selectedSede, isTeacherLocked } = useSede();
 
-  const currentPage = NAVIGATION_ITEMS.find((item) =>
-    item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)
-  );
+  const currentPage = [...NAVIGATION_ITEMS]
+    .sort((a, b) => b.href.length - a.href.length)
+    .find((item) => {
+      const itemPath = item.href.split('?')[0];
+      if (itemPath === '/') return pathname === '/';
+      return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+    });
 
   return (
     <header className="sticky top-0 z-30 h-[var(--header-height)] bg-[var(--color-paper-white)]/90 backdrop-blur-md border-b border-[var(--border-default)] transition-colors duration-150">

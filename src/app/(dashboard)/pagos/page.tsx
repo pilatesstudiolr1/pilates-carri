@@ -1,14 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { ComprobantePagoModal } from '@/components/pagos/ComprobantePagoModal';
-import { Alumna, Pago, MetodoPago } from '@/types/database';
-import { getPagos, registrarPago, deletePago } from '@/lib/services/pagos';
+import { PagoForm } from '@/components/pagos/PagoForm';
+import { Alumna, Pago } from '@/types/database';
+import { getPagos, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { buildAvisoPagoWhatsAppMessage, getLocalDateISO } from '@/lib/utils';
 import { useUser } from '@/hooks/useUser';
@@ -34,21 +36,6 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { AlumnaCombobox } from '@/components/pagos/AlumnaCombobox';
-
-const getMesAbonadoStr = (dateStr?: string) => {
-  if (dateStr) return dateStr.slice(0, 7);
-  return getLocalDateISO().slice(0, 7);
-};
-
-const calculateNextDueDate = (dateStr: string) => {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const nextDate = new Date(y, m, d);
-  const nextY = nextDate.getFullYear();
-  const nextM = String(nextDate.getMonth() + 1).padStart(2, '0');
-  const nextD = String(nextDate.getDate()).padStart(2, '0');
-  return `${nextY}-${nextM}-${nextD}`;
-};
 
 const cleanAndFormatWhatsAppPhone = (phone?: string | null) => {
   if (!phone) return null;
@@ -66,7 +53,10 @@ const cleanAndFormatWhatsAppPhone = (phone?: string | null) => {
   return clean;
 };
 
-export default function PagosPage() {
+function PagosPageContent() {
+  const searchParams = useSearchParams();
+  const queryAlumnaId = searchParams.get('alumnaId');
+
   const { confirm, alert: alertDialog } = useConfirm();
   const { profile } = useUser();
   const { selectedSedeId, sedes } = useSede();
@@ -78,31 +68,14 @@ export default function PagosPage() {
   const [search, setSearch] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   // Modal Comprobante
   const [selectedComprobantePago, setSelectedComprobantePago] = useState<Pago | null>(null);
   const [isComprobanteModalOpen, setIsComprobanteModalOpen] = useState(false);
 
-  // Formulario Registrar Pago
-  const [selectedAlumnaId, setSelectedAlumnaId] = useState('');
-  const [tipoCobro, setTipoCobro] = useState<'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA'>('MENSUALIDAD');
-  const [concepto, setConcepto] = useState('Cuota mensualidad');
-  const [monto, setMonto] = useState('');
-  const [metodoPago, setMetodoPago] = useState<MetodoPago>('transferencia');
-  const [fechaPago, setFechaPago] = useState<string>(
-    () => getLocalDateISO()
-  );
-  const [mesAbonado, setMesAbonado] = useState(() => getLocalDateISO().slice(0, 7));
-  const [observaciones, setObservaciones] = useState('');
+  // Alumna seleccionada para el formulario dedicado de cobro
+  const [selectedAlumnaForPago, setSelectedAlumnaForPago] = useState<Alumna | null>(null);
   const [searchVencidas, setSearchVencidas] = useState('');
-
-  // Pago Combinado
-  const [esPagoCombinado, setEsPagoCombinado] = useState(false);
-  const [metodoPago1, setMetodoPago1] = useState<MetodoPago>('transferencia');
-  const [monto1, setMonto1] = useState('');
-  const [metodoPago2, setMetodoPago2] = useState<MetodoPago>('efectivo');
-  const [monto2, setMonto2] = useState('');
 
   // Paginación de Historial de Pagos
   const [currentPage, setCurrentPage] = useState(1);
@@ -140,210 +113,20 @@ export default function PagosPage() {
     setCurrentPage(1);
   }, [search, selectedSedeId]);
 
-  const updateSplitAmounts = (totalStr: string) => {
-    const totalNum = parseFloat(totalStr) || 0;
-    if (totalNum > 0) {
-      const half = Math.round(totalNum / 2);
-      setMonto1(String(half));
-      setMonto2(String(totalNum - half));
-    } else {
-      setMonto1('');
-      setMonto2('');
-    }
-  };
-
-  const handleMontoChange = (val: string) => {
-    setMonto(val);
-    if (esPagoCombinado) {
-      updateSplitAmounts(val);
-    }
-  };
-
-  const handleTipoCobroChange = (tipo: 'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA') => {
-    setTipoCobro(tipo);
-    const alum = alumnas.find((a) => a.id === selectedAlumnaId);
-    let newM = '';
-    if (tipo === 'INSCRIPCION') {
-      setConcepto('Matrícula de inscripción inicial');
-      newM = alum?.enrollment_amount ? String(alum.enrollment_amount) : '9500';
-    } else if (tipo === 'MENSUALIDAD') {
-      setConcepto(alum?.plan ? `Cuota mensualidad (${alum.plan})` : 'Cuota mensualidad');
-      if (alum?.plan_amount) {
-        newM = String(alum.plan_amount);
-      }
-    } else if (tipo === 'CLASE_SUELTA') {
-      setConcepto('Clase suelta individual');
-      newM = '8000';
-    }
-    if (newM) {
-      setMonto(newM);
-      if (esPagoCombinado) updateSplitAmounts(newM);
-    }
-  };
-
-  // Al cambiar la alumna seleccionada, autocompletar el monto de su plan o inscripción
-  const handleAlumnaChange = (alumnaId: string, overrideTipo?: 'MENSUALIDAD' | 'INSCRIPCION' | 'CLASE_SUELTA') => {
-    setSelectedAlumnaId(alumnaId);
-    setErrorMsg('');
-    const activeTipo = overrideTipo || tipoCobro;
-    if (overrideTipo) {
-      setTipoCobro(overrideTipo);
-    }
-
-    const alum = alumnas.find((a) => a.id === alumnaId);
-    if (alum) {
-      let newM = '';
-      if (activeTipo === 'INSCRIPCION') {
-        newM = alum.enrollment_amount ? String(alum.enrollment_amount) : '9500';
-        setConcepto('Matrícula de inscripción inicial');
-      } else if (activeTipo === 'MENSUALIDAD') {
-        if (alum.plan_amount) {
-          newM = alum.plan_amount.toString();
-        }
-        if (alum.plan) {
-          setConcepto(`Cuota mensualidad (${alum.plan})`);
-        } else {
-          setConcepto('Cuota mensualidad');
-        }
-      } else if (activeTipo === 'CLASE_SUELTA') {
-        newM = '8000';
-        setConcepto('Clase suelta individual');
-      }
-      if (newM) {
-        setMonto(newM);
-        if (esPagoCombinado) updateSplitAmounts(newM);
+  // Preseleccionar alumna si viene en query param (?alumnaId=xyz)
+  useEffect(() => {
+    if (queryAlumnaId && alumnas.length > 0) {
+      const found = alumnas.find((a) => a.id === queryAlumnaId);
+      if (found) {
+        setSelectedAlumnaForPago(found);
+        setTimeout(() => {
+          document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 300);
       }
     }
-  };
+  }, [queryAlumnaId, alumnas]);
 
-  const handleFechaPagoChange = (newDate: string) => {
-    setFechaPago(newDate);
-    if (newDate) {
-      setMesAbonado(newDate.slice(0, 7));
-    }
-  };
 
-  const handleGuardarPago = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    if (!selectedAlumnaId) {
-      setErrorMsg('Debes seleccionar una alumna para registrar el pago');
-      return;
-    }
-
-    const amountNum = parseFloat(monto);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      setErrorMsg('El monto del pago debe ser mayor a 0');
-      return;
-    }
-
-    let splitPaymentData: { method1: MetodoPago; amount1: number; method2: MetodoPago; amount2: number } | undefined = undefined;
-
-    if (esPagoCombinado) {
-      const m1 = parseFloat(monto1);
-      const m2 = parseFloat(monto2);
-      if (isNaN(m1) || m1 <= 0 || isNaN(m2) || m2 <= 0) {
-        setErrorMsg('En el pago combinado, ambos métodos deben tener un importe mayor a 0');
-        return;
-      }
-      if (Math.abs((m1 + m2) - amountNum) > 0.01) {
-        setErrorMsg(`La suma de los dos importes ($${(m1 + m2).toLocaleString('es-AR')}) no coincide con el total ingresado ($${amountNum.toLocaleString('es-AR')})`);
-        return;
-      }
-      splitPaymentData = {
-        method1: metodoPago1,
-        amount1: m1,
-        method2: metodoPago2,
-        amount2: m2,
-      };
-    }
-
-    setSubmitting(true);
-
-    const nextDueDate = tipoCobro === 'INSCRIPCION' ? undefined : calculateNextDueDate(fechaPago);
-    const alum = alumnas.find((a) => a.id === selectedAlumnaId);
-    const activeSede = (selectedSedeId && selectedSedeId !== 'ALL') ? selectedSedeId : (alum?.sede_id || undefined);
-    const recordedByName = profile?.full_name || (profile?.role === 'ADMIN' ? 'Administrador' : 'Profesora');
-
-    let res = await registrarPago({
-      alumna_id: selectedAlumnaId,
-      amount: amountNum,
-      payment_method: esPagoCombinado ? 'otro' : metodoPago,
-      payment_type: tipoCobro,
-      due_date: nextDueDate,
-      concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
-      billing_month: mesAbonado.trim(),
-      notes: observaciones.trim() || undefined,
-      sede_id: activeSede,
-      profesora_id: alum?.profesora_id || undefined,
-      recorded_by_id: profile?.id,
-      recorded_by_name: recordedByName,
-      split_payment: splitPaymentData,
-    });
-
-    if (res.error && res.error.includes('Ya existe un pago registrado')) {
-      setSubmitting(false);
-      const allow = await confirm({
-        title: 'Pago ya registrado en este período',
-        message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
-        confirmText: 'Sí, registrar de todos modos',
-        variant: 'warning',
-      });
-      if (!allow) return;
-
-      setSubmitting(true);
-      res = await registrarPago({
-        alumna_id: selectedAlumnaId,
-        amount: amountNum,
-        payment_method: esPagoCombinado ? 'otro' : metodoPago,
-        payment_type: tipoCobro,
-        due_date: nextDueDate,
-        concept: concepto.trim() || (tipoCobro === 'INSCRIPCION' ? 'Matrícula de inscripción inicial' : 'Cuota mensualidad'),
-        billing_month: mesAbonado.trim(),
-        notes: observaciones.trim() || undefined,
-        sede_id: activeSede,
-        profesora_id: alum?.profesora_id || undefined,
-        recorded_by_id: profile?.id,
-        recorded_by_name: recordedByName,
-        split_payment: splitPaymentData,
-        allow_duplicate: true,
-      });
-    }
-
-    setSubmitting(false);
-
-    if (res.error || !res.data) {
-      setErrorMsg(res.error || 'Error al registrar el pago');
-      return;
-    }
-
-    const newPago = res.data;
-    setSuccessMsg('Pago registrado e ingresado a caja exitosamente');
-    setTimeout(() => setSuccessMsg(''), 6000);
-
-    // Asociar datos de la alumna para el modal de comprobante
-    const pagoConAlumna: Pago = {
-      ...newPago,
-      due_date: newPago.due_date || nextDueDate,
-      alumna: alum ? {
-        ...alum,
-        billing_due_date: tipoCobro === 'INSCRIPCION' ? (alum.billing_due_date || null) : (nextDueDate || null),
-      } : undefined,
-    };
-
-    setSelectedComprobantePago(pagoConAlumna);
-    setIsComprobanteModalOpen(true);
-
-    setSelectedAlumnaId('');
-    setMonto('');
-    setObservaciones('');
-    setEsPagoCombinado(false);
-    setMonto1('');
-    setMonto2('');
-    fetchData();
-  };
 
   const handleDeletePagoConfirm = async (pagoId: string) => {
     const isOk = await confirm({
@@ -511,262 +294,19 @@ export default function PagosPage() {
         </div>
       )}
 
-      {/* BLOQUE 1: Registrar pago (Formulario Lattice Limpio) */}
-      <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--border-default)] pb-3">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-[var(--badge-meadow-text)]" />
-            <h2 className="text-sm font-bold text-[var(--text-primary)]">
-              Registrar Nuevo Cobro
-            </h2>
-          </div>
-          <span className="text-[11px] text-[var(--text-secondary)]">Completa los datos del cobro</span>
-        </div>
-
-        <form onSubmit={handleGuardarPago} className="flex flex-col gap-4">
-          {/* Selector de Tipo de Cobro */}
-          <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-[12px] bg-[var(--bg-primary)] border border-[var(--border-default)]">
-            <span className="text-[11px] font-bold text-[var(--text-secondary)] px-2">Tipo de cobro:</span>
-            <button
-              type="button"
-              onClick={() => handleTipoCobroChange('MENSUALIDAD')}
-              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
-                tipoCobro === 'MENSUALIDAD'
-                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-              }`}
-            >
-              Cuota Mensual
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTipoCobroChange('INSCRIPCION')}
-              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
-                tipoCobro === 'INSCRIPCION'
-                  ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-              }`}
-            >
-              Inscripción (Matrícula inicial)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTipoCobroChange('CLASE_SUELTA')}
-              className={`px-3 py-1 rounded-[18px] text-xs font-bold transition-all cursor-pointer ${
-                tipoCobro === 'CLASE_SUELTA'
-                  ? 'bg-indigo-500/15 text-indigo-800 dark:text-indigo-300 border border-indigo-500/30 shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]'
-              }`}
-            >
-              Clase Suelta / Prueba
-            </button>
-          </div>
-
-          {/* Fila 1 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="sm:col-span-2">
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Alumna *
-              </label>
-              <AlumnaCombobox
-                alumnas={alumnas}
-                selectedAlumnaId={selectedAlumnaId}
-                onChange={(id) => handleAlumnaChange(id)}
-                sedes={sedes}
-                selectedSedeId={selectedSedeId}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Concepto
-              </label>
-              <Input
-                placeholder="Ej. Mensualidad 2x semana"
-                value={concepto}
-                onChange={(e) => setConcepto(e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Monto ($ ARS) *
-              </label>
-              <Input
-                type="number"
-                placeholder="55000"
-                value={monto}
-                onChange={(e) => handleMontoChange(e.target.value)}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Fila 2 */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className={esPagoCombinado ? 'sm:col-span-2' : ''}>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-[11px] font-bold text-[var(--text-secondary)]">
-                  Método de Pago
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !esPagoCombinado;
-                    setEsPagoCombinado(next);
-                    if (next) {
-                      updateSplitAmounts(monto);
-                    }
-                  }}
-                  className={`text-[10px] font-bold px-2.5 py-0.5 rounded-[16px] transition-all cursor-pointer ${
-                    esPagoCombinado
-                      ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/40 shadow-xs'
-                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-primary)]'
-                  }`}
-                >
-                  {esPagoCombinado ? '✓ Pago combinado activado' : '+ Pago combinado'}
-                </button>
-              </div>
-
-              {!esPagoCombinado ? (
-                <select
-                  value={metodoPago}
-                  onChange={(e) => setMetodoPago(e.target.value as MetodoPago)}
-                  className="w-full h-10 px-3 rounded-[12px] bg-[var(--bg-primary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--border-focus)] font-medium capitalize cursor-pointer"
-                >
-                  <option value="transferencia">Transferencia</option>
-                  <option value="efectivo">Efectivo</option>
-                  <option value="mercado_pago">Mercado Pago</option>
-                  <option value="tarjeta">Débito / Tarjeta</option>
-                  <option value="otro">Otro</option>
-                </select>
-              ) : (
-                <div className="p-3 rounded-[12px] bg-[var(--bg-primary)] border border-amber-500/30 space-y-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
-                        Método 1
-                      </span>
-                      <div className="flex gap-2">
-                        <select
-                          value={metodoPago1}
-                          onChange={(e) => setMetodoPago1(e.target.value as MetodoPago)}
-                          className="w-1/2 h-9 px-2 rounded-[8px] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium capitalize"
-                        >
-                          <option value="transferencia">Transferencia</option>
-                          <option value="efectivo">Efectivo</option>
-                          <option value="mercado_pago">Mercado Pago</option>
-                          <option value="tarjeta">Tarjeta</option>
-                        </select>
-                        <Input
-                          type="number"
-                          placeholder="Monto 1"
-                          value={monto1}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setMonto1(val);
-                            const totalNum = parseFloat(monto) || 0;
-                            const m1 = parseFloat(val) || 0;
-                            if (totalNum > 0) {
-                              setMonto2(String(Math.max(0, totalNum - m1)));
-                            }
-                          }}
-                          className="w-1/2 h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-[var(--text-secondary)] block mb-1">
-                        Método 2
-                      </span>
-                      <div className="flex gap-2">
-                        <select
-                          value={metodoPago2}
-                          onChange={(e) => setMetodoPago2(e.target.value as MetodoPago)}
-                          className="w-1/2 h-9 px-2 rounded-[8px] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium capitalize"
-                        >
-                          <option value="efectivo">Efectivo</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="mercado_pago">Mercado Pago</option>
-                          <option value="tarjeta">Tarjeta</option>
-                        </select>
-                        <Input
-                          type="number"
-                          placeholder="Monto 2"
-                          value={monto2}
-                          onChange={(e) => setMonto2(e.target.value)}
-                          className="w-1/2 h-9 text-xs font-mono"
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Modo comentario sutil */}
-                  <div className="text-[11px] text-[var(--text-muted)] italic pt-1.5 border-t border-[var(--border-default)] flex items-center justify-between">
-                    <span>
-                      Cobro dividido: ${(parseFloat(monto1) || 0).toLocaleString('es-AR')} ({metodoPago1}) + ${(parseFloat(monto2) || 0).toLocaleString('es-AR')} ({metodoPago2})
-                    </span>
-                    <span className="font-mono font-bold text-[var(--text-primary)] not-italic text-xs">
-                      Total: ${((parseFloat(monto1) || 0) + (parseFloat(monto2) || 0)).toLocaleString('es-AR')}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Fecha de Pago
-              </label>
-              <Input
-                type="date"
-                value={fechaPago}
-                onChange={(e) => handleFechaPagoChange(e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Mes Abonado
-              </label>
-              <Input
-                type="month"
-                value={mesAbonado}
-                onChange={(e) => setMesAbonado(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className={esPagoCombinado ? 'sm:col-span-2' : ''}>
-              <label className="text-[11px] font-bold text-[var(--text-secondary)] block mb-1">
-                Observaciones
-              </label>
-              <Input
-                placeholder="Notas opcionales..."
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Botón de Acción Principal y Destacado */}
-          <div className="flex justify-end pt-3 border-t border-[var(--border-default)]">
-            <Button
-              type="submit"
-              variant="primary"
-              loading={submitting}
-              icon={<Send className="h-4 w-4" />}
-            >
-              Guardar pago y generar comprobante
-            </Button>
-          </div>
-        </form>
-      </div>
+      {/* BLOQUE 1: Formulario Dedicado Único de Cobros (Sin Modales) */}
+      <PagoForm
+        id="formulario-cobro"
+        initialAlumna={selectedAlumnaForPago}
+        disableCommissionEdit={false}
+        defaultCommissionRate={0.40}
+        onPaymentSuccess={() => {
+          setSelectedAlumnaForPago(null);
+          setSuccessMsg('Cobro registrado e ingresado a caja exitosamente');
+          setTimeout(() => setSuccessMsg(''), 5000);
+          fetchData();
+        }}
+      />
 
       {/* BLOQUE 2: Resumen de Ingresos (Métricas Financieras Consolidadas) */}
       {isAdmin && (
@@ -905,8 +445,8 @@ export default function PagosPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      handleAlumnaChange(alum.id, 'MENSUALIDAD');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      setSelectedAlumnaForPago(alum);
+                      document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                     className="px-3 py-1.5 rounded-[22px] bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] hover:opacity-90 text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                   >
@@ -1174,5 +714,13 @@ export default function PagosPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function PagosPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-muted)]">Cargando módulo de pagos...</div>}>
+      <PagosPageContent />
+    </Suspense>
   );
 }

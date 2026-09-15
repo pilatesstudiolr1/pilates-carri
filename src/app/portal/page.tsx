@@ -40,6 +40,7 @@ export default function LatticePortalPage() {
             width={180}
             height={48}
             priority
+            style={{ width: 'auto', height: 'auto' }}
             className="h-10 sm:h-12 w-auto object-contain hidden dark:block"
           />
           <Image
@@ -48,6 +49,7 @@ export default function LatticePortalPage() {
             width={180}
             height={48}
             priority
+            style={{ width: 'auto', height: 'auto' }}
             className="h-10 sm:h-12 w-auto object-contain block dark:hidden"
           />
         </div>
@@ -89,7 +91,7 @@ export default function LatticePortalPage() {
         </div>
 
         {/* Cards Grid — Lattice Pastel Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 max-w-4xl gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 max-w-6xl gap-6">
           
           {/* Card: Profesora (Solo si es PROFESORA) */}
           {!loading && profile?.role === 'PROFESORA' && (
@@ -157,6 +159,34 @@ export default function LatticePortalPage() {
                   <div className="pt-4 border-t border-[var(--surface-lavender-border)] flex items-center justify-between">
                     <span className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
                       Gestionar Comisiones
+                    </span>
+                    <div className="w-8 h-8 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] flex items-center justify-center transition-transform group-hover:translate-x-1">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+
+              {/* Card 3: Cobros Históricos (Solo ADMIN) */}
+              <Link href="/cobros-historicos" className="group block">
+                <div className="surface-buttercream rounded-[14px] p-6 transition-all duration-200 flex flex-col gap-8 shadow-md hover:-translate-y-1 hover:shadow-lg h-full justify-between">
+                  <div className="flex items-center gap-3.5">
+                    <div className="w-11 h-11 rounded-full bg-[var(--color-wood)] text-[var(--color-dark)] flex items-center justify-center font-bold">
+                      <Receipt className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-medium text-[var(--text-primary)] tracking-tight">
+                        Cobros Históricos
+                      </h2>
+                      <span className="text-[11px] text-[var(--text-muted)] font-semibold">
+                        Auditoría y Gestión
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-[var(--surface-buttercream-border)] flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-primary)]">
+                      Ver Historial Completo
                     </span>
                     <div className="w-8 h-8 rounded-full bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] flex items-center justify-center transition-transform group-hover:translate-x-1">
                       <ArrowRight className="h-4 w-4" />

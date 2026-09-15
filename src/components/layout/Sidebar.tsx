@@ -33,6 +33,8 @@ import {
   Package,
   PiggyBank,
   Clock,
+  UserX,
+  History,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +60,8 @@ const iconMap: Record<string, LucideIcon> = {
   Package,
   PiggyBank,
   Clock,
+  UserX,
+  History,
 };
 
 interface SidebarProps {
@@ -114,7 +118,7 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
     }
 
     return roleFiltered.filter((item) =>
-      ['/portal', '/reformer', '/agenda', '/agenda?view=disponibilidad', '/alumnas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
+      ['/portal', '/reformer', '/agenda', '/agenda?view=disponibilidad', '/alumnas', '/alumnas-inactivas', '/pagos', '/caja', '/profesoras', '/reportes', '/whatsapp', '/lista-espera', '/inventario', '/configuracion'].includes(item.href)
     );
   }, [userRole, pathname]);
 
@@ -153,6 +157,7 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
               width={140}
               height={38}
               priority
+              style={{ width: 'auto', height: 'auto' }}
               className="h-8 w-auto object-contain transition-transform group-hover:scale-102 hidden dark:block"
             />
             <Image
@@ -161,6 +166,7 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
               width={140}
               height={38}
               priority
+              style={{ width: 'auto', height: 'auto' }}
               className="h-8 w-auto object-contain transition-transform group-hover:scale-102 block dark:hidden"
             />
           </Link>
@@ -183,10 +189,11 @@ export function Sidebar({ userRole, profile }: SidebarProps) {
             <ul className="space-y-1">
               {items.map((item: any) => {
                 const Icon = iconMap[item.icon] || LayoutGrid;
+                const itemPath = item.href.split('?')[0];
                 const isActive =
-                  item.href === '/'
+                  itemPath === '/'
                     ? pathname === '/'
-                    : pathname.startsWith(item.href);
+                    : pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
                 return (
                   <li key={item.href}>

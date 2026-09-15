@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
 import { getClasesConAlumnas, addAlumnaToClase, removeAlumnaFromClase } from '@/lib/services/agenda';
 import { getDisponibilidadCamillas, DisponibilidadCamillaItem } from '@/lib/services/liquidaciones';
 import { getPagos, registrarPago } from '@/lib/services/pagos';
-import { PagoFormModal } from '@/components/pagos/PagoFormModal';
+import { PagoForm } from '@/components/pagos/PagoForm';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { AgendaProfesoraView } from '@/components/agenda/AgendaProfesoraView';
 import { Badge } from '@/components/ui/Badge';
@@ -50,12 +51,18 @@ interface AsistenciaState {
 type VistaProfesora = 'HUB' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
 
 
-export default function ProfesoraVistaPage() {
+function ProfesoraVistaContent() {
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') || searchParams.get('view');
+  const queryAlumnaId = searchParams.get('alumnaId');
+
   const { profile } = useUser();
   const { confirm, alert: alertDialog } = useConfirm();
 
-  // Estado de Navegación: Por defecto la primera vista es 'HUB' (Accesos Rápidos)
-  const [vistaActual, setVistaActual] = useState<VistaProfesora>('HUB');
+  // Estado de Navegación: Por defecto la primera vista es 'HUB' o según URL
+  const [vistaActual, setVistaActual] = useState<VistaProfesora>(() => {
+    return tabParam === 'COBROS' ? 'COBROS' : 'HUB';
+  });
 
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateISO());
   const [clases, setClases] = useState<any[]>([]);
@@ -70,8 +77,7 @@ export default function ProfesoraVistaPage() {
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [searchCobro, setSearchCobro] = useState('');
 
-  // Modal para cobro directo a alumna
-  const [pagoModalOpen, setPagoModalOpen] = useState(false);
+  // Alumna seleccionada para el formulario dedicado de cobro
   const [selectedAlumnaForPago, setSelectedAlumnaForPago] = useState<any | null>(null);
 
   // Modal de Aviso de Pago por WhatsApp
@@ -214,9 +220,33 @@ export default function ProfesoraVistaPage() {
     }
   };
 
+  // Si viene alumnaId por query param, preseleccionar y navegar a COBROS
+  useEffect(() => {
+    if (queryAlumnaId) {
+      setVistaActual('COBROS');
+      const supabase = createClient();
+      supabase
+        .from('alumnas')
+        .select('*')
+        .eq('id', queryAlumnaId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setSelectedAlumnaForPago(data);
+            setTimeout(() => {
+              document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+          }
+        });
+    }
+  }, [queryAlumnaId]);
+
   const handleAbrirPago = (alumna: any) => {
     setSelectedAlumnaForPago(alumna);
-    setPagoModalOpen(true);
+    setVistaActual('COBROS');
+    setTimeout(() => {
+      document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
   };
 
   const handleAbrirAsignar = (clase: any, camilla?: number) => {
@@ -398,7 +428,10 @@ export default function ProfesoraVistaPage() {
               type="button"
               onClick={() => {
                 setSelectedAlumnaForPago(null);
-                setPagoModalOpen(true);
+                setVistaActual('COBROS');
+                setTimeout(() => {
+                  document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 200);
               }}
               className="group p-6 rounded-2xl bg-[var(--bg-secondary)] border-2 border-emerald-600/30 hover:border-emerald-600 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 cursor-pointer relative overflow-hidden"
             >
@@ -522,7 +555,7 @@ export default function ProfesoraVistaPage() {
             <div>
               <div className="flex items-center gap-2 mb-1.5">
                 <span className="px-3 py-0.5 rounded-full bg-[#cdface] text-[#001f1f] text-[11px] font-black uppercase tracking-wider border border-[#001f1f] shadow-2xs">
-                  Cobros Docentes
+                  Cobros Profesoras
                 </span>
                 <span className="text-xs font-semibold text-[var(--text-muted)]">
                   Registro personal de cobranzas
@@ -541,7 +574,7 @@ export default function ProfesoraVistaPage() {
               variant="primary"
               onClick={() => {
                 setSelectedAlumnaForPago(null);
-                setPagoModalOpen(true);
+                document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
               }}
               icon={<Plus className="h-4 w-4" />}
               className="bg-[#001f1f] text-white hover:bg-[#003333] font-bold shadow-sm self-start sm:self-auto"
@@ -610,6 +643,21 @@ export default function ProfesoraVistaPage() {
             </Card>
           </div>
 
+          {/* Formulario Dedicado Único de Cobros (Sin Modales) */}
+          <PagoForm
+            id="formulario-cobro"
+            initialAlumna={selectedAlumnaForPago}
+            defaultProfesoraId={profile?.id}
+            disableCommissionEdit={true}
+            title="Registrar Cobro a Alumna"
+            description="Carga de cuota mensual, inscripción o clase suelta con impacto directo en caja."
+            onPaymentSuccess={() => {
+              setSelectedAlumnaForPago(null);
+              fetchMisPagos();
+              fetchClasesYAsistencias();
+            }}
+          />
+
           {/* Tabla / Listado de Historial */}
           <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
@@ -657,7 +705,7 @@ export default function ProfesoraVistaPage() {
                     variant="primary"
                     onClick={() => {
                       setSelectedAlumnaForPago(null);
-                      setPagoModalOpen(true);
+                      document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }}
                     icon={<Plus className="h-3.5 w-3.5" />}
                     className="bg-[#001f1f] text-white mt-1"
@@ -938,41 +986,6 @@ export default function ProfesoraVistaPage() {
         />
       )}
 
-      {/* Modal de Cobro Directo a Alumna */}
-      <PagoFormModal
-        open={pagoModalOpen}
-        initialAlumna={selectedAlumnaForPago}
-        defaultProfesoraId={profile?.id}
-        disableCommissionEdit={true}
-        onClose={() => {
-          setPagoModalOpen(false);
-          setSelectedAlumnaForPago(null);
-          fetchMisPagos();
-        }}
-        onSubmit={async (data) => {
-          const res = await registrarPago({
-            ...data,
-            profesora_id: profile?.id || data.profesora_id,
-            recorded_by_id: profile?.id,
-            recorded_by_name: profile?.full_name,
-            sede_id: data.sede_id || selectedAlumnaForPago?.sede_id || profile?.sede_id || undefined,
-            split_payment: data.split_payment,
-          });
-          if (res.data) {
-            const savedPago = res.data;
-            const currentAlumna = selectedAlumnaForPago;
-            setPagoModalOpen(false);
-            setSelectedAlumnaForPago(null);
-            setPagoAvisoExitoso({ pago: savedPago, alumna: currentAlumna });
-            setIsAvisoModalOpen(true);
-            fetchMisPagos();
-            fetchClasesYAsistencias();
-            return true;
-          }
-          return false;
-        }}
-      />
-
       {/* Modal de Aviso y Confirmación WhatsApp para Alumna */}
       {isAvisoModalOpen && pagoAvisoExitoso && (
         <Modal
@@ -1056,6 +1069,14 @@ export default function ProfesoraVistaPage() {
         </Modal>
       )}
     </div>
+  );
+}
+
+export default function ProfesoraVistaPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-muted)]">Cargando panel de profesora...</div>}>
+      <ProfesoraVistaContent />
+    </Suspense>
   );
 }
 

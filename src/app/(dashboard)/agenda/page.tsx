@@ -11,7 +11,6 @@ import { ClaseFormModal } from '@/components/agenda/ClaseFormModal';
 import { ClaseDetailModal } from '@/components/agenda/ClaseDetailModal';
 import { AsignarAlumnaModal } from '@/components/agenda/AsignarAlumnaModal';
 import { TurnoModal } from '@/components/agenda/TurnoModal';
-import { PagoFormModal } from '@/components/pagos/PagoFormModal';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/Toast';
 import { Clase, Profile, Alumna, MetodoPago, TipoPago } from '@/types/database';
@@ -64,10 +63,6 @@ export default function AgendaPage() {
   const [isTurnoModalOpen, setIsTurnoModalOpen] = useState(false);
   const [turnoModalDayName, setTurnoModalDayName] = useState('Lunes');
   const [selectedAlumnaAsignada, setSelectedAlumnaAsignada] = useState<any | null>(null);
-
-  // Modal Rápido de Pago / Cobro Directo
-  const [isPagoModalOpen, setIsPagoModalOpen] = useState(false);
-  const [selectedAlumnaParaPago, setSelectedAlumnaParaPago] = useState<Alumna | null>(null);
 
   const [selectedClase, setSelectedClase] = useState<Clase | null>(null);
   const [presetDay, setPresetDay] = useState<number>(1);
@@ -480,100 +475,6 @@ export default function AgendaPage() {
     setIsDetailModalOpen(true);
   };
 
-  const handleRegistrarCobro = async (pagoData: {
-    alumna_id: string;
-    amount: number;
-    payment_method: MetodoPago;
-    payment_type?: TipoPago;
-    due_date?: string;
-    commission_rate: number;
-    concept?: string;
-    period?: string;
-    profesora_id?: string;
-    notes?: string;
-    sede_id?: string;
-    allow_duplicate?: boolean;
-    split_payment?: any;
-    recorded_by_id?: string;
-    recorded_by_name?: string;
-  }): Promise<boolean> => {
-    try {
-      let res = await registrarPago({
-        alumna_id: pagoData.alumna_id,
-        amount: pagoData.amount,
-        payment_method: pagoData.payment_method,
-        payment_type: pagoData.payment_type,
-        due_date: pagoData.due_date,
-        commission_rate: pagoData.commission_rate,
-        concept: pagoData.concept,
-        billing_month: pagoData.period,
-        profesora_id: pagoData.profesora_id,
-        notes: pagoData.notes,
-        sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
-        split_payment: pagoData.split_payment,
-        recorded_by_id: pagoData.recorded_by_id || profile?.id,
-        recorded_by_name: pagoData.recorded_by_name || profile?.full_name,
-      });
-
-      if (res.error && res.error.includes('Ya existe un pago registrado')) {
-        const isConfirmed = await confirm({
-          title: 'Pago ya registrado en este período',
-          message: `${res.error}\n\n¿Deseas registrar este cobro de todas formas (por ejemplo, como clase extra, cobro adicional o corrección de carga)?`,
-          confirmText: 'Sí, registrar de todos modos',
-          variant: 'warning',
-        });
-        if (isConfirmed) {
-          res = await registrarPago({
-            alumna_id: pagoData.alumna_id,
-            amount: pagoData.amount,
-            payment_method: pagoData.payment_method,
-            payment_type: pagoData.payment_type,
-            due_date: pagoData.due_date,
-            commission_rate: pagoData.commission_rate,
-            concept: pagoData.concept,
-            billing_month: pagoData.period,
-            profesora_id: pagoData.profesora_id,
-            notes: pagoData.notes,
-            sede_id: pagoData.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined),
-            split_payment: pagoData.split_payment,
-            recorded_by_id: pagoData.recorded_by_id || profile?.id,
-            recorded_by_name: pagoData.recorded_by_name || profile?.full_name,
-            allow_duplicate: true,
-          });
-        } else {
-          return false;
-        }
-      }
-
-      if (res.error) {
-        await alertDialog({
-          title: 'Error al registrar cobro',
-          message: res.error,
-          variant: 'danger',
-        });
-        return false;
-      }
-
-      await alertDialog({
-        title: '¡Cobro Registrado!',
-        message: `Se registró correctamente el cobro por $${pagoData.amount.toLocaleString('es-AR')}.`,
-        variant: 'success',
-      });
-
-      setIsPagoModalOpen(false);
-      setSelectedAlumnaParaPago(null);
-      await Promise.all([fetchAgenda(), fetchAsistencias()]);
-      return true;
-    } catch (err: any) {
-      await alertDialog({
-        title: 'Error al procesar cobro',
-        message: err.message || 'Error desconocido',
-        variant: 'danger',
-      });
-      return false;
-    }
-  };
-
 
   const currentSedeNombre = sedes.find((s) => s.id === selectedSedeId)?.name || 'Pilates Studio';
 
@@ -741,8 +642,10 @@ export default function AgendaPage() {
             handleAbrirTurnoModal(day, time, camilla, item)
           }
           onCobrar={(alumna) => {
-            setSelectedAlumnaParaPago(alumna);
-            setIsPagoModalOpen(true);
+            const targetUrl = isProfesora
+              ? `/profesora?tab=COBROS&alumnaId=${alumna.id}`
+              : `/pagos?alumnaId=${alumna.id}`;
+            window.location.href = targetUrl;
           }}
           onSelectClase={handleSelectClaseBlock}
           asistencias={asistencias}
@@ -784,21 +687,6 @@ export default function AgendaPage() {
           return true;
         }}
       />
-
-      {/* MODAL RÁPIDO DE COBRO [Cobrar Cuota] */}
-      {isPagoModalOpen && (
-        <PagoFormModal
-          open={isPagoModalOpen}
-          onClose={() => {
-            setIsPagoModalOpen(false);
-            setSelectedAlumnaParaPago(null);
-          }}
-          initialAlumna={selectedAlumnaParaPago}
-          defaultProfesoraId={isProfesora && profile?.id ? profile.id : (selectedAlumnaParaPago?.profesora_id || undefined)}
-          disableCommissionEdit={isProfesora}
-          onSubmit={handleRegistrarCobro}
-        />
-      )}
 
       {/* Modales de Gestión */}
       {isClaseModalOpen && (

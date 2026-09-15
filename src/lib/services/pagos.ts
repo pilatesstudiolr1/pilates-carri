@@ -114,6 +114,108 @@ export interface SplitPaymentData {
   amount2: number;
 }
 
+// =========================================================================
+// Protección anti-duplicados: Idempotency key en memoria con ventana de 60s
+// =========================================================================
+const _recentPaymentKeys = new Map<string, number>();
+const IDEMPOTENCY_WINDOW_MS = 60_000; // 60 segundos
+
+function generateIdempotencyKey(alumnaId: string, paymentType: string, period: string, amount: number): string {
+  return `${alumnaId}::${paymentType}::${period}::${amount}`;
+}
+
+function isRecentDuplicate(key: string): boolean {
+  const now = Date.now();
+  // Limpiar entradas expiradas
+  for (const [k, ts] of _recentPaymentKeys.entries()) {
+    if (now - ts > IDEMPOTENCY_WINDOW_MS) {
+      _recentPaymentKeys.delete(k);
+    }
+  }
+  if (_recentPaymentKeys.has(key)) {
+    return true;
+  }
+  _recentPaymentKeys.set(key, now);
+  return false;
+}
+
+export interface VerificacionPagoExistenteResult {
+  exists: boolean;
+  pago?: {
+    id: string;
+    amount: number;
+    payment_date: string;
+    period?: string | null;
+    payment_type?: TipoPago | null;
+    concept?: string | null;
+  };
+  tipo: TipoPago;
+  message?: string;
+}
+
+/**
+ * Verifica si ya existe un cobro registrado para la alumna según los parámetros estándar:
+ * - Si es INSCRIPCION: verifica si ya existe alguna inscripción previa registrada.
+ * - Si es MENSUALIDAD: verifica si ya existe un pago para el período (YYYY-MM).
+ */
+export async function verificarPagoExistente(params: {
+  alumnaId: string;
+  paymentType: TipoPago;
+  period?: string;
+}): Promise<VerificacionPagoExistenteResult> {
+  try {
+    const supabase = createClient();
+    const { alumnaId, paymentType, period } = params;
+    const currentPeriod = normalizePeriodToYearMonth(period);
+
+    if (paymentType === 'INSCRIPCION') {
+      const { data, error } = await supabase
+        .from('pagos')
+        .select('id, amount, payment_date, period, payment_type, concept')
+        .eq('alumna_id', alumnaId)
+        .eq('payment_type', 'INSCRIPCION')
+        .order('payment_date', { ascending: false })
+        .limit(1);
+
+      if (!error && data && data.length > 0) {
+        const p = data[0];
+        return {
+          exists: true,
+          pago: p,
+          tipo: 'INSCRIPCION',
+          message: `Esta alumna ya tiene una inscripción registrada el ${p.payment_date} por $${(p.amount || 0).toLocaleString('es-AR')}.`,
+        };
+      }
+    }
+
+    if (paymentType === 'MENSUALIDAD') {
+      const { data, error } = await supabase
+        .from('pagos')
+        .select('id, amount, payment_date, period, payment_type, concept')
+        .eq('alumna_id', alumnaId)
+        .eq('payment_type', 'MENSUALIDAD')
+        .order('payment_date', { ascending: false });
+
+      if (!error && data) {
+        const matchingPago = data.find((p) => normalizePeriodToYearMonth(p.period) === currentPeriod);
+        if (matchingPago) {
+          return {
+            exists: true,
+            pago: matchingPago,
+            tipo: 'MENSUALIDAD',
+            message: `Ya existe un pago de cuota para el período ${currentPeriod} registrado el ${matchingPago.payment_date} por $${(matchingPago.amount || 0).toLocaleString('es-AR')}.`,
+          };
+        }
+      }
+    }
+
+    return { exists: false, tipo: paymentType };
+  } catch (err) {
+    console.error('Error al verificar cobro existente:', err);
+    return { exists: false, tipo: params.paymentType };
+  }
+}
+
 export async function registrarPago(pagoData: {
   alumna_id: string;
   amount: number;
@@ -154,7 +256,46 @@ export async function registrarPago(pagoData: {
     const rawPeriod = pagoData.period || pagoData.billing_month || today.slice(0, 7);
     const currentPeriod = normalizePeriodToYearMonth(rawPeriod);
 
-    // Prevención de doble registro de mensualidad para el mismo período
+    // =====================================================================
+    // CAPA 1: Idempotency key - bloqueo en memoria contra doble clic / doble submit (60s)
+    // =====================================================================
+    if (!pagoData.allow_duplicate) {
+      const idempotencyKey = generateIdempotencyKey(
+        pagoData.alumna_id,
+        finalPaymentType,
+        currentPeriod,
+        pagoData.amount
+      );
+      if (isRecentDuplicate(idempotencyKey)) {
+        return {
+          data: null,
+          error: 'Este cobro ya fue procesado hace instantes. Esperá unos segundos antes de intentar nuevamente.',
+        };
+      }
+    }
+
+    // =====================================================================
+    // CAPA 2: Prevención de doble INSCRIPCIÓN para la misma alumna
+    // =====================================================================
+    if (finalPaymentType === 'INSCRIPCION' && !pagoData.allow_duplicate) {
+      const { data: existingInscripciones } = await supabase
+        .from('pagos')
+        .select('id')
+        .eq('alumna_id', pagoData.alumna_id)
+        .eq('payment_type', 'INSCRIPCION')
+        .limit(1);
+
+      if (existingInscripciones && existingInscripciones.length > 0) {
+        return {
+          data: null,
+          error: 'Esta alumna ya tiene una inscripción registrada. No se procesó el cobro duplicado.',
+        };
+      }
+    }
+
+    // =====================================================================
+    // CAPA 3: Prevención de doble MENSUALIDAD para el mismo período
+    // =====================================================================
     if (finalPaymentType === 'MENSUALIDAD' && !pagoData.allow_duplicate) {
       const { data: existingPagos } = await supabase
         .from('pagos')
@@ -170,7 +311,7 @@ export async function registrarPago(pagoData: {
       if (isDuplicate) {
         return {
           data: null,
-          error: `Esta alumna ya tiene una mensualidad registrada para el período actual (${currentPeriod}). No se procesó el cobro duplicado.`,
+          error: `Ya existe un pago registrado para esta alumna en el período ${currentPeriod}. Si necesitás registrar un cobro adicional, confirmá la operación.`,
         };
       }
     }
@@ -432,5 +573,93 @@ export async function deletePago(id: string): Promise<{ error: string | null }> 
     };
   }
 }
+
+export async function updatePago(
+  id: string,
+  updates: {
+    amount?: number;
+    payment_method?: MetodoPago;
+    payment_type?: TipoPago;
+    payment_date?: string;
+    due_date?: string;
+    period?: string;
+    concept?: string;
+    notes?: string;
+    sede_id?: string;
+    alumna_id?: string;
+    profesora_id?: string;
+    commission_rate?: number;
+  }
+): Promise<{ data: Pago | null; error: string | null }> {
+  try {
+    const supabase = createClient();
+    const updatePayload: any = {};
+    if (updates.amount !== undefined) updatePayload.amount = updates.amount;
+    if (updates.payment_method !== undefined) updatePayload.payment_method = updates.payment_method;
+    if (updates.payment_type !== undefined) updatePayload.payment_type = updates.payment_type;
+    if (updates.payment_date !== undefined) updatePayload.payment_date = updates.payment_date;
+    if (updates.due_date !== undefined) updatePayload.due_date = updates.due_date;
+    if (updates.period !== undefined) updatePayload.period = normalizePeriodToYearMonth(updates.period);
+    if (updates.concept !== undefined) updatePayload.concept = updates.concept;
+    if (updates.notes !== undefined) updatePayload.notes = updates.notes;
+    if (updates.sede_id !== undefined) updatePayload.sede_id = updates.sede_id;
+    if (updates.alumna_id !== undefined) updatePayload.alumna_id = updates.alumna_id;
+    if (updates.profesora_id !== undefined) updatePayload.profesora_id = updates.profesora_id;
+    if (updates.commission_rate !== undefined) {
+      updatePayload.commission_rate = updates.commission_rate;
+      if (updates.amount !== undefined) {
+        updatePayload.commission_amount = updates.amount * updates.commission_rate;
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('pagos')
+      .update(updatePayload)
+      .eq('id', id)
+      .select('*, alumna:alumnas(*)')
+      .single();
+
+    if (error) return { data: null, error: error.message };
+
+    // Sincronizar en caja_movimientos si cambió monto, método, sede, concepto o fecha
+    try {
+      const cajaUpdates: any = {};
+      if (updates.amount !== undefined) cajaUpdates.monto = updates.amount;
+      if (updates.sede_id !== undefined) cajaUpdates.sede_id = updates.sede_id;
+      if (updates.payment_method !== undefined) cajaUpdates.metodo_pago = updates.payment_method;
+      if (updates.concept !== undefined) cajaUpdates.concepto = updates.concept;
+      if (updates.payment_date !== undefined) cajaUpdates.fecha = updates.payment_date;
+
+      if (Object.keys(cajaUpdates).length > 0) {
+        await supabase
+          .from('caja_movimientos')
+          .update(cajaUpdates)
+          .eq('description', `pago_id:${id}`);
+      }
+    } catch (cajaErr) {
+      console.warn('Advertencia al sincronizar edición de caja:', cajaErr);
+    }
+
+    // Sincronizar vencimiento de la alumna si se actualizó due_date
+    if (updates.due_date && data?.alumna_id) {
+      try {
+        await supabase
+          .from('alumnas')
+          .update({
+            billing_due_date: updates.due_date,
+            monthly_paid: updates.due_date >= getLocalDateISO(),
+          })
+          .eq('id', data.alumna_id);
+      } catch (syncAlumnaErr) {
+        console.warn('Advertencia al sincronizar fecha de vencimiento de alumna tras edición de pago:', syncAlumnaErr);
+      }
+    }
+
+    return { data: data as Pago, error: null };
+  } catch (err: any) {
+    return { data: null, error: err.message || 'Error al actualizar el pago' };
+  }
+}
+
 
 

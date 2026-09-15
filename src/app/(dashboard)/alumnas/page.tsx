@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -84,7 +85,7 @@ function AlumnasPageContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<AlumnaStatus | 'ALL'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ACTIVE_AND_SUSPENDED' | 'ACTIVE' | 'SUSPENDED'>('ACTIVE_AND_SUSPENDED');
   const [vencimientoFilter, setVencimientoFilter] = useState<'ALL' | 'OVERDUE' | 'UPCOMING'>('ALL');
 
   // Modales
@@ -364,17 +365,17 @@ function AlumnasPageContent() {
 
             {/* Fila Inferior: Botones Interactivos de Filtrado */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pt-2 border-t border-[var(--border-default)]">
-              {/* Botones de Estado: Activas, Inactivas, Suspendidas */}
+              {/* Botones de Estado: Activas y Suspendidas (Inactivas en módulo separado) */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider mr-1">
                   Estado:
                 </span>
                 <button
                   onClick={() => {
-                    setStatusFilter('ALL');
+                    setStatusFilter('ACTIVE_AND_SUSPENDED');
                     setCurrentPage(1);
                   }}
-                  className={`filter-pill ${statusFilter === 'ALL' ? 'filter-pill-active' : ''}`}
+                  className={`filter-pill ${statusFilter === 'ACTIVE_AND_SUSPENDED' ? 'filter-pill-active' : ''}`}
                 >
                   Todas
                 </button>
@@ -390,16 +391,6 @@ function AlumnasPageContent() {
                 </button>
                 <button
                   onClick={() => {
-                    setStatusFilter('INACTIVE');
-                    setCurrentPage(1);
-                  }}
-                  className={`filter-pill ${statusFilter === 'INACTIVE' ? 'filter-pill-active-muted' : ''}`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${statusFilter === 'INACTIVE' ? 'bg-white' : 'bg-slate-400'}`} />
-                  Inactivas
-                </button>
-                <button
-                  onClick={() => {
                     setStatusFilter('SUSPENDED');
                     setCurrentPage(1);
                   }}
@@ -408,6 +399,14 @@ function AlumnasPageContent() {
                   <span className={`w-2 h-2 rounded-full ${statusFilter === 'SUSPENDED' ? 'bg-white' : 'bg-amber-500'}`} />
                   Suspendidas
                 </button>
+
+                <Link
+                  href="/alumnas-inactivas"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-[22px] text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/20 transition-all cursor-pointer ml-1"
+                >
+                  <UserX className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" />
+                  Ver Alumnas Inactivas →
+                </Link>
               </div>
 
               {/* Botones de Referencia: Vencimientos & Cuotas */}

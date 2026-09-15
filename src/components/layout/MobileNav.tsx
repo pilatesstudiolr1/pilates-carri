@@ -32,6 +32,8 @@ import {
   Layers,
   PiggyBank,
   Clock,
+  UserX,
+  History,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +60,8 @@ const iconMap: Record<string, LucideIcon> = {
   Layers,
   PiggyBank,
   Clock,
+  UserX,
+  History,
 };
 
 interface MobileNavProps {
@@ -144,6 +148,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
                 width={140}
                 height={38}
                 priority
+                style={{ width: 'auto', height: 'auto' }}
                 className="h-8 w-auto object-contain hidden dark:block"
               />
               <Image
@@ -152,6 +157,7 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
                 width={140}
                 height={38}
                 priority
+                style={{ width: 'auto', height: 'auto' }}
                 className="h-8 w-auto object-contain block dark:hidden"
               />
             </Link>
@@ -178,10 +184,11 @@ export function MobileNav({ open, onClose, userRole }: MobileNavProps) {
               <ul className="space-y-1">
                 {items.map((item: any) => {
                   const Icon = iconMap[item.icon] || LayoutGrid;
+                  const itemPath = item.href.split('?')[0];
                   const isActive =
-                    item.href === '/'
+                    itemPath === '/'
                       ? pathname === '/'
-                      : pathname.startsWith(item.href);
+                      : pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
                   return (
                     <li key={item.href}>
