@@ -31,7 +31,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useSede } from '@/hooks/useSede';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
-import { getLocalDateISO } from '@/lib/utils';
+import { getLocalDateISO, getDayOfWeekFromDate, getDateOfWeekDay } from '@/lib/utils';
 import {
   Calendar as CalendarIcon,
   Plus,
@@ -64,9 +64,9 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
   const { confirm, alert: alertDialog } = useConfirm();
   const toast = useToast();
 
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateISO());
   const hoyDiaNum = (() => {
-    const d = new Date().getDay();
-    return d === 0 ? 1 : d;
+    return getDayOfWeekFromDate(getLocalDateISO());
   })();
 
   const [selectedDay, setSelectedDay] = useState<number>(initialDay || hoyDiaNum);
@@ -115,14 +115,14 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
     }
   }, [selectedSedeId, filtroSoloMisClases, profile?.id]);
 
-  const fetchAsistencias = useCallback(async () => {
+  const fetchAsistencias = useCallback(async (targetDate?: string) => {
     try {
       const supabase = createClient();
-      const fechaHoy = getLocalDateISO();
+      const fechaAUsar = targetDate || selectedDate || getLocalDateISO();
       const { data } = await supabase
         .from('asistencias')
         .select('clase_alumna_id, status')
-        .eq('date', fechaHoy);
+        .eq('date', fechaAUsar);
 
       if (data) {
         const map: Record<string, string> = {};
@@ -134,12 +134,26 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
     } catch (err) {
       console.error('Error cargando asistencias:', err);
     }
-  }, []);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchAgenda();
-    fetchAsistencias();
-  }, [fetchAgenda, fetchAsistencias]);
+    fetchAsistencias(selectedDate);
+  }, [fetchAgenda, fetchAsistencias, selectedDate]);
+
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    const day = getDayOfWeekFromDate(newDate);
+    setSelectedDay(day);
+    fetchAsistencias(newDate);
+  };
+
+  const handleSelectDay = (day: number) => {
+    setSelectedDay(day);
+    const newDate = getDateOfWeekDay(selectedDate, day);
+    setSelectedDate(newDate);
+    fetchAsistencias(newDate);
+  };
 
 
   const handleCreateClase = async (data: {
@@ -364,6 +378,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
     startTime: string;
     observaciones?: string;
     asistenciaStatus?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED';
+    selectedDate?: string;
   }): Promise<boolean> => {
     try {
       let targetClaseId = data.claseId;
@@ -397,10 +412,11 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
       // Asignar alumna al turno en la camilla correspondiente
       await addAlumnaToClase(targetClaseId, data.alumnaId, data.camilla);
 
+      const fechaAsistencia = data.selectedDate || selectedDate || getLocalDateISO();
+
       // Si se marcó asistencia
       if (data.asistenciaStatus) {
         const supabase = (await import('@/lib/supabase/client')).createClient();
-        const fechaHoy = getLocalDateISO();
 
         const { data: caData } = await supabase
           .from('clase_alumnas')
@@ -415,13 +431,13 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
               .from('asistencias')
               .delete()
               .eq('clase_alumna_id', caData.id)
-              .eq('date', fechaHoy);
+              .eq('date', fechaAsistencia);
           } else {
             const { data: existingAsis } = await supabase
               .from('asistencias')
               .select('id')
               .eq('clase_alumna_id', caData.id)
-              .eq('date', fechaHoy)
+              .eq('date', fechaAsistencia)
               .maybeSingle();
 
             if (existingAsis?.id) {
@@ -434,7 +450,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
                 .from('asistencias')
                 .insert({
                   clase_alumna_id: caData.id,
-                  date: fechaHoy,
+                  date: fechaAsistencia,
                   status: data.asistenciaStatus,
                 });
             }
@@ -465,7 +481,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
         }
       }
 
-      await Promise.all([fetchAgenda(), fetchAsistencias()]);
+      await Promise.all([fetchAgenda(), fetchAsistencias(fechaAsistencia)]);
       setIsTurnoModalOpen(false);
       return true;
     } catch (err) {
@@ -562,7 +578,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
           {DIAS.map((d) => (
             <button
               key={d.value}
-              onClick={() => setSelectedDay(d.value)}
+              onClick={() => handleSelectDay(d.value)}
               className={`flex-1 min-w-[100px] py-2 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer text-center border ${
                 selectedDay === d.value
                   ? 'bg-[var(--color-wood)] text-[var(--color-dark)] border-[var(--color-wood)] shadow-xs scale-102'
@@ -586,7 +602,9 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
           <ReformerMatrixView
             clases={clases}
             selectedDay={selectedDay}
-            onSelectDay={setSelectedDay}
+            onSelectDay={handleSelectDay}
+            selectedDate={selectedDate}
+            onDateChange={handleDateChange}
             currentProfesoraId={profile?.id}
             isProfesoraView={true}
             profesoraWorkHours={filtroSoloMisClases ? profile?.work_hours : undefined}
@@ -630,6 +648,7 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
         dayName={turnoModalDayName}
         presetTime={presetTime}
         presetCamilla={presetCamilla}
+        selectedDate={selectedDate}
         alumnaAsignada={selectedAlumnaAsignada}
         initialAsistenciaStatus={selectedAlumnaAsignada?.caId ? asistencias[selectedAlumnaAsignada.caId] : undefined}
         profesoraFilter={profile?.id}

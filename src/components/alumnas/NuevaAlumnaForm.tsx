@@ -113,10 +113,10 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
   const [montoInscripcion, setMontoInscripcion] = useState('9500');
   const [metodoPagoInscripcion, setMetodoPagoInscripcion] = useState<MetodoPago>('efectivo');
 
-  // Turnos fijos semanales
-  const [turnosFijos, setTurnosFijos] = useState<TurnoFijoItem[]>([
-    { id: 'tf-1', day_of_week: 1, start_time: '08:00', camilla: 1 },
-  ]);
+  // Turnos fijos semanales (si se edita una alumna, empieza vacío hasta cargar sus turnos reales)
+  const [turnosFijos, setTurnosFijos] = useState<TurnoFijoItem[]>(
+    alumnaToEdit ? [] : [{ id: 'tf-1', day_of_week: 1, start_time: '08:00', camilla: 1 }]
+  );
 
   // Ficha de Salud
   const [hasMedicalClearance, setHasMedicalClearance] = useState(false);
@@ -177,9 +177,8 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
           }));
           setTurnosFijos(mapped);
         } else {
-          setTurnosFijos([
-            { id: `tf-${Date.now()}`, day_of_week: 1, start_time: '08:00', camilla: 1 },
-          ]);
+          // Si no tiene turnos asignados (o fue dada de baja), mantener lista vacía sin inventar turnos ficticios
+          setTurnosFijos([]);
         }
       });
     }
@@ -772,12 +771,15 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as any)}
-                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)]"
+                className="w-full h-11 px-3 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] font-semibold"
               >
-                <option value="ACTIVE">Activa</option>
+                <option value="ACTIVE">Activa (Mantiene sus reformers)</option>
                 <option value="SUSPENDED">Suspendida</option>
-                <option value="INACTIVE">Inactiva</option>
+                <option value="INACTIVE">Inactiva (Baja - Libera reformers)</option>
               </select>
+              <p className="text-[10px] text-[var(--text-muted)] mt-1.5 leading-relaxed">
+                💡 El vencimiento de la fecha de plan <strong>NO</strong> borra a la alumna de la agenda ni libera su lugar. Solo el estado <strong>Inactiva (Baja)</strong> libera sus reformers.
+              </p>
             </div>
           </div>
 
@@ -867,93 +869,112 @@ export function NuevaAlumnaForm({ alumnaToEdit, onSuccess, onCancel }: NuevaAlum
                 </p>
               </div>
               <span className="px-2.5 py-1 rounded-lg bg-[var(--color-wood)]/20 text-[var(--color-wood)] text-xs font-bold">
-                {turnosFijos.length} turnos
+                {turnosFijos.length} {turnosFijos.length === 1 ? 'turno' : 'turnos'}
               </span>
             </div>
 
-            {turnosFijos.map((tf, index) => (
-              <div key={tf.id} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center pt-2">
-                <div>
-                  <label className="text-[10px] text-[var(--text-muted)] block mb-1">Día</label>
-                  <select
-                    value={tf.day_of_week}
-                    onChange={(e) => handleUpdateTurnoFijo(tf.id, 'day_of_week', parseInt(e.target.value, 10))}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
-                  >
-                    {DIAS.map((d) => (
-                      <option key={d.value} value={d.value}>
-                        {d.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-[var(--text-muted)] block mb-1">Hora</label>
-                  <select
-                    value={tf.start_time}
-                    onChange={(e) => handleUpdateTurnoFijo(tf.id, 'start_time', e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)]"
-                  >
-                    {HORARIOS_ESTANDAR.map((h) => (
-                      <option key={h} value={h}>
-                        {h} hs
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
-                  {(() => {
-                    const availableCamillas = getAvailableCamillasForTurno(tf.day_of_week, tf.start_time);
-                    if (availableCamillas.length === 0) {
-                      return (
-                        <div className="w-full h-10 px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs border border-rose-500/30 flex items-center font-semibold">
-                          Sin reformers libres
-                        </div>
-                      );
-                    }
-                    return (
-                      <select
-                        value={tf.camilla}
-                        onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
-                        className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-semibold cursor-pointer"
-                      >
-                        {availableCamillas.map((num) => (
-                          <option key={num} value={num}>
-                            Reformer {num}
-                          </option>
-                        ))}
-                      </select>
-                    );
-                  })()}
-                </div>
-
-                <div className="flex items-end justify-start sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveTurnoFijo(tf.id)}
-                    disabled={turnosFijos.length === 1}
-                    className="px-3 py-2 rounded-xl text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-30 transition-colors cursor-pointer"
-                  >
-                    Quitar
-                  </button>
-                </div>
+            {turnosFijos.length === 0 ? (
+              <div className="p-4 rounded-xl border border-dashed border-[var(--border-default)] bg-[var(--bg-secondary)]/60 text-center space-y-2.5">
+                <p className="text-xs text-[var(--text-secondary)] font-medium">
+                  Esta alumna no tiene turnos fijos asignados actualmente en la agenda.
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTurnoFijo}
+                  icon={<Plus className="h-3.5 w-3.5" />}
+                  className="mx-auto"
+                >
+                  Asignar turno fijo
+                </Button>
               </div>
-            ))}
+            ) : (
+              turnosFijos.map((tf, index) => (
+                <div key={tf.id} className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center pt-2">
+                  <div>
+                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Día</label>
+                    <select
+                      value={tf.day_of_week}
+                      onChange={(e) => handleUpdateTurnoFijo(tf.id, 'day_of_week', parseInt(e.target.value, 10))}
+                      className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium"
+                    >
+                      {DIAS.map((d) => (
+                        <option key={d.value} value={d.value}>
+                          {d.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-            <div className="pt-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleAddTurnoFijo}
-                icon={<Plus className="h-3.5 w-3.5" />}
-              >
-                Agregar otro turno fijo
-              </Button>
-            </div>
+                  <div>
+                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Hora</label>
+                    <select
+                      value={tf.start_time}
+                      onChange={(e) => handleUpdateTurnoFijo(tf.id, 'start_time', e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-medium"
+                    >
+                      {HORARIOS_ESTANDAR.map((h) => (
+                        <option key={h} value={h}>
+                          {h} hs
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] text-[var(--text-muted)] block mb-1">Reformer</label>
+                    {(() => {
+                      const availableCamillas = getAvailableCamillasForTurno(tf.day_of_week, tf.start_time, tf.camilla);
+                      if (availableCamillas.length === 0) {
+                        return (
+                          <div className="w-full h-10 px-3 rounded-xl bg-rose-500/10 text-rose-500 text-xs border border-rose-500/30 flex items-center font-semibold">
+                            Sin reformers libres
+                          </div>
+                        );
+                      }
+                      return (
+                        <select
+                          value={tf.camilla}
+                          onChange={(e) => handleUpdateTurnoFijo(tf.id, 'camilla', parseInt(e.target.value, 10))}
+                          className="w-full h-10 px-3 rounded-xl bg-[var(--bg-secondary)] text-[var(--text-primary)] text-xs border border-[var(--border-default)] font-semibold cursor-pointer"
+                        >
+                          {availableCamillas.map((num) => (
+                            <option key={num} value={num}>
+                              Reformer {num}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="flex items-end justify-start sm:justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveTurnoFijo(tf.id)}
+                      className="px-3 py-2 rounded-xl text-xs text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer font-medium"
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+
+            {turnosFijos.length > 0 && (
+              <div className="pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddTurnoFijo}
+                  icon={<Plus className="h-3.5 w-3.5" />}
+                >
+                  Agregar otro turno fijo
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

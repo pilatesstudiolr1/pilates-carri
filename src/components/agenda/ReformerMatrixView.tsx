@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Clase } from '@/types/database';
-import { getLocalDateISO } from '@/lib/utils';
+import { getLocalDateISO, getDateOfWeekDay, addDaysToDate, getDayOfWeekFromDate } from '@/lib/utils';
 import {
   Calendar,
   Plus,
@@ -18,6 +18,8 @@ import {
   Lock,
   CreditCard,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useSede } from '@/hooks/useSede';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -51,6 +53,8 @@ interface ReformerMatrixViewProps {
   clases: Clase[];
   selectedDay: number;
   onSelectDay: (day: number) => void;
+  selectedDate?: string;
+  onDateChange?: (date: string) => void;
   onSelectClase: (clase: Clase) => void;
   onSelectEmptySlot?: (dayOfWeek: number, startTime: string, camilla?: number) => void;
   onOpenAssignModal?: (clase: Clase, camilla?: number) => void;
@@ -86,6 +90,8 @@ export function ReformerMatrixView({
   clases,
   selectedDay,
   onSelectDay,
+  selectedDate,
+  onDateChange,
   onSelectClase,
   onSelectEmptySlot,
   onOpenAssignModal,
@@ -137,9 +143,18 @@ export function ReformerMatrixView({
     }
   }, [baseCamillas]);
 
-  const [fechaAsistencia, setFechaAsistencia] = useState<string>(
+  const [internalDate, setInternalDate] = useState<string>(
     () => getLocalDateISO()
   );
+  const activeDate = selectedDate || internalDate;
+
+  const handleDateChange = (newDate: string) => {
+    if (onDateChange) {
+      onDateChange(newDate);
+    } else {
+      setInternalDate(newDate);
+    }
+  };
 
   // Normalizar una hora a formato "HH:mm" (ej. "8:00" -> "08:00", "08:00:00" -> "08:00")
   const normalizeHour = (h?: string | null): string => {
@@ -454,7 +469,7 @@ export function ReformerMatrixView({
 
       // Evaluar si es pendiente de inicio
       const fechaInicio = alumna.billing_start_date || alumna.start_date || alumna.entry_date;
-      const fechaReferencia = fechaAsistencia || hoyStr;
+      const fechaReferencia = activeDate || hoyStr;
       const isPendienteInicio =
         (fechaInicio && fechaInicio > fechaReferencia) ||
         alumna.status === 'PENDING' ||
@@ -930,7 +945,7 @@ export function ReformerMatrixView({
     <div className="flex flex-col gap-6 text-[var(--text-primary)] w-full">
       {/* 1. SELECTOR DE DÍAS + FECHA ASISTENCIA */}
       <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-4 sm:p-5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Botones de Días */}
+        {/* Botones de Días con Fechas */}
         <div className="flex items-center gap-2 flex-wrap">
           {DIAS.map((d) => {
             const isSelected = selectedDay === d.value;
@@ -944,17 +959,26 @@ export function ReformerMatrixView({
               .filter((c) => c.day_of_week === d.value)
               .reduce((acc, c) => acc + (c.alumnas?.length || 0), 0);
 
+            const dayDateStr = getDateOfWeekDay(activeDate, d.value);
+            const dayDateShort = formatFechaCorta(dayDateStr);
+
             return (
               <button
                 key={d.value}
-                onClick={() => onSelectDay(d.value)}
-                className={`px-3.5 sm:px-4 py-2 rounded-[29px] text-xs font-semibold tracking-tight transition-all cursor-pointer flex items-center gap-1.5 ${
+                onClick={() => {
+                  onSelectDay(d.value);
+                  handleDateChange(dayDateStr);
+                }}
+                className={`px-3 sm:px-4 py-2 rounded-[29px] text-xs font-semibold tracking-tight transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSelected
                     ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs font-bold'
                     : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] border border-[var(--border-default)]'
                 }`}
               >
                 <span>{d.label}</span>
+                <span className={`text-[11px] font-mono ${isSelected ? 'opacity-90 font-bold' : 'text-[var(--text-muted)]'}`}>
+                  {dayDateShort}
+                </span>
                 {isProfesoraView && isWorkDay && profesoraWorkDays && profesoraWorkDays.length > 0 && (
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Día laboral asignado" />
                 )}
@@ -974,16 +998,63 @@ export function ReformerMatrixView({
           })}
         </div>
 
-        {/* Input de Fecha para Asistencias */}
-        <div className="flex items-center gap-2 self-start md:self-auto shrink-0 bg-[var(--bg-primary)] border border-[var(--border-default)] px-3.5 py-1.5 rounded-[29px]">
-          <Calendar className="h-4 w-4 text-[var(--text-secondary)]" />
-          <span className="text-xs font-medium text-[var(--text-secondary)]">Fecha:</span>
-          <input
-            type="date"
-            value={fechaAsistencia}
-            onChange={(e) => setFechaAsistencia(e.target.value)}
-            className="bg-transparent text-xs font-bold text-[var(--text-primary)] focus:outline-none cursor-pointer"
-          />
+        {/* Navegación semanal y selector de fecha */}
+        <div className="flex items-center gap-1 self-start md:self-auto shrink-0 bg-[var(--bg-primary)] border border-[var(--border-default)] p-1 rounded-[29px] shadow-2xs">
+          <button
+            type="button"
+            title="Semana anterior"
+            onClick={() => {
+              const prevWeekDate = addDaysToDate(activeDate, -7);
+              handleDateChange(prevWeekDate);
+            }}
+            className="p-1.5 rounded-full hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+
+          <button
+            type="button"
+            title="Volver a la fecha de hoy"
+            onClick={() => {
+              const today = getLocalDateISO();
+              const todayDay = getDayOfWeekFromDate(today);
+              onSelectDay(todayDay);
+              handleDateChange(today);
+            }}
+            className="px-2.5 py-1 text-[11px] font-bold rounded-full hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            Hoy
+          </button>
+
+          <button
+            type="button"
+            title="Semana siguiente"
+            onClick={() => {
+              const nextWeekDate = addDaysToDate(activeDate, 7);
+              handleDateChange(nextWeekDate);
+            }}
+            className="p-1.5 rounded-full hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="h-4 w-px bg-[var(--border-default)] mx-0.5" />
+
+          <div className="flex items-center gap-1.5 px-2 py-0.5">
+            <Calendar className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+            <input
+              type="date"
+              value={activeDate}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (!val) return;
+                const newDay = getDayOfWeekFromDate(val);
+                onSelectDay(newDay);
+                handleDateChange(val);
+              }}
+              className="bg-transparent text-xs font-bold text-[var(--text-primary)] focus:outline-none cursor-pointer"
+            />
+          </div>
         </div>
       </div>
 
@@ -1042,7 +1113,7 @@ export function ReformerMatrixView({
             {totalLugaresOcupados}{' '}
             <span className="text-xs font-normal text-[var(--text-muted)]">/ {totalCapacidadDia || 72}</span>
           </div>
-          <span className="text-[10px] text-[var(--text-muted)]">{nombreDiaActual}</span>
+          <span className="text-[10px] text-[var(--text-muted)]">{nombreDiaActual} ({formatFechaCorta(activeDate)})</span>
         </div>
 
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 flex flex-col justify-between shadow-xs">
@@ -1052,7 +1123,7 @@ export function ReformerMatrixView({
           <div className="text-2xl font-bold text-[#b45309] dark:text-[#fde047] my-0.5">
             {presentesCount}
           </div>
-          <span className="text-[10px] text-[var(--text-muted)]">Asistieron hoy</span>
+          <span className="text-[10px] text-[var(--text-muted)]">Asistieron ({formatFechaCorta(activeDate)})</span>
         </div>
 
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 flex flex-col justify-between shadow-xs">
@@ -1062,7 +1133,7 @@ export function ReformerMatrixView({
           <div className="text-2xl font-bold text-[#b91c1c] dark:text-[#f87171] my-0.5">
             {ausentesCount}
           </div>
-          <span className="text-[10px] text-[var(--text-muted)]">Faltas registradas</span>
+          <span className="text-[10px] text-[var(--text-muted)]">Faltas ({formatFechaCorta(activeDate)})</span>
         </div>
 
         <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-[14px] p-3.5 flex flex-col justify-between shadow-xs">
@@ -1080,7 +1151,7 @@ export function ReformerMatrixView({
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-base sm:text-lg font-bold text-[var(--text-primary)] tracking-tight">
-            Turnos Reformer &bull; {nombreDiaActual}
+            Turnos Reformer &bull; {nombreDiaActual} {formatFechaCorta(activeDate)}
           </h2>
           <span className="text-xs text-[var(--text-secondary)]">
             Hacé clic en cualquier alumna para ver opciones o en [Cobrar] para registrar pago

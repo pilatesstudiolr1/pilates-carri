@@ -30,6 +30,7 @@ interface TurnoModalProps {
   dayName: string;
   presetTime: string;
   presetCamilla: number;
+  selectedDate?: string;
   alumnaAsignada?: any | null;
   initialAsistenciaStatus?: string;
   profesoras?: Profile[];
@@ -43,6 +44,7 @@ interface TurnoModalProps {
     observaciones?: string;
     asistenciaStatus?: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED' | 'UNMARKED';
     profesoraId?: string | null;
+    selectedDate?: string;
   }) => Promise<boolean>;
   onDeleteTurno?: (claseId: string, alumnaId?: string) => Promise<boolean>;
   loading?: boolean;
@@ -55,6 +57,7 @@ export function TurnoModal({
   dayName,
   presetTime,
   presetCamilla,
+  selectedDate,
   alumnaAsignada = null,
   initialAsistenciaStatus,
   profesoras = [],
@@ -307,6 +310,7 @@ export function TurnoModal({
         startTime: presetTime,
         asistenciaStatus: targetStatus,
         profesoraId: selectedProfesoraId || (profesoraFilter !== 'ALL' ? profesoraFilter : null),
+        selectedDate: selectedDate || getLocalDateISO(),
       });
 
       if (ok) {
@@ -372,7 +376,7 @@ export function TurnoModal({
                 Reformer {selectedCamilla}
               </span>
               <span className="text-xs font-bold text-[var(--text-secondary)]">
-                {dayName} · {presetTime} hs
+                {dayName} {selectedDate ? `(${formatFechaArg(selectedDate)})` : ''} · {presetTime} hs
               </span>
             </div>
             <h3 className="text-base font-extrabold text-[var(--text-primary)] mt-1">
