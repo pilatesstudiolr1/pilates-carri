@@ -69,22 +69,33 @@ export async function calcularLiquidacionSemanal(
       getPagos({ status: 'PAID' }),
     ]);
 
-    const profe = profsRes.data.find((p) => p.id === profesoraId);
+    const todasProfesoras = profsRes.data.filter((p) => p.role === 'PROFESORA');
+    const profe = todasProfesoras.find((p) => p.id === profesoraId);
     const profesoraNombre = profe?.full_name || 'Profesora';
-    const commissionRate = profe?.commission_rate ?? 0.40;
+    const defaultRate = profe?.commission_rate ?? 0.40;
 
     // Filtrar cobros efectivamente ingresados en el período para esa profesora estrictamente
+    // Fallback: si pago.profesora_id no pertenece a una profesora (por ejemplo, si se guardó con el ID de un ADMIN),
+    // o está vacío, atribuirlo a la profesora de la alumna (alumna.profesora_id).
     const pagosFiltrados = pagosRes.data.filter((p) => {
       const pDate = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : '');
       const matchDate = pDate >= startDate && pDate <= endDate;
-      const profeIdAsignada = p.profesora_id || (p.alumna as any)?.profesora_id;
-      const matchProfe = profeIdAsignada === profesoraId;
-      return matchDate && matchProfe;
+      if (!matchDate) return false;
+
+      const pProfIsProf = todasProfesoras.some((pr) => pr.id === p.profesora_id);
+      const profeIdAsignada = pProfIsProf ? p.profesora_id : ((p.alumna as any)?.profesora_id || p.profesora_id);
+      return profeIdAsignada === profesoraId;
     });
 
     const detalles: LiquidacionDetalle[] = pagosFiltrados.map((p) => {
       const amountPaid = p.amount || 0;
-      const teacherComm = amountPaid * commissionRate;
+      const isInscripcion = p.payment_type === 'INSCRIPCION' || (p.concept || '').toLowerCase().includes('inscri');
+      const teacherComm = isInscripcion
+        ? 0
+        : (p.commission_amount != null
+            ? p.commission_amount
+            : amountPaid * (p.commission_rate ?? defaultRate));
+
       return {
         id: `det-${p.id}`,
         pago_id: p.id,
@@ -98,7 +109,7 @@ export async function calcularLiquidacionSemanal(
     });
 
     const totalCollected = detalles.reduce((acc, d) => acc + d.amount_paid, 0);
-    const teacherAmount = totalCollected * commissionRate;
+    const teacherAmount = detalles.reduce((acc, d) => acc + d.teacher_commission, 0);
     const studioAmount = totalCollected - teacherAmount;
 
     const liquidacion: LiquidacionSemanal = {
@@ -108,7 +119,7 @@ export async function calcularLiquidacionSemanal(
       period_start: startDate,
       period_end: endDate,
       total_collected: totalCollected,
-      commission_rate: commissionRate,
+      commission_rate: defaultRate,
       teacher_amount: teacherAmount,
       studio_amount: studioAmount,
       status: 'PENDING',
@@ -183,17 +194,24 @@ export async function calcularLiquidacionGlobal(
     let totalEstudioGlobal = 0;
 
     for (const profe of todasProfesoras) {
-      const commissionRate = profe.commission_rate ?? 0.40;
+      const defaultRate = profe.commission_rate ?? 0.40;
       
-      // Cada pago se atribuye estrictamente a la profesora asignada (pago.profesora_id o alumna.profesora_id)
+      // Cada pago se atribuye estrictamente a la profesora asignada (o fallback a la de la alumna si pago.profesora_id no es PROFESORA)
       const pagosDeEstaProfe = todosLosPagos.filter((p) => {
-        const asignadaId = p.profesora_id || (p.alumna as any)?.profesora_id;
+        const pProfIsProf = todasProfesoras.some((pr) => pr.id === p.profesora_id);
+        const asignadaId = pProfIsProf ? p.profesora_id : ((p.alumna as any)?.profesora_id || p.profesora_id);
         return asignadaId === profe.id;
       });
 
       const detalles: LiquidacionDetalle[] = pagosDeEstaProfe.map((p) => {
         const amountPaid = p.amount || 0;
-        const teacherComm = amountPaid * commissionRate;
+        const isInscripcion = p.payment_type === 'INSCRIPCION' || (p.concept || '').toLowerCase().includes('inscri');
+        const teacherComm = isInscripcion
+          ? 0
+          : (p.commission_amount != null
+              ? p.commission_amount
+              : amountPaid * (p.commission_rate ?? defaultRate));
+
         const item: LiquidacionDetalle = {
           id: `det-${p.id}`,
           pago_id: p.id,
@@ -209,7 +227,7 @@ export async function calcularLiquidacionGlobal(
       });
 
       const totalCollected = detalles.reduce((acc, d) => acc + d.amount_paid, 0);
-      const teacherAmount = totalCollected * commissionRate;
+      const teacherAmount = detalles.reduce((acc, d) => acc + d.teacher_commission, 0);
       const studioAmount = totalCollected - teacherAmount;
 
       totalRecaudadoGlobal += totalCollected;
@@ -223,7 +241,7 @@ export async function calcularLiquidacionGlobal(
         period_start: startDate,
         period_end: endDate,
         total_collected: totalCollected,
-        commission_rate: commissionRate,
+        commission_rate: defaultRate,
         teacher_amount: teacherAmount,
         studio_amount: studioAmount,
         status: 'PENDING',
@@ -233,7 +251,8 @@ export async function calcularLiquidacionGlobal(
 
     // Pagos sin profesora asignada (100% ingreso directo del estudio)
     const pagosSinProfe = todosLosPagos.filter((p) => {
-      const asignadaId = p.profesora_id || (p.alumna as any)?.profesora_id;
+      const pProfIsProf = todasProfesoras.some((pr) => pr.id === p.profesora_id);
+      const asignadaId = pProfIsProf ? p.profesora_id : ((p.alumna as any)?.profesora_id || p.profesora_id);
       return !todasProfesoras.some((pr) => pr.id === asignadaId);
     });
 
