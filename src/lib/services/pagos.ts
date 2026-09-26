@@ -11,7 +11,7 @@ export async function getPagos(options?: {
     const supabase = createClient();
     let query = supabase
       .from('pagos')
-      .select('*, alumna:alumnas(id, first_name, last_name, phone, dni, plan, sede_id), profesora:profiles!profesora_id(id, full_name, first_name, last_name, role)')
+      .select('*, alumna:alumnas(id, first_name, last_name, phone, dni, plan, sede_id, profesora_id), profesora:profiles!profesora_id(id, full_name, first_name, last_name, role)')
       .order('payment_date', { ascending: false });
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
@@ -332,7 +332,43 @@ export async function registrarPago(pagoData: {
     const finalNotes = notesParts.join(' ') || null;
 
     const finalMethod = pagoData.split_payment ? 'otro' : pagoData.payment_method;
-    const finalProfesoraId = pagoData.recorded_by_id || pagoData.profesora_id || null;
+
+    // Determinar la profesora legítima para la comisión:
+    // 1. Priorizar pagoData.profesora_id si fue enviada.
+    // 2. Si el ID enviado pertenece a un ADMIN, no considerarlo profesora para comisión.
+    // 3. Si queda vacío, buscar la profesora asignada a la alumna en la tabla alumnas.
+    let finalProfesoraId = pagoData.profesora_id || null;
+
+    if (finalProfesoraId) {
+      try {
+        const { data: profCheck } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', finalProfesoraId)
+          .single();
+        if (profCheck && profCheck.role === 'ADMIN') {
+          // El ID pertenecía a un administrador, no a una profesora que dicta clase
+          finalProfesoraId = null;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!finalProfesoraId && pagoData.alumna_id) {
+      try {
+        const { data: alumData } = await supabase
+          .from('alumnas')
+          .select('profesora_id')
+          .eq('id', pagoData.alumna_id)
+          .single();
+        if (alumData?.profesora_id) {
+          finalProfesoraId = alumData.profesora_id;
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     const { data, error } = await supabase
       .from('pagos')
