@@ -42,13 +42,17 @@ import {
   Plus,
   Phone,
   MessageCircle,
+  CalendarClock,
+  AlertCircle,
+  AlertTriangle,
+  Users,
 } from 'lucide-react';
 
 interface AsistenciaState {
   [claseAlumnaId: string]: 'PRESENT' | 'ABSENT' | 'RECOVERY' | 'SUSPENDED';
 }
 
-type VistaProfesora = 'HUB' | 'COBROS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
+type VistaProfesora = 'HUB' | 'COBROS' | 'ESTADO_ALUMNAS' | 'AGENDA_SEMANAL' | 'LUGARES_DISPONIBLES';
 
 
 function ProfesoraVistaContent() {
@@ -61,7 +65,9 @@ function ProfesoraVistaContent() {
 
   // Estado de Navegación: Por defecto la primera vista es 'HUB' o según URL
   const [vistaActual, setVistaActual] = useState<VistaProfesora>(() => {
-    return tabParam === 'COBROS' ? 'COBROS' : 'HUB';
+    if (tabParam === 'COBROS') return 'COBROS';
+    if (tabParam === 'ESTADO_ALUMNAS' || tabParam === 'VENCIMIENTOS' || tabParam === 'ALUMNAS') return 'ESTADO_ALUMNAS';
+    return 'HUB';
   });
 
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalDateISO());
@@ -76,6 +82,12 @@ function ProfesoraVistaContent() {
   const [misPagos, setMisPagos] = useState<any[]>([]);
   const [loadingPagos, setLoadingPagos] = useState(false);
   const [searchCobro, setSearchCobro] = useState('');
+
+  // Alumnas a cargo y estado de cuotas / vencimientos
+  const [misAlumnas, setMisAlumnas] = useState<any[]>([]);
+  const [loadingAlumnas, setLoadingAlumnas] = useState(false);
+  const [searchAlumnaVenc, setSearchAlumnaVenc] = useState('');
+  const [filtroVencimiento, setFiltroVencimiento] = useState<'TODAS' | 'VENCIDAS' | 'POR_VENCER' | 'AL_DIA'>('TODAS');
 
   // Alumna seleccionada para el formulario dedicado de cobro
   const [selectedAlumnaForPago, setSelectedAlumnaForPago] = useState<any | null>(null);
@@ -153,11 +165,72 @@ function ProfesoraVistaContent() {
     }
   }, [profile?.id]);
 
+  // Cargar alumnas asignadas y su estado de cuota
+  const fetchMisAlumnas = useCallback(async () => {
+    if (!profile?.id) return;
+    setLoadingAlumnas(true);
+    try {
+      const supabase = createClient();
+
+      // 1. Alumnas con profesora_id asignada directamente
+      let directasQuery = supabase
+        .from('alumnas')
+        .select('id, first_name, last_name, phone, dni, plan, plan_amount, billing_due_date, monthly_paid, enrollment_paid, status, profesora_id, sede_id');
+
+      if (isProfesora) {
+        directasQuery = directasQuery.eq('profesora_id', profile.id);
+      }
+      const { data: directasData, error: directasErr } = await directasQuery.in('status', ['ACTIVE', 'SUSPENDED']);
+      if (directasErr) console.error('Error directas alumnas:', directasErr);
+
+      // 2. Alumnas que asisten a clases de esta profesora
+      let enClasesAlumnas: any[] = [];
+      if (isProfesora) {
+        const { data: clasesProf } = await supabase
+          .from('clases')
+          .select('id')
+          .eq('profesora_id', profile.id);
+
+        const claseIds = (clasesProf || []).map((c: any) => c.id);
+        if (claseIds.length > 0) {
+          const { data: caData } = await supabase
+            .from('clase_alumnas')
+            .select('alumna:alumnas(id, first_name, last_name, phone, dni, plan, plan_amount, billing_due_date, monthly_paid, enrollment_paid, status, profesora_id, sede_id)')
+            .in('clase_id', claseIds);
+
+          if (caData) {
+            enClasesAlumnas = caData
+              .map((item: any) => item.alumna)
+              .filter((a: any) => a && (a.status === 'ACTIVE' || a.status === 'SUSPENDED'));
+          }
+        }
+      }
+
+      // Consolidar sin duplicados
+      const mapa = new Map<string, any>();
+      (directasData || []).forEach((a: any) => {
+        if (a?.id) mapa.set(a.id, a);
+      });
+      enClasesAlumnas.forEach((a: any) => {
+        if (a?.id && !mapa.has(a.id)) {
+          mapa.set(a.id, a);
+        }
+      });
+
+      setMisAlumnas(Array.from(mapa.values()));
+    } catch (err) {
+      console.error('Error cargando alumnas de la profesora:', err);
+    } finally {
+      setLoadingAlumnas(false);
+    }
+  }, [profile?.id, isProfesora]);
+
   useEffect(() => {
     fetchClasesYAsistencias();
     fetchDisponibilidad();
     fetchMisPagos();
-  }, [fetchClasesYAsistencias, fetchDisponibilidad, fetchMisPagos]);
+    fetchMisAlumnas();
+  }, [fetchClasesYAsistencias, fetchDisponibilidad, fetchMisPagos, fetchMisAlumnas]);
 
 
   // Manejador de asistencia
@@ -316,6 +389,72 @@ function ProfesoraVistaContent() {
     });
   }, [misPagos, searchCobro]);
 
+  const estadisticasAlumnas = useMemo(() => {
+    let vencidas = 0;
+    let porVencer = 0;
+    let alDia = 0;
+
+    misAlumnas.forEach((a) => {
+      const estado = getEstadoCuotaAlumna(a, hoyStr);
+      if (estado.estado === 'VENCIDA') vencidas++;
+      else if (estado.estado === 'POR_VENCER') porVencer++;
+      else alDia++;
+    });
+
+    return {
+      total: misAlumnas.length,
+      vencidas,
+      porVencer,
+      alDia,
+    };
+  }, [misAlumnas, hoyStr]);
+
+  const alumnasFiltradasVenc = useMemo(() => {
+    return misAlumnas
+      .filter((a) => {
+        const estado = getEstadoCuotaAlumna(a, hoyStr);
+        if (filtroVencimiento === 'VENCIDAS' && estado.estado !== 'VENCIDA') return false;
+        if (filtroVencimiento === 'POR_VENCER' && estado.estado !== 'POR_VENCER') return false;
+        if (filtroVencimiento === 'AL_DIA' && estado.estado !== 'AL_DIA') return false;
+
+        if (!searchAlumnaVenc.trim()) return true;
+        const q = searchAlumnaVenc.toLowerCase();
+        const nombreCompleto = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
+        const dni = (a.dni || '').toLowerCase();
+        const phone = (a.phone || '').toLowerCase();
+        return nombreCompleto.includes(q) || dni.includes(q) || phone.includes(q);
+      })
+      .sort((a, b) => {
+        const orderMap = { VENCIDA: 0, POR_VENCER: 1, AL_DIA: 2 };
+        const estadoA = getEstadoCuotaAlumna(a, hoyStr).estado;
+        const estadoB = getEstadoCuotaAlumna(b, hoyStr).estado;
+        if (orderMap[estadoA] !== orderMap[estadoB]) {
+          return orderMap[estadoA] - orderMap[estadoB];
+        }
+        const dateA = a.billing_due_date || '9999-99-99';
+        const dateB = b.billing_due_date || '9999-99-99';
+        return dateA.localeCompare(dateB);
+      });
+  }, [misAlumnas, filtroVencimiento, searchAlumnaVenc, hoyStr]);
+
+  const handleAvisoWhatsAppAlumna = (alumna: any) => {
+    const primerNombre = (alumna.first_name || 'Alumna').trim();
+    const dueDateStr = alumna.billing_due_date ? formatFechaCorta(alumna.billing_due_date) : '';
+    const montoPlan = alumna.plan_amount ? `$${Number(alumna.plan_amount).toLocaleString('es-AR')} ARS` : '';
+
+    let mensaje = `¡Hola ${primerNombre}! 👋✨ Te escribo de Pilates Studio.\n\n`;
+    if (alumna.billing_due_date) {
+      mensaje += `Te recordamos que tu cuota mensual tiene fecha de vencimiento el *${dueDateStr}*`;
+      if (montoPlan) mensaje += ` (Plan: *${montoPlan}*)`;
+      mensaje += `.\n\n`;
+    } else {
+      mensaje += `Te recordamos que podés abonar tu cuota mensual de Pilates en tu próxima clase.\n\n`;
+    }
+    mensaje += `Podés abonarla en recepción o directamente con tu profe al llegar, o por transferencia. ¡Muchas gracias! 😊🧘‍♀️`;
+
+    openWhatsAppMessage(alumna.phone, mensaje);
+  };
+
   const DIAS_FILTRO = [
     { value: 'ALL', label: 'Todos los días' },
     { value: 1, label: 'Lunes' },
@@ -342,6 +481,24 @@ function ProfesoraVistaContent() {
 
           {/* Acceso directo a otros módulos */}
           <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar p-1 bg-[var(--bg-primary)] rounded-xl border border-[var(--border-default)] self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setVistaActual('ESTADO_ALUMNAS')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                vistaActual === 'ESTADO_ALUMNAS'
+                  ? 'bg-[#001f1f] text-white shadow-2xs dark:bg-emerald-700'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              <span>Vencimientos</span>
+              {estadisticasAlumnas.vencidas > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-black bg-rose-600 text-white">
+                  {estadisticasAlumnas.vencidas}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setVistaActual('COBROS')}
@@ -485,7 +642,40 @@ function ProfesoraVistaContent() {
               </div>
             </button>
 
-
+            {/* 3. Vencimientos y Cuotas de Alumnas */}
+            <button
+              type="button"
+              onClick={() => setVistaActual('ESTADO_ALUMNAS')}
+              className="group p-6 rounded-2xl bg-[var(--bg-secondary)] border-2 border-[var(--border-default)] hover:border-[#001f1f] dark:hover:border-emerald-500 shadow-sm hover:shadow-md transition-all text-left flex flex-col justify-between gap-6 cursor-pointer"
+            >
+              <div className="flex items-start justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-[#cdface]/50 text-[#001f1f] border border-[#001f1f]/20 flex items-center justify-center font-bold group-hover:scale-105 transition-transform">
+                  <CalendarClock className="h-6 w-6" />
+                </div>
+                {estadisticasAlumnas.vencidas > 0 ? (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    {estadisticasAlumnas.vencidas} a cobrar
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                    Al día
+                  </span>
+                )}
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-[var(--text-primary)]">
+                  Vencimientos de Cuotas
+                </h3>
+                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                  Semáforo de vencimientos: sabé quién debe cuota al llegar a clase y quién está próxima a vencer.
+                </p>
+              </div>
+              <div className="pt-3 border-t border-[var(--border-default)] flex items-center justify-between text-xs font-bold text-[var(--text-primary)]">
+                <span>Ver estado de alumnas</span>
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </button>
 
             {/* 4. Turnos Disponibles */}
             <button
@@ -655,6 +845,7 @@ function ProfesoraVistaContent() {
               setSelectedAlumnaForPago(null);
               fetchMisPagos();
               fetchClasesYAsistencias();
+              fetchMisAlumnas();
             }}
           />
 
@@ -806,6 +997,331 @@ function ProfesoraVistaContent() {
             )}
           </div>
 
+        </div>
+      )}
+
+
+
+      {/* =========================================================================
+          VISTA 3: ESTADO DE CUOTAS Y VENCIMIENTOS DE ALUMNAS
+          ========================================================================= */}
+      {vistaActual === 'ESTADO_ALUMNAS' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header del Módulo */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-5 sm:p-6 shadow-sm">
+            <div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="px-3 py-0.5 rounded-full bg-[#cdface] text-[#001f1f] text-[11px] font-black uppercase tracking-wider border border-[#001f1f] shadow-2xs">
+                  Semáforo de Pagos
+                </span>
+                <span className="text-xs font-semibold text-[var(--text-muted)]">
+                  Control de cuotas y vencimientos
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-[var(--text-primary)] flex items-center gap-2">
+                <CalendarClock className="h-6 w-6 text-emerald-600" />
+                <span>Vencimientos de Cuotas de Alumnas</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+                Revisa qué alumnas deben abonar la cuota al llegar a clase, quiénes están por vencer y registra sus pagos directamente.
+              </p>
+            </div>
+
+            <Button
+              variant="primary"
+              onClick={() => {
+                setSelectedAlumnaForPago(null);
+                setVistaActual('COBROS');
+                setTimeout(() => {
+                  document.getElementById('formulario-cobro')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 200);
+              }}
+              icon={<Plus className="h-4 w-4" />}
+              className="bg-[#001f1f] text-white hover:bg-[#003333] font-bold shadow-sm self-start sm:self-auto"
+            >
+              Registrar Cobro
+            </Button>
+          </div>
+
+          {/* Tarjetas de Semáforo Operativo (KPIs) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            {/* 1. Vencidas / Deben Cuota */}
+            <div
+              onClick={() => setFiltroVencimiento(filtroVencimiento === 'VENCIDAS' ? 'TODAS' : 'VENCIDAS')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                filtroVencimiento === 'VENCIDAS'
+                  ? 'border-rose-500 bg-rose-500/10 shadow-sm'
+                  : 'border-rose-500/30 bg-[var(--bg-secondary)] hover:border-rose-500 hover:bg-rose-500/5'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                  Cuotas Vencidas
+                </p>
+                <div className="w-8 h-8 rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center font-bold">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400 mt-2">
+                {estadisticasAlumnas.vencidas}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                {estadisticasAlumnas.vencidas === 1 ? 'Alumna debe abonar' : 'Alumnas deben abonar'}
+              </p>
+            </div>
+
+            {/* 2. Por Vencer en 7 días */}
+            <div
+              onClick={() => setFiltroVencimiento(filtroVencimiento === 'POR_VENCER' ? 'TODAS' : 'POR_VENCER')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                filtroVencimiento === 'POR_VENCER'
+                  ? 'border-amber-500 bg-amber-500/10 shadow-sm'
+                  : 'border-amber-500/30 bg-[var(--bg-secondary)] hover:border-amber-500 hover:bg-amber-500/5'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                  Vencen en 7 días
+                </p>
+                <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center font-bold">
+                  <AlertTriangle className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 mt-2">
+                {estadisticasAlumnas.porVencer}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Próximas a vencer
+              </p>
+            </div>
+
+            {/* 3. Al Día */}
+            <div
+              onClick={() => setFiltroVencimiento(filtroVencimiento === 'AL_DIA' ? 'TODAS' : 'AL_DIA')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                filtroVencimiento === 'AL_DIA'
+                  ? 'border-emerald-500 bg-emerald-500/10 shadow-sm'
+                  : 'border-emerald-500/30 bg-[var(--bg-secondary)] hover:border-emerald-500 hover:bg-emerald-500/5'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                  Cuota al Día
+                </p>
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-emerald-700 dark:text-emerald-400 mt-2">
+                {estadisticasAlumnas.alDia}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Cuotas vigentes
+              </p>
+            </div>
+
+            {/* 4. Total Alumnas */}
+            <div
+              onClick={() => setFiltroVencimiento('TODAS')}
+              className={`p-4 rounded-2xl border-2 transition-all cursor-pointer ${
+                filtroVencimiento === 'TODAS'
+                  ? 'border-[#001f1f] dark:border-emerald-500 bg-[var(--bg-primary)] shadow-sm'
+                  : 'border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-[#001f1f]'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Total Alumnas
+                </p>
+                <div className="w-8 h-8 rounded-xl bg-[var(--bg-tertiary)] text-[var(--text-primary)] flex items-center justify-center font-bold">
+                  <Users className="h-4 w-4" />
+                </div>
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] mt-2">
+                {estadisticasAlumnas.total}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                Alumnas asignadas
+              </p>
+            </div>
+          </div>
+
+          {/* Listado / Tabla con Buscador y Filtros */}
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-2xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[var(--border-default)]">
+              {/* Filtros tipo píldoras */}
+              <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1">
+                <button
+                  type="button"
+                  onClick={() => setFiltroVencimiento('TODAS')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    filtroVencimiento === 'TODAS'
+                      ? 'bg-[#001f1f] text-white shadow-2xs dark:bg-emerald-700'
+                      : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border-default)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  Todas ({estadisticasAlumnas.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroVencimiento('VENCIDAS')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    filtroVencimiento === 'VENCIDAS'
+                      ? 'bg-rose-600 text-white shadow-2xs'
+                      : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-rose-500 inline-block animate-pulse" />
+                  Vencidas ({estadisticasAlumnas.vencidas})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroVencimiento('POR_VENCER')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    filtroVencimiento === 'POR_VENCER'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-amber-500 inline-block" />
+                  Por Vencer ({estadisticasAlumnas.porVencer})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroVencimiento('AL_DIA')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    filtroVencimiento === 'AL_DIA'
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                  Al Día ({estadisticasAlumnas.alDia})
+                </button>
+              </div>
+
+              {/* Buscador */}
+              <div className="relative w-full md:w-72">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
+                <input
+                  type="text"
+                  placeholder="Buscar por alumna, DNI o tel..."
+                  value={searchAlumnaVenc}
+                  onChange={(e) => setSearchAlumnaVenc(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border-default)] text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-emerald-600 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Tabla de Alumnas */}
+            {loadingAlumnas ? (
+              <div className="p-12 text-center text-xs text-[var(--text-muted)]">
+                Cargando estado de alumnas...
+              </div>
+            ) : alumnasFiltradasVenc.length === 0 ? (
+              <div className="p-12 text-center space-y-2">
+                <CalendarClock className="h-10 w-10 text-[var(--text-muted)] mx-auto opacity-40" />
+                <p className="text-sm font-bold text-[var(--text-primary)]">
+                  No se encontraron alumnas con este criterio
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {searchAlumnaVenc ? 'Probá con otro término de búsqueda.' : 'No hay alumnas en esta categoría.'}
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto custom-scrollbar">
+                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)]/50 text-[var(--text-muted)] uppercase tracking-wider font-semibold">
+                      <th className="py-2.5 px-3">Alumna</th>
+                      <th className="py-2.5 px-3">DNI</th>
+                      <th className="py-2.5 px-3">Plan / Monto</th>
+                      <th className="py-2.5 px-3">Fecha Vencimiento</th>
+                      <th className="py-2.5 px-3">Estado de Cuota</th>
+                      <th className="py-2.5 px-3 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--border-default)]">
+                    {alumnasFiltradasVenc.map((alumna) => {
+                      const nombreCompleto = `${alumna.last_name || ''}, ${alumna.first_name || ''}`.trim();
+                      const estado = getEstadoCuotaAlumna(alumna, hoyStr);
+                      const planTexto = alumna.plan || 'Sin plan asignado';
+                      const montoTexto = alumna.plan_amount ? `$${Number(alumna.plan_amount).toLocaleString('es-AR')}` : '-';
+
+                      return (
+                        <tr key={alumna.id} className="hover:bg-[var(--bg-tertiary)]/40 transition-colors">
+                          {/* Alumna */}
+                          <td className="py-3 px-3">
+                            <p className="font-bold text-[var(--text-primary)]">{nombreCompleto}</p>
+                            {alumna.phone && (
+                              <p className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 mt-0.5">
+                                <Phone className="h-2.5 w-2.5" />
+                                <span>{alumna.phone}</span>
+                              </p>
+                            )}
+                          </td>
+
+                          {/* DNI */}
+                          <td className="py-3 px-3 text-[var(--text-secondary)] font-mono text-[11px]">
+                            {alumna.dni || 'Sin DNI'}
+                          </td>
+
+                          {/* Plan */}
+                          <td className="py-3 px-3">
+                            <p className="font-semibold text-[var(--text-primary)]">{planTexto}</p>
+                            <p className="text-[10px] text-[var(--text-muted)] font-mono">{montoTexto}</p>
+                          </td>
+
+                          {/* Fecha Vencimiento */}
+                          <td className="py-3 px-3 font-mono text-[11px]">
+                            {alumna.billing_due_date ? formatFechaCorta(alumna.billing_due_date) : <span className="text-[var(--text-muted)]">Sin fecha</span>}
+                          </td>
+
+                          {/* Estado / Semáforo */}
+                          <td className="py-3 px-3">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${estado.badgeClass}`}>
+                              <span className={`w-2 h-2 rounded-full ${estado.dotColor} ${estado.estado === 'VENCIDA' ? 'animate-pulse' : ''}`} />
+                              <span>{estado.texto}</span>
+                            </span>
+                          </td>
+
+                          {/* Acciones */}
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Botón Cobrar */}
+                              <Button
+                                size="sm"
+                                variant="primary"
+                                onClick={() => handleAbrirPago(alumna)}
+                                icon={<DollarSign className="h-3.5 w-3.5" />}
+                                className="bg-[#001f1f] text-white hover:bg-[#003333] font-bold text-[11px] py-1 px-2.5"
+                              >
+                                Cobrar
+                              </Button>
+
+                              {/* Botón WhatsApp */}
+                              {alumna.phone && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleAvisoWhatsAppAlumna(alumna)}
+                                  icon={<MessageCircle className="h-3.5 w-3.5 text-emerald-600" />}
+                                  className="text-[11px] font-bold py-1 px-2 text-[var(--text-primary)] hover:border-emerald-500"
+                                  title="Enviar recordatorio de cuota por WhatsApp"
+                                >
+                                  Avisar
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1099,4 +1615,89 @@ function formatFechaLarga(dateStr: string): string {
   } catch {
     return dateStr;
   }
+}
+
+function formatFechaCorta(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const cleanDate = dateStr.slice(0, 10);
+    const [y, m, d] = cleanDate.split('-').map(Number);
+    if (isNaN(y) || isNaN(m) || isNaN(d)) return dateStr;
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+    });
+  } catch {
+    return dateStr;
+  }
+}
+
+type EstadoCuota = 'VENCIDA' | 'POR_VENCER' | 'AL_DIA';
+
+interface InfoEstadoCuota {
+  estado: EstadoCuota;
+  diffDias: number | null;
+  texto: string;
+  badgeClass: string;
+  dotColor: string;
+}
+
+function getEstadoCuotaAlumna(alumna: any, hoyStr: string): InfoEstadoCuota {
+  const dueDate = alumna?.billing_due_date;
+  const isPaid = !!alumna?.monthly_paid;
+
+  if (!dueDate) {
+    if (!isPaid) {
+      return {
+        estado: 'VENCIDA',
+        diffDias: null,
+        texto: 'Sin fecha (Impaga)',
+        badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30',
+        dotColor: 'bg-rose-500',
+      };
+    }
+    return {
+      estado: 'AL_DIA',
+      diffDias: null,
+      texto: 'Cuota al día',
+      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30',
+      dotColor: 'bg-emerald-500',
+    };
+  }
+
+  const cleanDue = dueDate.slice(0, 10);
+  const [y, m, d] = cleanDue.split('-').map(Number);
+  const [hy, hm, hd] = hoyStr.split('-').map(Number);
+  const vencObj = new Date(y, m - 1, d);
+  const hoyObj = new Date(hy, hm - 1, hd);
+  const diffDias = Math.ceil((vencObj.getTime() - hoyObj.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (!isPaid || diffDias < 0) {
+    return {
+      estado: 'VENCIDA',
+      diffDias,
+      texto: diffDias < 0 ? `Venció hace ${Math.abs(diffDias)}d (${formatFechaCorta(dueDate)})` : `Vence hoy (${formatFechaCorta(dueDate)}) - Impaga`,
+      badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30 font-bold',
+      dotColor: 'bg-rose-500',
+    };
+  }
+
+  if (diffDias <= 7) {
+    return {
+      estado: 'POR_VENCER',
+      diffDias,
+      texto: diffDias === 0 ? `Vence hoy (${formatFechaCorta(dueDate)})` : `Vence en ${diffDias}d (${formatFechaCorta(dueDate)})`,
+      badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-bold',
+      dotColor: 'bg-amber-500',
+    };
+  }
+
+  return {
+    estado: 'AL_DIA',
+    diffDias,
+    texto: `Al día (${formatFechaCorta(dueDate)})`,
+    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold',
+    dotColor: 'bg-emerald-500',
+  };
 }

@@ -81,7 +81,7 @@ export async function getClasesConAlumnas(options?: {
     const supabase = createClient();
     let query = supabase
       .from('clases')
-      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, dni, phone, profesora_id))')
+      .select('*, profesora:profiles(*), sede:sedes(*), clase_alumnas(id, alumna_id, camilla, status, alumna:alumnas(id, first_name, last_name, dni, phone, profesora_id, billing_due_date, monthly_paid, enrollment_paid, plan, plan_amount))')
       .eq('is_active', true);
 
     if (options?.sedeId && options.sedeId !== 'ALL') {
