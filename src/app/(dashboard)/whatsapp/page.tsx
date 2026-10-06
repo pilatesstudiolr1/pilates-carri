@@ -20,7 +20,7 @@ const PLANTILLAS_PREDEFINIDAS = [
   {
     id: 'transferencia',
     titulo: 'Datos Bancarios para Transferencia',
-    texto: `Hola {nombre}. Te compartimos los datos bancarios para abonar tu cuota:\n\nTitular: ${DATOS_TRANSFERENCIA.titular}\nAlias: ${DATOS_TRANSFERENCIA.alias}\nCBU: ${DATOS_TRANSFERENCIA.cbu}\n\nPor favor envianos el comprobante una vez realizada la transferencia. Muchas gracias.`,
+    texto: `Hola {nombre}. Te compartimos los datos bancarios para abonar tu cuota:\n\nTitular: ${DATOS_TRANSFERENCIA.titular}\nAlias: ${DATOS_TRANSFERENCIA.alias}\n\nPor favor envianos el comprobante una vez realizada la transferencia. Muchas gracias.`,
   },
   {
     id: 'bienvenida',
@@ -41,6 +41,16 @@ const PLANTILLAS_PREDEFINIDAS = [
     id: 'recuperacion',
     titulo: 'Confirmación de Turno de Recuperación',
     texto: 'Hola {nombre}. Te confirmamos tu turno de recuperación para el día {horario}. Por favor avísanos si necesitas reprogramar. Te esperamos.',
+  },
+  {
+    id: 'cuota_pendiente',
+    titulo: 'Recordatorio de Cuota Pendiente (con datos bancarios)',
+    texto: `Hola {nombre}, te recordamos desde Pilates Studio que tu cuota mensual de \${monto} se encuentra pendiente de pago.\n\nDatos para transferencia:\nTitular: ${DATOS_TRANSFERENCIA.titular}\nAlias: ${DATOS_TRANSFERENCIA.alias}\n\nPor favor envianos el comprobante una vez realizada la transferencia.\n\nMuchas gracias.`,
+  },
+  {
+    id: 'aviso_clase',
+    titulo: 'Aviso previo a clase por cuota impaga',
+    texto: `Hola {nombre}, te recordamos que hoy tenes turno en Pilates Studio. Para poder asistir a tu clase y mantener tu reformer es necesario tener regularizada la cuota del mes (\${monto}). Si ya realizaste la transferencia al Alias ${DATOS_TRANSFERENCIA.alias}, envianos el comprobante por favor. Te esperamos.`,
   },
 ];
 

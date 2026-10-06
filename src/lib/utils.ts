@@ -168,6 +168,30 @@ export function buildMensajeBienvenidaInscripcion(data: {
   return msg;
 }
 
+export function buildRecordatorioCuotaWhatsAppMessage(data: {
+  nombre: string;
+  monto: number;
+  alias?: string;
+  cbu?: string;
+  titular?: string;
+}): string {
+  const primerNombre = (data.nombre || '').trim().split(' ')[0] || 'Alumna';
+  const montoStr = `$${(data.monto || 0).toLocaleString('es-AR')}`;
+
+  let msg = `Hola ${primerNombre}, te recordamos desde Pilates Studio que tu cuota mensual de ${montoStr} se encuentra pendiente de pago.\n\n`;
+
+  if (data.alias || data.cbu) {
+    msg += `Datos para transferencia:\n`;
+    if (data.titular) msg += `Titular: ${data.titular}\n`;
+    if (data.alias) msg += `Alias: ${data.alias}\n`;
+    if (data.cbu) msg += `CBU: ${data.cbu}\n`;
+    msg += `\nPor favor envianos el comprobante una vez realizada la transferencia.\n\n`;
+  }
+
+  msg += `Muchas gracias.`;
+  return msg;
+}
+
 export function openWhatsAppMessage(phone: string, text: string): boolean {
   const formatted = cleanAndFormatWhatsAppPhone(phone);
   if (!formatted) return false;

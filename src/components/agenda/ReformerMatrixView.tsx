@@ -3,7 +3,15 @@
 import { useState, useMemo } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Clase } from '@/types/database';
-import { getLocalDateISO, getDateOfWeekDay, addDaysToDate, getDayOfWeekFromDate } from '@/lib/utils';
+import {
+  getLocalDateISO,
+  getDateOfWeekDay,
+  addDaysToDate,
+  getDayOfWeekFromDate,
+  cleanAndFormatWhatsAppPhone,
+  buildRecordatorioCuotaWhatsAppMessage,
+} from '@/lib/utils';
+import { DATOS_TRANSFERENCIA } from '@/lib/constants';
 import {
   Calendar,
   Plus,
@@ -18,6 +26,7 @@ import {
   Lock,
   CreditCard,
   X,
+  MessageCircle,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
@@ -66,6 +75,7 @@ interface ReformerMatrixViewProps {
     clase: Clase | null
   ) => void;
   onCobrar?: (alumna: any) => void;
+  onWhatsAppRecordatorio?: (alumna: any) => void;
   asistencias?: Record<string, string>; // clase_alumna_id -> status
   maxCamillas?: number;
   currentProfesoraId?: string;
@@ -97,6 +107,7 @@ export function ReformerMatrixView({
   onOpenAssignModal,
   onSelectOccupiedSlot,
   onCobrar,
+  onWhatsAppRecordatorio,
   asistencias = {},
   maxCamillas,
   currentProfesoraId,
@@ -270,7 +281,7 @@ export function ReformerMatrixView({
     }
   };
 
-  // Helper para botón de cobro / al día
+  // Helper para botón de cobro / al día + WhatsApp
   const renderBotonCobroOAlDia = (
     alumna: any,
     isAlDia: boolean,
@@ -288,21 +299,54 @@ export function ReformerMatrixView({
       );
     }
     return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (onCobrar) {
-            onCobrar(alumna);
-          } else if (onSelectOccupiedSlot) {
-            onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
-          }
-        }}
-        className={`w-full py-1 px-2 rounded-lg ${btnCustomColor || 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-extrabold flex items-center justify-center gap-1.5 shadow-2xs transition-transform active:scale-95 cursor-pointer`}
-      >
-        <CreditCard className="h-3.5 w-3.5" />
-        <span>Cobrar Cuota</span>
-      </button>
+      <div className="flex items-center gap-1.5 w-full">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (onCobrar) {
+              onCobrar(alumna);
+            } else if (onSelectOccupiedSlot) {
+              onSelectOccupiedSlot(selectedDay, row.hora, refNum, item, row.clase);
+            }
+          }}
+          className={`flex-1 py-1 px-2 rounded-lg ${btnCustomColor || 'bg-emerald-600 hover:bg-emerald-700'} text-white text-[11px] font-extrabold flex items-center justify-center gap-1 shadow-2xs transition-transform active:scale-95 cursor-pointer`}
+        >
+          <CreditCard className="h-3 w-3" />
+          <span>Cobrar</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const phone = alumna.phone;
+            const formatted = cleanAndFormatWhatsAppPhone(phone);
+            if (!formatted) {
+              alertDialog({
+                title: 'Sin teléfono',
+                message: `${alumna.first_name} ${alumna.last_name || ''} no tiene teléfono registrado.`,
+                variant: 'warning',
+              });
+              return;
+            }
+            if (onWhatsAppRecordatorio) {
+              onWhatsAppRecordatorio(alumna);
+            } else {
+              const textMsg = buildRecordatorioCuotaWhatsAppMessage({
+                nombre: `${alumna.first_name} ${alumna.last_name || ''}`.trim(),
+                monto: alumna.plan_amount || 0,
+                alias: DATOS_TRANSFERENCIA.alias,
+                titular: DATOS_TRANSFERENCIA.titular,
+              });
+              window.open(`https://wa.me/${formatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
+            }
+          }}
+          className="py-1 px-2 rounded-lg bg-[#25D366] hover:bg-[#20bd5a] text-white text-[11px] font-extrabold flex items-center justify-center shadow-2xs transition-transform active:scale-95 cursor-pointer"
+          title="Enviar recordatorio por WhatsApp"
+        >
+          <MessageCircle className="h-3.5 w-3.5" />
+        </button>
+      </div>
     );
   };
 

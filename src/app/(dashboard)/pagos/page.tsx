@@ -12,7 +12,8 @@ import { PagoForm } from '@/components/pagos/PagoForm';
 import { Alumna, Pago } from '@/types/database';
 import { getPagos, deletePago } from '@/lib/services/pagos';
 import { getAlumnas } from '@/lib/services/alumnas';
-import { buildAvisoPagoWhatsAppMessage, getLocalDateISO } from '@/lib/utils';
+import { buildAvisoPagoWhatsAppMessage, buildRecordatorioCuotaWhatsAppMessage, getLocalDateISO } from '@/lib/utils';
+import { DATOS_TRANSFERENCIA } from '@/lib/constants';
 import { useUser } from '@/hooks/useUser';
 import { useSede } from '@/hooks/useSede';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -159,10 +160,13 @@ function PagosPageContent() {
       });
       return;
     }
-    const textMsg = encodeURIComponent(
-      `Hola ${alumna.first_name}! Te recordamos de Pilates Studio que tu cuota mensual por $${(alumna.plan_amount || 0).toLocaleString('es-AR')} se encuentra vencida. Te pedimos regularizarla para mantener tu turno fijo. ¡Muchas gracias!`
-    );
-    window.open(`https://wa.me/${phoneFormatted}?text=${textMsg}`, '_blank');
+    const textMsg = buildRecordatorioCuotaWhatsAppMessage({
+      nombre: `${alumna.first_name} ${alumna.last_name || ''}`.trim(),
+      monto: alumna.plan_amount || 0,
+      alias: DATOS_TRANSFERENCIA.alias,
+      titular: DATOS_TRANSFERENCIA.titular,
+    });
+    window.open(`https://wa.me/${phoneFormatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
   };
 
   const sendWhatsAppComprobanteDirecto = async (pago: Pago) => {
@@ -187,12 +191,26 @@ function PagosPageContent() {
     window.open(`https://wa.me/${phoneFormatted}?text=${encodeURIComponent(textMsg)}`, '_blank');
   };
 
-  // Filtrar alumnas vencidas con búsqueda en tiempo real
+  // Filtrar alumnas con cuota pendiente o vencida
   const hoyStr = new Date().toISOString().split('T')[0];
   const alumnasVencidas = alumnas.filter((a) => {
     if (a.status !== 'ACTIVE') return false;
-    const isVencida = Boolean(a.billing_due_date && a.billing_due_date < hoyStr);
+
+    // Excluir planes de solo inscripción / clase de prueba (sin cuota mensual)
+    const esSoloPrueba =
+      a.plan === 'Solo Inscripción / Clase de prueba' ||
+      (a.plan && (a.plan.toLowerCase().includes('prueba') || a.plan.toLowerCase().includes('individual'))) ||
+      (a.enrollment_paid && (!a.plan_amount || a.plan_amount === 0));
+    if (esSoloPrueba) return false;
+
+    // Caso 1: billing_due_date existe y ya venció (incluye el día de hoy)
+    const vencidaPorFecha = Boolean(a.billing_due_date && a.billing_due_date <= hoyStr);
+    // Caso 2: cuota mensual marcada como no paga y tiene un plan con monto > 0
+    const impagaSinFecha = !a.monthly_paid && (a.plan_amount || 0) > 0;
+
+    const isVencida = vencidaPorFecha || impagaSinFecha;
     if (!isVencida) return false;
+
     if (!searchVencidas.trim()) return true;
     const term = searchVencidas.toLowerCase();
     const nombre = `${a.first_name} ${a.last_name || ''}`.toLowerCase();
@@ -436,7 +454,11 @@ function PagosPageContent() {
                       {alum.first_name} {alum.last_name}
                     </h3>
                     <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                      Venció el <span className="font-bold text-rose-600 dark:text-rose-400">{alum.billing_due_date}</span> • Plan: {alum.plan || 'Estándar'} — <strong className="text-[var(--text-primary)] font-mono">${(alum.plan_amount || 0).toLocaleString('es-AR')}</strong>
+                      {alum.billing_due_date
+                        ? <>Venció el <span className="font-bold text-rose-600 dark:text-rose-400">{alum.billing_due_date}</span> • </>
+                        : <span className="font-bold text-amber-600 dark:text-amber-400">Cuota pendiente • </span>
+                      }
+                      Plan: {alum.plan || 'Estándar'} — <strong className="text-[var(--text-primary)] font-mono">${(alum.plan_amount || 0).toLocaleString('es-AR')}</strong>
                     </p>
                   </div>
                 </div>

@@ -21,9 +21,7 @@ export const MONTO_INSCRIPCION_DEFAULT = 9500; // $9.500 ARS
 // Datos bancarios para transferencias
 export const DATOS_TRANSFERENCIA = {
   alias: 'PILATES148',
-  cbu: '3840200500000025297333',
-  titular: 'Juliana Carrizo',
-  banco: 'Banco Santander',
+  titular: 'Juliana Carrizo Varas',
 };
 
 // Respaldo de precios de planes
