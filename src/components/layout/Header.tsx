@@ -18,7 +18,7 @@ interface HeaderProps {
 export function Header({ profile, onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const { theme, toggleTheme } = useTheme();
-  const { sedes, selectedSedeId, setSelectedSedeId, selectedSede, isTeacherLocked } = useSede();
+  const { sedes, selectedSedeId, setSelectedSedeId, selectedSede, isTeacherLocked, isTeacher } = useSede();
 
   const currentPage = [...NAVIGATION_ITEMS]
     .sort((a, b) => b.href.length - a.href.length)
@@ -74,7 +74,7 @@ export function Header({ profile, onMenuClick }: HeaderProps) {
                 title="Seleccionar Sede Operativa"
               >
                 <option value="ALL" className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">
-                  Todas las Sedes
+                  {isTeacher ? 'Mis Sedes Asignadas' : 'Todas las Sedes'}
                 </option>
                 {sedes.map((s) => (
                   <option key={s.id} value={s.id} className="bg-[var(--bg-secondary)] text-[var(--text-primary)]">

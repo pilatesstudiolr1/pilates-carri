@@ -81,6 +81,7 @@ export default function ProfesorasPage() {
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<UserRole>('PROFESORA');
   const [sedeId, setSedeId] = useState<string>('');
+  const [selectedSedeIds, setSelectedSedeIds] = useState<string[]>([]);
   const [turno, setTurno] = useState('Mañana');
   const [commissionPercent, setCommissionPercent] = useState('45');
   const [hireDate, setHireDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -100,7 +101,8 @@ export default function ProfesorasPage() {
 
     if (sedesRes.data) {
       setSedes(sedesRes.data);
-      if (sedesRes.data.length > 0 && !sedeId) {
+      if (sedesRes.data.length > 0 && selectedSedeIds.length === 0 && !editingId) {
+        setSelectedSedeIds([sedesRes.data[0].id]);
         setSedeId(sedesRes.data[0].id);
       }
     }
@@ -136,7 +138,13 @@ export default function ProfesorasPage() {
     setDni('');
     setPhone('');
     setRole('PROFESORA');
-    if (sedes.length > 0) setSedeId(sedes[0].id);
+    if (sedes.length > 0) {
+      setSelectedSedeIds([sedes[0].id]);
+      setSedeId(sedes[0].id);
+    } else {
+      setSelectedSedeIds([]);
+      setSedeId('');
+    }
     setTurno('Mañana');
     setCommissionPercent('45');
     setHireDate(new Date().toISOString().split('T')[0]);
@@ -145,6 +153,14 @@ export default function ProfesorasPage() {
     setWorkDays([]);
     setWorkHours([]);
     setErrorMsg('');
+  };
+
+  const toggleSedeSelection = (id: string) => {
+    setSelectedSedeIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id];
+      setSedeId(next.length > 0 ? next[0] : '');
+      return next;
+    });
   };
 
   const handleEditClick = (profile: Profile) => {
@@ -166,7 +182,13 @@ export default function ProfesorasPage() {
     setDni(profile.dni || '');
     setPhone(profile.phone || '');
     setRole(profile.role || 'PROFESORA');
-    setSedeId(profile.sede_id || (sedes.length > 0 ? sedes[0].id : ''));
+
+    const profSedeIds = Array.isArray(profile.sede_ids) && profile.sede_ids.length > 0
+      ? profile.sede_ids
+      : (profile.sede_id ? [profile.sede_id] : (sedes.length > 0 ? [sedes[0].id] : []));
+    setSelectedSedeIds(profSedeIds);
+    setSedeId(profSedeIds[0] || '');
+
     setTurno(profile.turno || 'Mañana');
     setCommissionPercent(
       profile.commission_rate !== undefined
@@ -212,12 +234,17 @@ export default function ProfesorasPage() {
   };
 
   const copyCredenciales = (prof: Profile) => {
-    const sedeObj = sedes.find((s) => s.id === prof.sede_id);
-    const sedeName = sedeObj ? sedeObj.name : 'Pilates Studio';
+    const profSedeIds = Array.isArray(prof.sede_ids) && prof.sede_ids.length > 0
+      ? prof.sede_ids
+      : (prof.sede_id ? [prof.sede_id] : []);
+    const matchingSedes = sedes.filter((s) => profSedeIds.includes(s.id));
+    const sedeName = matchingSedes.length > 0
+      ? matchingSedes.map((s) => s.name).join(' y ')
+      : (sedes.find((s) => s.id === prof.sede_id)?.name || 'Pilates Studio');
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://pilatesstudio.com';
     const userIdent = prof.username || prof.email;
     const pass = prof.password_text || '(definida por administración)';
-    const text = `¡Hola ${prof.first_name || prof.full_name}! 👋\n\nTus datos de acceso para el sistema de Pilates Studio son:\n🔗 Enlace: ${origin}/login\n👤 Usuario / Correo: ${userIdent}\n🔑 Contraseña: ${pass}\n🏢 Sede: ${sedeName}\n\n¡Bienvenida al equipo!`;
+    const text = `¡Hola ${prof.first_name || prof.full_name}! 👋\n\nTus datos de acceso para el sistema de Pilates Studio son:\n🔗 Enlace: ${origin}/login\n👤 Usuario / Correo: ${userIdent}\n🔑 Contraseña: ${pass}\n🏢 Sedes asignadas: ${sedeName}\n\n¡Bienvenida al equipo!`;
 
     navigator.clipboard.writeText(text);
     alertDialog({
@@ -267,7 +294,15 @@ export default function ProfesorasPage() {
       return;
     }
 
+    if ((role as string) !== 'ADMIN' && selectedSedeIds.length === 0) {
+      setErrorMsg('Debes asignar al menos una sede a la profesora.');
+      return;
+    }
+
     setSubmitting(true);
+
+    const effectiveSedeIds = (role as string) === 'ADMIN' ? sedes.map((s) => s.id) : selectedSedeIds;
+    const primarySedeId = effectiveSedeIds[0] || null;
 
     const { data: savedProfile, error } = await createOrUpdateProfileByEmail({
       id: editingId || undefined,
@@ -281,7 +316,8 @@ export default function ProfesorasPage() {
       phone: phone.trim() || null,
       dni: dni.trim() || null,
       role,
-      sede_id: sedeId || null,
+      sede_id: primarySedeId,
+      sede_ids: effectiveSedeIds,
       turno,
       hire_date: hireDate,
       observations: observations.trim() || null,
@@ -611,22 +647,52 @@ export default function ProfesorasPage() {
                 </select>
               </div>
 
-              <div className="flex flex-col gap-1.5 w-full min-w-0">
-                <label className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] block">
-                  Sede asignada
-                </label>
-                <select
-                  value={sedeId}
-                  onChange={(e) => setSedeId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-md bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-default)] focus:outline-none focus:border-[var(--color-wood)] text-xs font-semibold"
-                >
-                  {sedes.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {role === 'ADMIN' ? (
+                <div className="flex flex-col gap-1.5 w-full min-w-0">
+                  <label className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] block">
+                    Alcance de sedes
+                  </label>
+                  <div className="h-10 px-3 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] flex items-center text-xs text-[var(--text-muted)] font-medium">
+                    Todas las sedes (Rol Administrador)
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1.5 w-full min-w-0 col-span-1 sm:col-span-2">
+                  <label className="text-xs sm:text-sm font-semibold text-[var(--text-secondary)] block">
+                    Sedes Asignadas *
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2 p-2 rounded-md bg-[var(--bg-tertiary)] border border-[var(--border-default)] min-h-[40px]">
+                    {sedes.map((s) => {
+                      const isChecked = selectedSedeIds.includes(s.id);
+                      return (
+                        <label
+                          key={s.id}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-semibold cursor-pointer transition-colors border select-none ${
+                            isChecked
+                              ? 'bg-[var(--color-wood)]/15 border-[var(--color-wood)] text-[var(--color-wood)]'
+                              : 'bg-[var(--bg-secondary)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleSedeSelection(s.id)}
+                            className="rounded accent-[var(--color-wood)] h-3.5 w-3.5"
+                          />
+                          <span>{s.name}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[11px] text-[var(--text-muted)]">
+                    {selectedSedeIds.length === 1
+                      ? 'Asignación fija en 1 sede.'
+                      : selectedSedeIds.length > 1
+                      ? `Profesora multi-sede (${selectedSedeIds.length} sedes autorizadas). Podrá alternar únicamente entre estas sedes.`
+                      : 'Marcar al menos una sede.'}
+                  </span>
+                </div>
+              )}
 
               {(role as string) !== 'ADMIN' && (
                 <>
@@ -889,6 +955,7 @@ export default function ProfesorasPage() {
                   <th className="py-3 px-4 font-semibold">Email / Usuario</th>
                   <th className="py-3 px-4 font-semibold">Contraseña</th>
                   <th className="py-3 px-4 font-semibold">Rol</th>
+                  <th className="py-3 px-4 font-semibold">Sedes Asignadas</th>
                   <th className="py-3 px-4 font-semibold">Turno</th>
                   <th className="py-3 px-4 font-semibold">Comisión</th>
                   <th className="py-3 px-4 font-semibold">Estado</th>
@@ -938,6 +1005,36 @@ export default function ProfesorasPage() {
                             Profesora
                           </span>
                         )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {prof.role === 'ADMIN' ? (
+                          <span className="text-[var(--text-muted)] italic text-[11px] font-medium">Todas (Admin)</span>
+                        ) : (() => {
+                          const pIds = Array.isArray(prof.sede_ids) && prof.sede_ids.length > 0
+                            ? prof.sede_ids
+                            : (prof.sede_id ? [prof.sede_id] : []);
+                          const matchingSedes = sedes.filter((s) => pIds.includes(s.id));
+                          if (matchingSedes.length === 0) {
+                            return <span className="text-[var(--text-muted)] italic text-[11px]">Sin sede</span>;
+                          }
+                          if (matchingSedes.length === 1) {
+                            return (
+                              <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-[var(--bg-tertiary)] border border-[var(--border-default)] text-[var(--text-secondary)]">
+                                {matchingSedes[0].name}
+                              </span>
+                            );
+                          }
+                          return (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 w-fit">
+                                Multi-sede ({matchingSedes.length})
+                              </span>
+                              <span className="text-[10px] text-[var(--text-muted)] leading-tight">
+                                {matchingSedes.map(s => s.name.split('—')[0].trim()).join(' + ')}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-3.5 px-4">
                         {prof.role === 'ADMIN' ? (

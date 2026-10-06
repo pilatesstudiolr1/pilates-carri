@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
+import { useSede } from '@/hooks/useSede';
 import { createClient } from '@/lib/supabase/client';
 import { getClasesConAlumnas, addAlumnaToClase, removeAlumnaFromClase } from '@/lib/services/agenda';
 import { getDisponibilidadCamillas, DisponibilidadCamillaItem } from '@/lib/services/liquidaciones';
@@ -61,6 +62,7 @@ function ProfesoraVistaContent() {
   const queryAlumnaId = searchParams.get('alumnaId');
 
   const { profile } = useUser();
+  const { selectedSedeId } = useSede();
   const { confirm, alert: alertDialog } = useConfirm();
 
   // Estado de Navegación: Por defecto la primera vista es 'HUB' o según URL
@@ -115,6 +117,7 @@ function ProfesoraVistaContent() {
       const { data: clasesRes } = await getClasesConAlumnas({
         dayOfWeek: dayOfWeekNum,
         profesoraId: isProfesora && profile?.id ? profile.id : undefined,
+        sedeId: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
       });
 
       setClases(clasesRes || []);
@@ -138,16 +141,17 @@ function ProfesoraVistaContent() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, isProfesora, profile?.id]);
+  }, [selectedDate, isProfesora, profile?.id, selectedSedeId]);
 
   // Cargar disponibilidad de camillas
   const fetchDisponibilidad = useCallback(async () => {
     const { data } = await getDisponibilidadCamillas({
       dayOfWeek: filtroDisponibilidadDia !== 'ALL' ? filtroDisponibilidadDia : undefined,
       profesoraId: isProfesora && profile?.id ? profile.id : undefined,
+      sedeId: selectedSedeId !== 'ALL' ? selectedSedeId : undefined,
     });
     setDisponibilidad(data || []);
-  }, [filtroDisponibilidadDia, isProfesora, profile?.id]);
+  }, [filtroDisponibilidadDia, isProfesora, profile?.id, selectedSedeId]);
 
   // Cargar cobros registrados exclusivamente por esta profesora
   const fetchMisPagos = useCallback(async () => {
@@ -180,23 +184,34 @@ function ProfesoraVistaContent() {
       if (isProfesora) {
         directasQuery = directasQuery.eq('profesora_id', profile.id);
       }
+      if (selectedSedeId !== 'ALL') {
+        directasQuery = directasQuery.eq('sede_id', selectedSedeId);
+      }
       const { data: directasData, error: directasErr } = await directasQuery.in('status', ['ACTIVE', 'SUSPENDED']);
       if (directasErr) console.error('Error directas alumnas:', directasErr);
 
       // 2. Alumnas que asisten a clases de esta profesora
       let enClasesAlumnas: any[] = [];
       if (isProfesora) {
-        const { data: clasesProf } = await supabase
+        let clasesQuery = supabase
           .from('clases')
           .select('id')
           .eq('profesora_id', profile.id);
 
+        if (selectedSedeId !== 'ALL') {
+          clasesQuery = clasesQuery.eq('sede_id', selectedSedeId);
+        }
+
+        const { data: clasesProf } = await clasesQuery;
+
         const claseIds = (clasesProf || []).map((c: any) => c.id);
         if (claseIds.length > 0) {
-          const { data: caData } = await supabase
+          let caQuery = supabase
             .from('clase_alumnas')
             .select('alumna:alumnas(id, first_name, last_name, phone, dni, plan, plan_amount, billing_due_date, monthly_paid, enrollment_paid, status, profesora_id, sede_id)')
             .in('clase_id', claseIds);
+
+          const { data: caData } = await caQuery;
 
           if (caData) {
             enClasesAlumnas = caData
@@ -223,7 +238,7 @@ function ProfesoraVistaContent() {
     } finally {
       setLoadingAlumnas(false);
     }
-  }, [profile?.id, isProfesora]);
+  }, [profile?.id, isProfesora, selectedSedeId]);
 
   useEffect(() => {
     fetchClasesYAsistencias();

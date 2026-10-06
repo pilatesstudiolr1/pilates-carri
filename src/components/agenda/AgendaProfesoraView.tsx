@@ -164,11 +164,21 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
     end_time: string;
     max_capacity: number;
   }): Promise<boolean> => {
+    const targetSedeId = selectedSedeId !== 'ALL' ? selectedSedeId : (profile?.sede_id || (profile?.sede_ids && profile.sede_ids.length === 1 ? profile.sede_ids[0] : null));
+    if (!targetSedeId) {
+      await alertDialog({
+        title: 'Sede requerida',
+        message: 'Por favor seleccioná una sede específica en la barra superior antes de crear un nuevo turno.',
+        variant: 'warning',
+      });
+      return false;
+    }
+
     setSubmitting(true);
     const { error } = await createClase({
       ...data,
       profesora_id: data.profesora_id || profile?.id || null,
-      sede_id: selectedSedeId !== 'ALL' ? selectedSedeId : (profile?.sede_id || null),
+      sede_id: targetSedeId,
     });
     setSubmitting(false);
 
@@ -384,13 +394,23 @@ export function AgendaProfesoraView({ initialDay }: AgendaProfesoraViewProps) {
       let targetClaseId = data.claseId;
 
       if (!targetClaseId) {
+        const targetSedeId = selectedSedeId !== 'ALL' ? selectedSedeId : (profile?.sede_id || (profile?.sede_ids && profile.sede_ids.length === 1 ? profile.sede_ids[0] : null));
+        if (!targetSedeId) {
+          await alertDialog({
+            title: 'Sede requerida',
+            message: 'Por favor seleccioná una sede específica en la barra superior antes de crear un nuevo turno.',
+            variant: 'warning',
+          });
+          return false;
+        }
+
         const endHourNum = parseInt(data.startTime.split(':')[0], 10) + 1;
         const endTime = `${endHourNum < 10 ? '0' : ''}${endHourNum}:00`;
 
         const { data: newClase, error: createErr } = await createClase({
           name: `Turno ${data.startTime} hs`,
           profesora_id: profile?.id || null,
-          sede_id: selectedSedeId !== 'ALL' ? selectedSedeId : (profile?.sede_id || null),
+          sede_id: targetSedeId,
           day_of_week: data.dayOfWeek,
           start_time: `${data.startTime}:00`,
           end_time: `${endTime}:00`,

@@ -43,6 +43,7 @@ export interface Profile {
   role: UserRole;
   avatar_url: string | null;
   sede_id: string | null;
+  sede_ids?: string[] | null;
   phone: string | null;
   dni: string | null;
   turno?: string | null;

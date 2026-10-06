@@ -84,6 +84,7 @@ export async function createOrUpdateProfileByEmail(profileData: {
   work_days?: string[];
   work_hours?: string[];
   sede_id?: string | null;
+  sede_ids?: string[] | null;
   commission_rate?: number;
   is_active?: boolean;
 }): Promise<{ data: Profile | null; error: string | null }> {

@@ -178,9 +178,11 @@ export function TurnoModal({
         setSelectedProfesoraId('');
       }
 
-      // Cargar lista de alumnas activas (filtradas por profesora si corresponde)
+      // Cargar lista de alumnas activas (filtradas por sede y profesora si corresponde)
+      const targetSedeId = clase?.sede_id || (selectedSedeId !== 'ALL' ? selectedSedeId : undefined);
       getAlumnas({
         status: 'ACTIVE',
+        sedeId: targetSedeId,
         profesoraId: profesoraFilter && profesoraFilter !== 'ALL' ? profesoraFilter : undefined,
         limit: 300,
       }).then((res) => {
@@ -191,7 +193,7 @@ export function TurnoModal({
     return () => {
       document.body.style.overflow = '';
     };
-  }, [open, alumnaAsignada, presetCamilla, clase, profesoraFilter]);
+  }, [open, alumnaAsignada, presetCamilla, clase, profesoraFilter, selectedSedeId]);
 
   useEffect(() => {
     if (selectedAlumnaId && !isOccupied) {

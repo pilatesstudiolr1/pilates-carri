@@ -43,6 +43,7 @@ export async function POST(req: Request) {
       dni,
       username,
       sede_id,
+      sede_ids,
       turno = 'Mañana',
       hire_date,
       observations,
@@ -143,7 +144,12 @@ export async function POST(req: Request) {
       userId = crypto.randomUUID();
     }
 
-    const profilePayload = {
+    const parsedSedeIds = Array.isArray(sede_ids)
+      ? sede_ids.filter(Boolean)
+      : (sede_id ? [sede_id] : []);
+    const primarySedeId = sede_id || (parsedSedeIds.length > 0 ? parsedSedeIds[0] : null);
+
+    const profilePayload: any = {
       id: userId,
       email: rawEmail,
       full_name: computedFullName,
@@ -154,7 +160,8 @@ export async function POST(req: Request) {
       dni: dni || null,
       username: rawUsername,
       password_text: effectivePassword || null,
-      sede_id: sede_id || null,
+      sede_id: primarySedeId,
+      sede_ids: parsedSedeIds,
       turno,
       hire_date: hire_date || new Date().toISOString().split('T')[0],
       observations: observations || null,
@@ -165,11 +172,22 @@ export async function POST(req: Request) {
       updated_at: new Date().toISOString(),
     };
 
-    const { data: savedProfile, error: profileError } = await client
+    let { data: savedProfile, error: profileError } = await client
       .from('profiles')
       .upsert(profilePayload, { onConflict: 'email' })
       .select()
       .single();
+
+    if (profileError && profileError.message?.includes('sede_ids')) {
+      const { sede_ids: _, ...fallbackPayload } = profilePayload;
+      const retryRes = await client
+        .from('profiles')
+        .upsert(fallbackPayload, { onConflict: 'email' })
+        .select()
+        .single();
+      savedProfile = retryRes.data;
+      profileError = retryRes.error;
+    }
 
     if (profileError) {
       return NextResponse.json({ error: `Error al guardar perfil: ${profileError.message}` }, { status: 500 });
@@ -230,13 +248,31 @@ export async function PUT(req: Request) {
     if (currentId) updateFields.id = currentId;
     if (full_name) updateFields.full_name = full_name;
     if (role) updateFields.role = role;
+    if ('sede_ids' in body || 'sede_id' in body) {
+      const parsedSedeIds = Array.isArray(body.sede_ids)
+        ? body.sede_ids.filter(Boolean)
+        : (body.sede_id ? [body.sede_id] : []);
+      updateFields.sede_ids = parsedSedeIds;
+      updateFields.sede_id = body.sede_id || (parsedSedeIds.length > 0 ? parsedSedeIds[0] : null);
+    }
     updateFields.updated_at = new Date().toISOString();
 
-    const { data: updatedProfile, error: updateError } = await client
+    let { data: updatedProfile, error: updateError } = await client
       .from('profiles')
       .upsert(updateFields, { onConflict: 'email' })
       .select()
       .single();
+
+    if (updateError && updateError.message?.includes('sede_ids')) {
+      const { sede_ids: _, ...fallbackUpdate } = updateFields;
+      const retryRes = await client
+        .from('profiles')
+        .upsert(fallbackUpdate, { onConflict: 'email' })
+        .select()
+        .single();
+      updatedProfile = retryRes.data;
+      updateError = retryRes.error;
+    }
 
     if (updateError) {
       return NextResponse.json({ error: updateError.message }, { status: 500 });
