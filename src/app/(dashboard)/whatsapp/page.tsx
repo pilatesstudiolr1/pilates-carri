@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { getAlumnas } from '@/lib/services/alumnas';
 import { Alumna } from '@/types/database';
-import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign, Search, X } from 'lucide-react';
+import { MessageCircle, Send, Copy, Sparkles, User, Calendar, DollarSign, Search, X, Cake } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 import { DATOS_TRANSFERENCIA } from '@/lib/constants';
+import { openWhatsAppMessage } from '@/lib/utils';
 
 const PLANTILLAS_PREDEFINIDAS = [
   {
@@ -31,6 +33,11 @@ const PLANTILLAS_PREDEFINIDAS = [
     id: 'cumpleanos',
     titulo: 'Feliz Cumpleaños',
     texto: 'Feliz cumpleaños {nombre}. Te deseamos un excelente día de parte de todo el equipo de Pilates Studio LR. Gracias por entrenar con nosotros.',
+  },
+  {
+    id: 'baja_alumna',
+    titulo: 'Baja de Alumna / Despedida',
+    texto: 'Hola {nombre}! Te confirmamos que hemos procesado la baja de tus clases en Pilates Studio y tus turnos quedaron liberados. Te agradecemos por haber compartido este tiempo con nosotros y recordá que podés volver cuando desees. ¡Siempre tendrás las puertas abiertas! 💕',
   },
   {
     id: 'pago_confirmado',
@@ -121,21 +128,45 @@ export default function WhatsAppPage() {
       return;
     }
 
-    const phone = alumnaSeleccionada.phone.replace(/\D/g, '');
-    const encoded = encodeURIComponent(getMensajeFinal());
-    window.open(`https://wa.me/${phone}?text=${encoded}`, '_blank');
+    if (!alumnaSeleccionada.phone) {
+      await alertDialog({
+        title: 'Sin teléfono',
+        message: `La alumna ${alumnaSeleccionada.first_name} ${alumnaSeleccionada.last_name || ''} no tiene un número de teléfono cargado en su ficha.`,
+        variant: 'warning',
+      });
+      return;
+    }
+
+    const ok = openWhatsAppMessage(alumnaSeleccionada.phone, getMensajeFinal());
+    if (!ok) {
+      await alertDialog({
+        title: 'Número inválido',
+        message: `El teléfono "${alumnaSeleccionada.phone}" no tiene un formato válido para enviar WhatsApp.`,
+        variant: 'warning',
+      });
+    }
   };
 
   return (
     <div className="flex flex-col gap-6 animate-fade-in">
       {/* Encabezado */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
-          <MessageCircle className="h-6 w-6 text-[#25D366]" /> Centro de Envíos WhatsApp
-        </h1>
-        <p className="text-sm text-[var(--text-muted)] mt-0.5">
-          Generador directo de mensajes con variables dinámicas sin costos de API
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border-default)] pb-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] flex items-center gap-2">
+            <MessageCircle className="h-6 w-6 text-[#25D366]" /> Centro de Envíos WhatsApp
+          </h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">
+            Generador directo de mensajes con variables dinámicas sin costos de API
+          </p>
+        </div>
+
+        <Link
+          href="/alumnas?tab=cumpleanos"
+          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 text-xs font-bold transition-all self-start sm:self-auto cursor-pointer"
+        >
+          <Cake className="h-4 w-4 text-amber-500" />
+          <span>🎂 Ver Cumpleaños del Mes</span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

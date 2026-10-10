@@ -11,7 +11,7 @@ import { getAlumnas, reactivarAlumna, deleteAlumna } from '@/lib/services/alumna
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useToast } from '@/components/ui/Toast';
 import { useSede } from '@/hooks/useSede';
-import { formatFechaArg } from '@/lib/utils';
+import { formatFechaArg, buildMensajeBajaAlumna, openWhatsAppMessage } from '@/lib/utils';
 import {
   UserX,
   Search,
@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldAlert,
+  MessageCircle,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 25;
@@ -277,6 +278,20 @@ export default function AlumnasInactivasPage() {
                         >
                           <RotateCcw className="h-3.5 w-3.5" />
                           <span className="hidden sm:inline">Reactivar</span>
+                        </button>
+
+                        {/* WhatsApp Baja */}
+                        <button
+                          onClick={() => {
+                            if (a.phone) {
+                              openWhatsAppMessage(a.phone, buildMensajeBajaAlumna(a.first_name));
+                            }
+                          }}
+                          disabled={!a.phone}
+                          className="p-1.5 rounded-[8px] bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/30 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                          title={a.phone ? "Enviar aviso de baja / despedida por WhatsApp" : "Sin teléfono registrado"}
+                        >
+                          <MessageCircle className="h-4 w-4" />
                         </button>
 
                         {/* Ver Ficha */}

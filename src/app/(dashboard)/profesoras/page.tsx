@@ -56,6 +56,22 @@ const DIAS_OPCIONES = [
 const HORARIOS_MANANA = ['07:00', '08:00', '09:00', '10:00', '11:00'];
 const HORARIOS_TARDE = ['15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00'];
 
+export function parseSedeSchedules(obs: string | null | undefined): Record<string, { work_days: string[]; work_hours: string[] }> | null {
+  if (!obs) return null;
+  const match = obs.match(/\[CONFIG_SEDES_HORARIOS\]([\s\S]*?)\[\/CONFIG_SEDES_HORARIOS\]/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+export function cleanObservations(obs: string | null | undefined): string {
+  if (!obs) return '';
+  return obs.replace(/\[CONFIG_SEDES_HORARIOS\][\s\S]*?\[\/CONFIG_SEDES_HORARIOS\]/g, '').trim();
+}
+
 export default function ProfesorasPage() {
   const { confirm, alert: alertDialog } = useConfirm();
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -89,6 +105,8 @@ export default function ProfesorasPage() {
   const [observations, setObservations] = useState('');
   const [workDays, setWorkDays] = useState<string[]>([]);
   const [workHours, setWorkHours] = useState<string[]>([]);
+  const [sedeSchedules, setSedeSchedules] = useState<Record<string, { work_days: string[]; work_hours: string[] }>>({});
+  const [activeScheduleSedeId, setActiveScheduleSedeId] = useState<string>('');
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
@@ -152,6 +170,8 @@ export default function ProfesorasPage() {
     setObservations('');
     setWorkDays([]);
     setWorkHours([]);
+    setSedeSchedules({});
+    setActiveScheduleSedeId('');
     setErrorMsg('');
   };
 
@@ -159,6 +179,9 @@ export default function ProfesorasPage() {
     setSelectedSedeIds((prev) => {
       const next = prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id];
       setSedeId(next.length > 0 ? next[0] : '');
+      if (next.length > 0 && !next.includes(activeScheduleSedeId)) {
+        setActiveScheduleSedeId(next[0]);
+      }
       return next;
     });
   };
@@ -188,6 +211,7 @@ export default function ProfesorasPage() {
       : (profile.sede_id ? [profile.sede_id] : (sedes.length > 0 ? [sedes[0].id] : []));
     setSelectedSedeIds(profSedeIds);
     setSedeId(profSedeIds[0] || '');
+    setActiveScheduleSedeId(profSedeIds[0] || '');
 
     setTurno(profile.turno || 'Mañana');
     setCommissionPercent(
@@ -197,23 +221,80 @@ export default function ProfesorasPage() {
     );
     setHireDate(profile.hire_date || new Date().toISOString().split('T')[0]);
     setIsActive(profile.is_active ?? true);
-    setObservations(profile.observations || '');
+    setObservations(cleanObservations(profile.observations));
+
+    // Cargar horarios diferenciados por sede
+    const parsedSchedules = parseSedeSchedules(profile.observations);
+    const initialSchedules: Record<string, { work_days: string[]; work_hours: string[] }> = {};
+    profSedeIds.forEach((sId) => {
+      if (parsedSchedules && parsedSchedules[sId]) {
+        initialSchedules[sId] = parsedSchedules[sId];
+      } else {
+        initialSchedules[sId] = {
+          work_days: profile.work_days || [],
+          work_hours: profile.work_hours || [],
+        };
+      }
+    });
+    setSedeSchedules(initialSchedules);
     setWorkDays(profile.work_days || []);
     setWorkHours(profile.work_hours || []);
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const currentSedeForSchedule = activeScheduleSedeId || selectedSedeIds[0] || '';
+  const activeWorkDays = currentSedeForSchedule && sedeSchedules[currentSedeForSchedule]?.work_days !== undefined
+    ? sedeSchedules[currentSedeForSchedule].work_days
+    : workDays;
+  const activeWorkHours = currentSedeForSchedule && sedeSchedules[currentSedeForSchedule]?.work_hours !== undefined
+    ? sedeSchedules[currentSedeForSchedule].work_hours
+    : workHours;
+
   const toggleDay = (dayFull: string) => {
-    setWorkDays((prev) =>
-      prev.includes(dayFull) ? prev.filter((d) => d !== dayFull) : [...prev, dayFull]
-    );
+    if (currentSedeForSchedule) {
+      setSedeSchedules((prev) => {
+        const currentDays = prev[currentSedeForSchedule]?.work_days || [];
+        const nextDays = currentDays.includes(dayFull)
+          ? currentDays.filter((d) => d !== dayFull)
+          : [...currentDays, dayFull];
+        const nextHours = prev[currentSedeForSchedule]?.work_hours || [];
+        const updated = {
+          ...prev,
+          [currentSedeForSchedule]: { work_days: nextDays, work_hours: nextHours },
+        };
+        const allDays = Array.from(new Set(Object.values(updated).flatMap((s) => s.work_days)));
+        setWorkDays(allDays);
+        return updated;
+      });
+    } else {
+      setWorkDays((prev) =>
+        prev.includes(dayFull) ? prev.filter((d) => d !== dayFull) : [...prev, dayFull]
+      );
+    }
   };
 
   const toggleHour = (hour: string) => {
-    setWorkHours((prev) =>
-      prev.includes(hour) ? prev.filter((h) => h !== hour) : [...prev, hour]
-    );
+    if (currentSedeForSchedule) {
+      setSedeSchedules((prev) => {
+        const currentHours = prev[currentSedeForSchedule]?.work_hours || [];
+        const nextHours = currentHours.includes(hour)
+          ? currentHours.filter((h) => h !== hour)
+          : [...currentHours, hour];
+        const currentDays = prev[currentSedeForSchedule]?.work_days || [];
+        const updated = {
+          ...prev,
+          [currentSedeForSchedule]: { work_days: currentDays, work_hours: nextHours },
+        };
+        const allHours = Array.from(new Set(Object.values(updated).flatMap((s) => s.work_hours)));
+        setWorkHours(allHours);
+        return updated;
+      });
+    } else {
+      setWorkHours((prev) =>
+        prev.includes(hour) ? prev.filter((h) => h !== hour) : [...prev, hour]
+      );
+    }
   };
 
   const togglePasswordVisibility = (userId: string) => {
@@ -304,6 +385,34 @@ export default function ProfesorasPage() {
     const effectiveSedeIds = (role as string) === 'ADMIN' ? sedes.map((s) => s.id) : selectedSedeIds;
     const primarySedeId = effectiveSedeIds[0] || null;
 
+    // Serializar horarios por sede en observations para persistencia garantizada
+    const filteredSedeSchedules: Record<string, { work_days: string[]; work_hours: string[] }> = {};
+    effectiveSedeIds.forEach((sId) => {
+      if (sedeSchedules[sId]) {
+        filteredSedeSchedules[sId] = sedeSchedules[sId];
+      }
+    });
+    if (primarySedeId && !filteredSedeSchedules[primarySedeId]) {
+      filteredSedeSchedules[primarySedeId] = {
+        work_days: workDays,
+        work_hours: workHours,
+      };
+    }
+
+    let finalObservations = cleanObservations(observations.trim());
+    if (Object.keys(filteredSedeSchedules).length > 0) {
+      finalObservations = `${finalObservations}\n\n[CONFIG_SEDES_HORARIOS]${JSON.stringify(filteredSedeSchedules)}[/CONFIG_SEDES_HORARIOS]`.trim();
+    }
+
+    const allDays = Array.from(new Set([
+      ...workDays,
+      ...Object.values(filteredSedeSchedules).flatMap((s) => s.work_days || []),
+    ]));
+    const allHours = Array.from(new Set([
+      ...workHours,
+      ...Object.values(filteredSedeSchedules).flatMap((s) => s.work_hours || []),
+    ]));
+
     const { data: savedProfile, error } = await createOrUpdateProfileByEmail({
       id: editingId || undefined,
       email: cleanEmail,
@@ -320,11 +429,11 @@ export default function ProfesorasPage() {
       sede_ids: effectiveSedeIds,
       turno,
       hire_date: hireDate,
-      observations: observations.trim() || null,
+      observations: finalObservations || null,
       commission_rate: commVal / 100,
       is_active: isActive,
-      work_days: workDays,
-      work_hours: workHours,
+      work_days: allDays,
+      work_hours: allHours,
     });
 
     setSubmitting(false);
@@ -766,19 +875,65 @@ export default function ProfesorasPage() {
           </div>
 
           {/* Bloque 3: Disponibilidad Horaria (Días y Horarios) */}
-          <div className="space-y-3 pt-4 border-t border-[var(--border-default)]">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-wood)] flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" /> 3. Disponibilidad &amp; Horarios de Trabajo
-            </h3>
+          <div className="space-y-4 pt-4 border-t border-[var(--border-default)]">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-wood)] flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" /> 3. Disponibilidad &amp; Horarios de Trabajo
+              </h3>
+              {selectedSedeIds.length > 1 && (
+                <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  ⚡ Modo Multi-Sede activo: Horarios configurables por estudio
+                </span>
+              )}
+            </div>
+
+            {/* Pestañas de Sedes para horarios diferenciados */}
+            {selectedSedeIds.length > 1 && (
+              <div className="p-3.5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-default)] space-y-2.5">
+                <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                  🏢 Seleccioná el estudio para definir sus días y turnos de trabajo:
+                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {sedes.filter((s) => selectedSedeIds.includes(s.id)).map((s) => {
+                    const isCurrent = currentSedeForSchedule === s.id;
+                    const sched = sedeSchedules[s.id];
+                    const daysCount = sched?.work_days?.length || 0;
+                    const hoursCount = sched?.work_hours?.length || 0;
+
+                    return (
+                      <button
+                        type="button"
+                        key={s.id}
+                        onClick={() => setActiveScheduleSedeId(s.id)}
+                        className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border ${
+                          isCurrent
+                            ? 'bg-[var(--color-wood)] text-white border-[var(--color-wood)] shadow-xs ring-2 ring-[var(--color-wood)]/30'
+                            : 'bg-[var(--bg-secondary)] border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        <span>{s.name}</span>
+                        <span className="text-[10px] opacity-85 font-normal">
+                          ({daysCount}d · {hoursCount}hs)
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Configurando disponibilidad para: <strong className="text-[var(--text-primary)]">{sedes.find((s) => s.id === currentSedeForSchedule)?.name || 'Sede'}</strong>
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
                 <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">
-                  Días Asignados
+                  Días Asignados {selectedSedeIds.length > 1 && `(${sedes.find((s) => s.id === currentSedeForSchedule)?.name.split('—')[0].trim() || 'Sede'})`}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                   {DIAS_OPCIONES.map((dia) => {
-                    const checked = workDays.includes(dia.full);
+                    const checked = activeWorkDays.includes(dia.full);
                     return (
                       <button
                         type="button"
@@ -800,11 +955,11 @@ export default function ProfesorasPage() {
 
               <div>
                 <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">
-                  Horarios Asignados (Turno Mañana)
+                  Horarios Asignados (Turno Mañana) {selectedSedeIds.length > 1 && `(${sedes.find((s) => s.id === currentSedeForSchedule)?.name.split('—')[0].trim() || 'Sede'})`}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                   {HORARIOS_MANANA.map((hour) => {
-                    const checked = workHours.includes(hour);
+                    const checked = activeWorkHours.includes(hour);
                     return (
                       <button
                         type="button"
@@ -826,11 +981,11 @@ export default function ProfesorasPage() {
 
               <div>
                 <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block mb-2">
-                  Horarios Asignados (Turno Tarde / Noche)
+                  Horarios Asignados (Turno Tarde / Noche) {selectedSedeIds.length > 1 && `(${sedes.find((s) => s.id === currentSedeForSchedule)?.name.split('—')[0].trim() || 'Sede'})`}
                 </span>
                 <div className="flex flex-wrap items-center gap-2">
                   {HORARIOS_TARDE.map((hour) => {
-                    const checked = workHours.includes(hour);
+                    const checked = activeWorkHours.includes(hour);
                     return (
                       <button
                         type="button"
@@ -1025,13 +1180,32 @@ export default function ProfesorasPage() {
                             );
                           }
                           return (
-                            <div className="flex flex-col gap-0.5">
+                            <div className="flex flex-col gap-1">
                               <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 w-fit">
                                 Multi-sede ({matchingSedes.length})
                               </span>
                               <span className="text-[10px] text-[var(--text-muted)] leading-tight">
                                 {matchingSedes.map(s => s.name.split('—')[0].trim()).join(' + ')}
                               </span>
+                              {(() => {
+                                const scheds = parseSedeSchedules(prof.observations);
+                                if (!scheds) return null;
+                                return (
+                                  <div className="flex flex-col gap-0.5 mt-0.5">
+                                    {matchingSedes.map((s) => {
+                                      const sc = scheds[s.id];
+                                      if (!sc || (sc.work_days.length === 0 && sc.work_hours.length === 0)) return null;
+                                      return (
+                                        <div key={s.id} className="text-[10px] leading-tight text-[var(--text-secondary)] bg-[var(--bg-tertiary)]/70 px-1.5 py-0.5 rounded border border-[var(--border-default)]">
+                                          <strong className="text-[var(--color-wood)]">{s.name.split('—')[0].trim()}:</strong>{' '}
+                                          <span>{sc.work_days.map(d => d.slice(0, 3)).join(', ')}</span>{' '}
+                                          <span className="text-[var(--text-muted)] font-mono">({sc.work_hours.join(', ')})</span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           );
                         })()}

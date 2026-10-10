@@ -1,4 +1,10 @@
 import { clsx, type ClassValue } from 'clsx';
+import {
+  getSyncedLocalDateISO,
+  getSyncedLocalTime,
+  syncTimeWithTimeZoneDB,
+  getTimeSyncInfo,
+} from '@/lib/services/timeService';
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
@@ -199,12 +205,85 @@ export function openWhatsAppMessage(phone: string, text: string): boolean {
   return true;
 }
 
-import {
-  getSyncedLocalDateISO,
-  getSyncedLocalTime,
-  syncTimeWithTimeZoneDB,
-  getTimeSyncInfo,
-} from '@/lib/services/timeService';
+export function buildMensajeCumpleanos(nombre: string): string {
+  const primerNombre = (nombre || '').trim().split(' ')[0] || 'Alumna';
+  return `¡Feliz cumpleaños ${primerNombre}! 🎂✨\n\nTe deseamos un excelente y maravilloso día de parte de todo el equipo de Pilates Studio LR. ¡Muchas gracias por entrenar y compartir tu energía con nosotros! 💕`;
+}
+
+export function buildMensajeBajaAlumna(nombre: string): string {
+  const primerNombre = (nombre || '').trim().split(' ')[0] || 'Alumna';
+  return `Hola ${primerNombre}! 👋\n\nTe escribimos desde Pilates Studio para confirmarte que hemos procesado la baja de tus clases y tus turnos en la agenda ya quedaron liberados.\n\nTe agradecemos un montón por haber compartido este tiempo con nosotros. Recordá que cuando desees retomar, ¡siempre tendrás las puertas abiertas del estudio! 💕`;
+}
+
+export function getBirthdayInfo(dateOfBirth?: string | null): {
+  isToday: boolean;
+  isThisMonth: boolean;
+  daysUntil: number;
+  day: number;
+  month: number;
+  ageToTurn: number | null;
+  formattedDate: string;
+} | null {
+  if (!dateOfBirth) return null;
+  const clean = dateOfBirth.slice(0, 10).trim();
+
+  // Support both YYYY-MM-DD and DD/MM/YYYY or YYYY/MM/DD
+  const separator = clean.includes('-') ? '-' : clean.includes('/') ? '/' : null;
+  if (!separator) return null;
+
+  const parts = clean.split(separator).map(Number);
+  if (parts.length < 3 || isNaN(parts[0]) || isNaN(parts[1]) || isNaN(parts[2])) return null;
+
+  let birthYear: number;
+  let birthMonth: number;
+  let birthDay: number;
+
+  if (parts[0] > 1900) {
+    // Format: YYYY-MM-DD or YYYY/MM/DD
+    [birthYear, birthMonth, birthDay] = parts;
+  } else if (parts[2] > 1900) {
+    // Format: DD/MM/YYYY
+    [birthDay, birthMonth, birthYear] = parts;
+  } else {
+    [birthYear, birthMonth, birthDay] = parts;
+  }
+
+  if (birthMonth < 1 || birthMonth > 12 || birthDay < 1 || birthDay > 31) return null;
+
+  const todayStr = getLocalDateISO();
+  const [currentYear, currentMonth, currentDay] = todayStr.split('-').map(Number);
+
+  const isToday = birthMonth === currentMonth && birthDay === currentDay;
+  const isThisMonth = birthMonth === currentMonth;
+
+  let nextBdayYear = currentYear;
+  if (birthMonth < currentMonth || (birthMonth === currentMonth && birthDay < currentDay)) {
+    nextBdayYear = currentYear + 1;
+  }
+
+  const todayDate = new Date(currentYear, currentMonth - 1, currentDay);
+  const nextBdayDate = new Date(nextBdayYear, birthMonth - 1, birthDay);
+  const diffMs = nextBdayDate.getTime() - todayDate.getTime();
+  const daysUntil = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  const ageToTurn = birthYear > 1900 ? nextBdayYear - birthYear : null;
+
+  const meses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
+  const formattedDate = `${birthDay} de ${meses[birthMonth - 1]}`;
+
+  return {
+    isToday,
+    isThisMonth,
+    daysUntil,
+    day: birthDay,
+    month: birthMonth,
+    ageToTurn,
+    formattedDate,
+  };
+}
 
 export function getLocalDateISO(d?: Date | string): string {
   return getSyncedLocalDateISO(d);

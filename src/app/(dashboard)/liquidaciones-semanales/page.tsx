@@ -38,6 +38,8 @@ import {
   Clock,
   MapPin,
   UserCheck,
+  Percent,
+  Info,
 } from 'lucide-react';
 
 export type ModalityFilter = 'ALL' | 'REFORMER' | 'ESTETICA';
@@ -48,6 +50,10 @@ export default function LiquidacionesSemanalesPage() {
   const [profesoras, setProfesoras] = useState<Profile[]>([]);
   const [selectedProfesoraId, setSelectedProfesoraId] = useState<string>('ALL');
   const [modalityFilter, setModalityFilter] = useState<ModalityFilter>('ALL');
+
+  // Custom rates overrides (percentage 0-100)
+  const [customRatesByProf, setCustomRatesByProf] = useState<Record<string, number>>({});
+  const [ratesInput, setRatesInput] = useState<Record<string, string>>({});
 
   // Rango de semana actual (Lunes a Domingo)
   const [startDate, setStartDate] = useState(() => {
@@ -97,11 +103,19 @@ export default function LiquidacionesSemanalesPage() {
     setLoading(true);
 
     if (selectedProfesoraId === 'ALL') {
-      const { data } = await calcularLiquidacionGlobal(startDate, endDate);
+      const ratesDecimal: Record<string, number> = {};
+      Object.entries(customRatesByProf).forEach(([id, rate]) => {
+        ratesDecimal[id] = rate / 100;
+      });
+      const { data } = await calcularLiquidacionGlobal(startDate, endDate, ratesDecimal);
       setLiquidacionGlobal(data);
       setLiquidacionCalculada(null);
     } else {
-      const { data } = await calcularLiquidacionSemanal(selectedProfesoraId, startDate, endDate);
+      const overrideRate = customRatesByProf[selectedProfesoraId] !== undefined
+        ? customRatesByProf[selectedProfesoraId] / 100
+        : undefined;
+
+      const { data } = await calcularLiquidacionSemanal(selectedProfesoraId, startDate, endDate, overrideRate);
       if (data) {
         if (modalityFilter !== 'ALL') {
           const filteredDetalles = data.detalles.filter((d) => {
@@ -111,7 +125,9 @@ export default function LiquidacionesSemanalesPage() {
             return true;
           });
 
-          const totalCollected = filteredDetalles.reduce((acc, d) => acc + d.amount_paid, 0);
+          const totalCuotas = filteredDetalles.filter((d) => !d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+          const totalInscripciones = filteredDetalles.filter((d) => d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+          const totalCollected = totalCuotas + totalInscripciones;
           const teacherAmount = filteredDetalles.reduce((acc, d) => acc + d.teacher_commission, 0);
           const studioAmount = totalCollected - teacherAmount;
 
@@ -119,6 +135,8 @@ export default function LiquidacionesSemanalesPage() {
             ...data,
             detalles: filteredDetalles,
             total_collected: totalCollected,
+            total_cuotas: totalCuotas,
+            total_inscripciones: totalInscripciones,
             teacher_amount: teacherAmount,
             studio_amount: studioAmount,
           });
@@ -132,11 +150,98 @@ export default function LiquidacionesSemanalesPage() {
     }
 
     setLoading(false);
-  }, [selectedProfesoraId, startDate, endDate, modalityFilter]);
+  }, [selectedProfesoraId, startDate, endDate, modalityFilter, customRatesByProf]);
 
   useEffect(() => {
     handleCalcular();
   }, [selectedProfesoraId, startDate, endDate, modalityFilter, handleCalcular]);
+
+  // Recálculo en vivo sin parpadeos ni pérdida de foco
+  const handleRateChange = (profId: string, newRatePct: number) => {
+    const validPct = Math.max(0, Math.min(100, isNaN(newRatePct) ? 0 : newRatePct));
+    setCustomRatesByProf((prev) => ({ ...prev, [profId]: validPct }));
+    const rateDecimal = validPct / 100;
+
+    // Actualización inmediata para vista individual
+    if (selectedProfesoraId === profId && liquidacionCalculada) {
+      const updatedDetalles = liquidacionCalculada.detalles.map((d) => {
+        const comm = d.is_inscripcion ? 0 : d.amount_paid * rateDecimal;
+        return { ...d, teacher_commission: comm };
+      });
+      const teacherAmount = updatedDetalles.reduce((acc, d) => acc + d.teacher_commission, 0);
+      const studioAmount = liquidacionCalculada.total_collected - teacherAmount;
+
+      setLiquidacionCalculada({
+        ...liquidacionCalculada,
+        commission_rate: rateDecimal,
+        detalles: updatedDetalles,
+        teacher_amount: teacherAmount,
+        studio_amount: studioAmount,
+      });
+    }
+
+    // Actualización inmediata para vista global
+    if (liquidacionGlobal) {
+      let updatedTotalProfesoras = 0;
+      const updatedLiquidaciones = liquidacionGlobal.liquidaciones_profesoras.map((liq) => {
+        if (liq.profesora_id === profId) {
+          const updatedDetalles = liq.detalles.map((d) => {
+            const comm = d.is_inscripcion ? 0 : d.amount_paid * rateDecimal;
+            return { ...d, teacher_commission: comm };
+          });
+          const teacherAmount = updatedDetalles.reduce((acc, d) => acc + d.teacher_commission, 0);
+          const studioAmount = liq.total_collected - teacherAmount;
+          updatedTotalProfesoras += teacherAmount;
+          return {
+            ...liq,
+            commission_rate: rateDecimal,
+            detalles: updatedDetalles,
+            teacher_amount: teacherAmount,
+            studio_amount: studioAmount,
+          };
+        } else {
+          updatedTotalProfesoras += liq.teacher_amount;
+          return liq;
+        }
+      });
+
+      const updatedTodosDetalles = liquidacionGlobal.todos_los_detalles.map((d) => {
+        const matchingLiq = updatedLiquidaciones.find((l) =>
+          l.detalles.some((subD) => subD.id === d.id)
+        );
+        if (matchingLiq && matchingLiq.profesora_id === profId) {
+          const comm = d.is_inscripcion ? 0 : d.amount_paid * rateDecimal;
+          return { ...d, teacher_commission: comm };
+        }
+        return d;
+      });
+
+      setLiquidacionGlobal({
+        ...liquidacionGlobal,
+        liquidaciones_profesoras: updatedLiquidaciones,
+        todos_los_detalles: updatedTodosDetalles,
+        total_profesoras: updatedTotalProfesoras,
+        total_estudio: liquidacionGlobal.total_recaudado - updatedTotalProfesoras,
+      });
+    }
+  };
+
+  const handleRateInputChange = (profId: string, valueString: string) => {
+    setRatesInput((prev) => ({ ...prev, [profId]: valueString }));
+    const numVal = parseFloat(valueString);
+    if (!isNaN(numVal) && numVal >= 0 && numVal <= 100) {
+      handleRateChange(profId, numVal);
+    }
+  };
+
+  const handleRateInputBlur = (profId: string, fallbackRateDecimal: number) => {
+    const rawVal = ratesInput[profId];
+    if (rawVal === undefined || rawVal === '' || isNaN(parseFloat(rawVal))) {
+      const defaultPct = Math.round(fallbackRateDecimal * 100);
+      setRatesInput((prev) => ({ ...prev, [profId]: String(defaultPct) }));
+      handleRateChange(profId, defaultPct);
+    }
+  };
 
   const handleMarcarPagada = async (liq?: LiquidacionSemanal) => {
     const target = liq || liquidacionCalculada;
@@ -277,6 +382,14 @@ export default function LiquidacionesSemanalesPage() {
 
       {activeTab === 'NUEVA' && (
         <>
+          {/* Banner Aclaratorio de Regla de Negocio */}
+          <div className="flex items-start sm:items-center gap-3 p-3.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs text-blue-900 dark:text-blue-200">
+            <Info className="h-4 w-4 shrink-0 text-blue-500 mt-0.5 sm:mt-0" />
+            <div className="leading-relaxed">
+              <strong>Regla de Liquidación:</strong> Las <strong>Cuotas / Mensualidades</strong> se liquidan aplicando el porcentaje de comisión pactado con cada profesora. Las <strong>Inscripciones al Estudio</strong> corresponden 100% al estudio (0% de comisión) y no forman parte del pago a las profesoras. Puedes modificar el <strong>% Comisión</strong> en vivo para recalcular al instante.
+            </div>
+          </div>
+
           {/* Panel de Selección: Todo el Estudio vs Profesora Particular + Presets de Período */}
           <Card className="p-6 border border-[var(--border-default)] shadow-xs space-y-4">
             {/* Presets Rápidos de Período (Cierre Mensual 1 al 31 vs Semana Actual) */}
@@ -385,73 +498,91 @@ export default function LiquidacionesSemanalesPage() {
           ) : selectedProfesoraId === 'ALL' && liquidacionGlobal ? (
             /* VISTA CONSOLIDADA DE TODO EL ESTUDIO */
             <div className="flex flex-col gap-6">
-              {/* 4 KPIs Clave del Estudio */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="p-5 border-l-4 border-l-blue-500 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                        Total Recaudado Estudio
-                      </span>
-                      <p className="text-2xl font-black text-[var(--text-primary)] mt-1">
-                        ${liquidacionGlobal.total_recaudado.toLocaleString('es-AR')} ARS
-                      </p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                      <DollarSign className="h-5 w-5" />
-                    </div>
+              {/* 5 KPIs Clave del Estudio con Desglose Cuotas vs Inscripciones */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                {/* 1. Total Recaudado Global */}
+                <Card className="p-4 border-l-4 border-l-blue-500 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">
+                      Total Recaudado Global
+                    </span>
+                    <p className="text-xl font-black text-[var(--text-primary)] mt-1 font-mono">
+                      ${liquidacionGlobal.total_recaudado.toLocaleString('es-AR')}
+                    </p>
                   </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Cuotas + Inscripciones
+                  </span>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-emerald-500 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                        Ganancia Neta del Estudio
+                {/* 2. Total Cuotas (Comisionables) */}
+                <Card className="p-4 border-l-4 border-l-indigo-500 shadow-xs flex flex-col justify-between bg-indigo-500/5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider block">
+                        Total Cuotas
                       </span>
-                      <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                        ${liquidacionGlobal.total_estudio.toLocaleString('es-AR')} ARS
-                      </p>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600">
+                        Comisionable
+                      </span>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
+                    <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
+                      ${liquidacionGlobal.total_cuotas.toLocaleString('es-AR')}
+                    </p>
                   </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Base para comisiones
+                  </span>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-[var(--color-wood)] shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                        Comisiones a Profesoras
+                {/* 3. Total Inscripciones (100% Estudio) */}
+                <Card className="p-4 border-l-4 border-l-amber-500 shadow-xs flex flex-col justify-between bg-amber-500/5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider block">
+                        Inscripciones
                       </span>
-                      <p className="text-2xl font-black text-[var(--color-wood)] mt-1">
-                        ${liquidacionGlobal.total_profesoras.toLocaleString('es-AR')} ARS
-                      </p>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600">
+                        100% Estudio
+                      </span>
                     </div>
-                    <div className="w-10 h-10 rounded-full bg-[var(--color-wood)]/10 flex items-center justify-center text-[var(--color-wood)]">
-                      <Users className="h-5 w-5" />
-                    </div>
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1 font-mono">
+                      ${liquidacionGlobal.total_inscripciones.toLocaleString('es-AR')}
+                    </p>
                   </div>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-2">
+                    0% a profes (no comisiona)
+                  </span>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-purple-500 shadow-xs">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                        Lugares Disponibles
-                      </span>
-                      <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
-                        {totalLibresEstudio} Reformers
-                      </p>
-                      <span className="text-[10px] text-[var(--text-muted)]">
-                        {porcentajeOcupacion}% ocupación actual
-                      </span>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-500">
-                      <BedDouble className="h-5 w-5" />
-                    </div>
+                {/* 4. A Pagar Profesoras */}
+                <Card className="p-4 border-l-4 border-l-[var(--color-wood)] shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">
+                      A Pagar Profesoras
+                    </span>
+                    <p className="text-xl font-black text-[var(--color-wood)] mt-1 font-mono">
+                      ${liquidacionGlobal.total_profesoras.toLocaleString('es-AR')}
+                    </p>
                   </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Calculado en vivo por %
+                  </span>
+                </Card>
+
+                {/* 5. Ganancia Neta Estudio */}
+                <Card className="p-4 border-l-4 border-l-emerald-500 shadow-xs flex flex-col justify-between bg-emerald-500/5">
+                  <div>
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider block">
+                      Ganancia Neta Estudio
+                    </span>
+                    <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1 font-mono">
+                      ${liquidacionGlobal.total_estudio.toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-medium mt-2">
+                    Margen cuotas + 100% inscrip.
+                  </span>
                 </Card>
               </div>
 
@@ -464,7 +595,7 @@ export default function LiquidacionesSemanalesPage() {
                       <span>Liquidación Desglosada por Profesora</span>
                     </h3>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                      Montos recaudados, porcentaje de comisión asignado y beneficio para el estudio en esta semana
+                      Montos recaudados separados por cuotas e inscripciones. Puedes modificar el <strong>% Comisión</strong> en vivo para recalcular al instante.
                     </p>
                   </div>
 
@@ -478,32 +609,63 @@ export default function LiquidacionesSemanalesPage() {
                 </div>
 
                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <table className="w-full text-left text-xs border-collapse min-w-[850px]">
                     <thead>
                       <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
-                        <th className="py-3 px-4 font-semibold">Profesora</th>
-                        <th className="py-3 px-4 font-semibold">Cobros</th>
-                        <th className="py-3 px-4 font-semibold">Total Cobrado</th>
-                        <th className="py-3 px-4 font-semibold">% Comisión</th>
-                        <th className="py-3 px-4 font-semibold text-[var(--color-wood)]">A Pagar Profe</th>
-                        <th className="py-3 px-4 font-semibold text-emerald-600">Margen Estudio</th>
-                        <th className="py-3 px-4 font-semibold text-right">Acción</th>
+                        <th className="py-3 px-3.5 font-semibold">Profesora</th>
+                        <th className="py-3 px-3 font-semibold text-center">Cobros</th>
+                        <th className="py-3 px-3.5 font-semibold text-indigo-600 dark:text-indigo-400">Total Cuotas</th>
+                        <th className="py-3 px-3.5 font-semibold text-amber-600 dark:text-amber-400">Inscripciones (Estudio)</th>
+                        <th className="py-3 px-3.5 font-semibold">Total Cobrado</th>
+                        <th className="py-3 px-3 font-semibold text-center w-28">% Comisión (Editable)</th>
+                        <th className="py-3 px-3.5 font-semibold text-[var(--color-wood)]">A Pagar Profe</th>
+                        <th className="py-3 px-3.5 font-semibold text-emerald-600">Margen Estudio</th>
+                        <th className="py-3 px-3.5 font-semibold text-right">Acción</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[var(--border-default)] text-[var(--text-primary)]">
                       {liquidacionGlobal.liquidaciones_profesoras.map((liq) => (
                         <tr key={liq.id} className="hover:bg-[var(--bg-tertiary)]/50 transition-colors">
-                          <td className="py-3.5 px-4 font-bold">{liq.profesora_nombre}</td>
-                          <td className="py-3.5 px-4 font-mono">{liq.detalles.length}</td>
-                          <td className="py-3.5 px-4 font-mono font-bold">${liq.total_collected.toLocaleString('es-AR')}</td>
-                          <td className="py-3.5 px-4 font-mono">{Math.round(liq.commission_rate * 100)}%</td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-[var(--color-wood)]">
+                          <td className="py-3.5 px-3.5 font-bold">{liq.profesora_nombre}</td>
+                          <td className="py-3.5 px-3 font-mono text-center">{liq.detalles.length}</td>
+                          <td className="py-3.5 px-3.5 font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            ${liq.total_cuotas.toLocaleString('es-AR')}
+                          </td>
+                          <td className="py-3.5 px-3.5 font-mono">
+                            <span className="font-bold text-amber-600 dark:text-amber-400">
+                              ${liq.total_inscripciones.toLocaleString('es-AR')}
+                            </span>
+                            {liq.total_inscripciones > 0 && (
+                              <span className="ml-1 text-[9px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-600 font-semibold">
+                                0% com.
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3.5 px-3.5 font-mono font-bold text-[var(--text-muted)]">
+                            ${liq.total_collected.toLocaleString('es-AR')}
+                          </td>
+                          <td className="py-3.5 px-3 text-center">
+                            <div className="inline-flex items-center gap-1 bg-[var(--bg-tertiary)] px-2 py-1 rounded-lg border border-[var(--border-default)] focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500">
+                              <input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="1"
+                                value={ratesInput[liq.profesora_id] ?? String(Math.round(liq.commission_rate * 100))}
+                                onChange={(e) => handleRateInputChange(liq.profesora_id, e.target.value)}
+                                onBlur={() => handleRateInputBlur(liq.profesora_id, liq.commission_rate)}
+                                className="w-12 text-center text-xs font-bold bg-transparent border-none outline-none text-[var(--text-primary)]"
+                              />
+                              <span className="text-[10px] font-bold text-[var(--text-muted)]">%</span>
+                            </div>
+                          </td>
+                          <td className="py-3.5 px-3.5 font-mono font-bold text-[var(--color-wood)]">
                             ${liq.teacher_amount.toLocaleString('es-AR')}
                           </td>
-                          <td className="py-3.5 px-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
+                          <td className="py-3.5 px-3.5 font-mono font-bold text-emerald-600 dark:text-emerald-400">
                             ${liq.studio_amount.toLocaleString('es-AR')}
                           </td>
-                          <td className="py-3.5 px-4 text-right">
+                          <td className="py-3.5 px-3.5 text-right">
                             <Button
                               size="sm"
                               variant="outline"
@@ -523,9 +685,14 @@ export default function LiquidacionesSemanalesPage() {
 
               {/* Master Detalle de Todos los Cobros Registrados */}
               <Card className="p-6 border border-[var(--border-default)] shadow-xs space-y-4">
-                <h3 className="text-base font-bold text-[var(--text-primary)]">
-                  Registro Maestro de Todos los Cobros Abonados ({liquidacionGlobal.todos_los_detalles.length})
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base font-bold text-[var(--text-primary)]">
+                    Registro Maestro de Todos los Cobros Abonados ({liquidacionGlobal.todos_los_detalles.length})
+                  </h3>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    Las inscripciones no generan comisión a profesoras
+                  </span>
+                </div>
 
                 {liquidacionGlobal.todos_los_detalles.length === 0 ? (
                   <p className="text-xs text-[var(--text-muted)] py-8 text-center">
@@ -533,12 +700,13 @@ export default function LiquidacionesSemanalesPage() {
                   </p>
                 ) : (
                   <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                    <table className="w-full text-left text-xs border-collapse min-w-[780px]">
                       <thead>
                         <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                           <th className="py-3 px-4 font-semibold">Alumna / Cliente</th>
                           <th className="py-3 px-4 font-semibold">Fecha Pago</th>
                           <th className="py-3 px-4 font-semibold">Concepto / Plan</th>
+                          <th className="py-3 px-4 font-semibold">Tipo de Cobro</th>
                           <th className="py-3 px-4 font-semibold">Sede</th>
                           <th className="py-3 px-4 font-semibold">Monto Abonado</th>
                           <th className="py-3 px-4 font-semibold text-[var(--color-wood)]">Comisión Profe</th>
@@ -550,10 +718,29 @@ export default function LiquidacionesSemanalesPage() {
                             <td className="py-3.5 px-4 font-bold">{d.alumna_nombre}</td>
                             <td className="py-3.5 px-4 font-mono">{d.payment_date}</td>
                             <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">{d.plan_name}</td>
+                            <td className="py-3.5 px-4">
+                              {d.is_inscripcion ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  Inscripción (Estudio)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                                  Cuota / Mensualidad
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3.5 px-4">{d.sede_name}</td>
                             <td className="py-3.5 px-4 font-mono font-bold">${d.amount_paid.toLocaleString('es-AR')}</td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-[var(--color-wood)]">
-                              ${d.teacher_commission.toLocaleString('es-AR')}
+                            <td className="py-3.5 px-4 font-mono">
+                              {d.is_inscripcion ? (
+                                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                                  $0 (100% Estudio)
+                                </span>
+                              ) : (
+                                <span className="font-bold text-[var(--color-wood)]">
+                                  ${d.teacher_commission.toLocaleString('es-AR')}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -566,42 +753,106 @@ export default function LiquidacionesSemanalesPage() {
           ) : liquidacionCalculada ? (
             /* VISTA INDIVIDUAL DE UNA PROFESORA */
             <div className="flex flex-col gap-6">
-              {/* Tarjetas KPI Individuales */}
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                <Card className="p-5 border-l-4 border-l-blue-500 shadow-xs">
-                  <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                    Total Cobrado Semana
+              {/* Tarjetas KPI Individuales con Desglose Cuotas / Inscripciones y Porcentaje Editable */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+                {/* 1. Total Cobrado */}
+                <Card className="p-4 border-l-4 border-l-blue-500 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">
+                      Total Cobrado
+                    </span>
+                    <p className="text-xl font-black text-[var(--text-primary)] mt-1 font-mono">
+                      ${liquidacionCalculada.total_collected.toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Cuotas + Inscripciones
                   </span>
-                  <p className="text-2xl font-black text-[var(--text-primary)] mt-1">
-                    ${liquidacionCalculada.total_collected.toLocaleString('es-AR')} ARS
-                  </p>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-amber-500 shadow-xs">
-                  <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                    % Comisión Profesora
+                {/* 2. Total Cuotas (Comisionables) */}
+                <Card className="p-4 border-l-4 border-l-indigo-500 shadow-xs flex flex-col justify-between bg-indigo-500/5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider block">
+                        Total Cuotas
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/10 text-indigo-600">
+                        Comisionable
+                      </span>
+                    </div>
+                    <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1 font-mono">
+                      ${liquidacionCalculada.total_cuotas.toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Base sobre la que comisiona
                   </span>
-                  <p className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">
-                    {(liquidacionCalculada.commission_rate * 100).toFixed(0)}%
-                  </p>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-[var(--color-wood)] shadow-xs">
-                  <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                    A Pagar a Profesora
+                {/* 3. Inscripciones (Estudio) */}
+                <Card className="p-4 border-l-4 border-l-amber-500 shadow-xs flex flex-col justify-between bg-amber-500/5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider block">
+                        Inscripciones
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600">
+                        100% Estudio
+                      </span>
+                    </div>
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400 mt-1 font-mono">
+                      ${liquidacionCalculada.total_inscripciones.toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300 font-medium mt-2">
+                    0% a profesora
                   </span>
-                  <p className="text-2xl font-black text-[var(--color-wood)] mt-1">
-                    ${liquidacionCalculada.teacher_amount.toLocaleString('es-AR')} ARS
-                  </p>
                 </Card>
 
-                <Card className="p-5 border-l-4 border-l-emerald-500 shadow-xs">
-                  <span className="text-xs text-[var(--text-muted)] font-bold uppercase tracking-wider">
-                    Margen para Estudio
+                {/* 4. % Comisión Editable en Vivo */}
+                <Card className="p-4 border-l-4 border-l-purple-500 shadow-xs flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider block">
+                        % Comisión
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/10 text-purple-600">
+                        Editable en vivo
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={ratesInput[selectedProfesoraId] ?? String(Math.round(liquidacionCalculada.commission_rate * 100))}
+                        onChange={(e) => handleRateInputChange(selectedProfesoraId, e.target.value)}
+                        onBlur={() => handleRateInputBlur(selectedProfesoraId, liquidacionCalculada.commission_rate)}
+                        className="w-16 h-8 px-2 text-center text-lg font-black rounded-lg bg-[var(--bg-tertiary)] border border-purple-500/40 text-purple-600 dark:text-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                      <span className="text-lg font-black text-purple-600 dark:text-purple-400">%</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-1">
+                    Recalcula montos al instante
                   </span>
-                  <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                    ${liquidacionCalculada.studio_amount.toLocaleString('es-AR')} ARS
-                  </p>
+                </Card>
+
+                {/* 5. A Pagar a Profesora */}
+                <Card className="p-4 border-l-4 border-l-[var(--color-wood)] shadow-xs flex flex-col justify-between">
+                  <div>
+                    <span className="text-[11px] text-[var(--text-muted)] font-bold uppercase tracking-wider block">
+                      A Pagar a Profesora
+                    </span>
+                    <p className="text-xl font-black text-[var(--color-wood)] mt-1 font-mono">
+                      ${liquidacionCalculada.teacher_amount.toLocaleString('es-AR')}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-2">
+                    Margen para estudio: ${liquidacionCalculada.studio_amount.toLocaleString('es-AR')}
+                  </span>
                 </Card>
               </div>
 
@@ -616,7 +867,7 @@ export default function LiquidacionesSemanalesPage() {
                       )}
                     </h3>
                     <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                      Cobros efectivamente ingresados en la semana seleccionada.
+                      Cobros efectivamente ingresados en la semana seleccionada. Las inscripciones no generan comisión.
                     </p>
                   </div>
 
@@ -646,12 +897,13 @@ export default function LiquidacionesSemanalesPage() {
                   </p>
                 ) : (
                   <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left text-xs border-collapse min-w-[650px]">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                       <thead>
                         <tr className="border-b border-[var(--border-default)] bg-[var(--bg-tertiary)] text-[var(--text-muted)] uppercase tracking-wider">
                           <th className="py-3 px-4 font-semibold">Alumna / Paciente</th>
                           <th className="py-3 px-4 font-semibold">Fecha Pago</th>
                           <th className="py-3 px-4 font-semibold">Plan / Servicio</th>
+                          <th className="py-3 px-4 font-semibold">Tipo</th>
                           <th className="py-3 px-4 font-semibold">Monto Abonado</th>
                           <th className="py-3 px-4 font-semibold text-[var(--color-wood)]">Comisión Profesora</th>
                         </tr>
@@ -662,9 +914,28 @@ export default function LiquidacionesSemanalesPage() {
                             <td className="py-3.5 px-4 font-bold">{d.alumna_nombre}</td>
                             <td className="py-3.5 px-4 font-mono">{d.payment_date}</td>
                             <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium">{d.plan_name}</td>
+                            <td className="py-3.5 px-4">
+                              {d.is_inscripcion ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                  Inscripción (Estudio)
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                                  Cuota / Mensualidad
+                                </span>
+                              )}
+                            </td>
                             <td className="py-3.5 px-4 font-mono font-bold">${d.amount_paid.toLocaleString('es-AR')}</td>
-                            <td className="py-3.5 px-4 font-mono font-bold text-[var(--color-wood)]">
-                              ${d.teacher_commission.toLocaleString('es-AR')}
+                            <td className="py-3.5 px-4 font-mono">
+                              {d.is_inscripcion ? (
+                                <span className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                                  $0 (100% Estudio)
+                                </span>
+                              ) : (
+                                <span className="font-bold text-[var(--color-wood)]">
+                                  ${d.teacher_commission.toLocaleString('es-AR')}
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))}

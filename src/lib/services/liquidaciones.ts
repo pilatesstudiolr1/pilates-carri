@@ -9,6 +9,8 @@ export interface LiquidacionSemanal {
   period_start: string;
   period_end: string;
   total_collected: number;
+  total_cuotas: number;
+  total_inscripciones: number;
   commission_rate: number;
   teacher_amount: number;
   studio_amount: number;
@@ -25,6 +27,7 @@ export interface LiquidacionDetalle {
   alumna_nombre: string;
   payment_date: string;
   plan_name: string;
+  is_inscripcion: boolean;
   amount_paid: number;
   teacher_commission: number;
   sede_name: string;
@@ -61,7 +64,8 @@ function saveStoredLiquidacion(liq: LiquidacionSemanal) {
 export async function calcularLiquidacionSemanal(
   profesoraId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  overrideCommissionRate?: number
 ): Promise<{ data: LiquidacionSemanal | null; error: string | null }> {
   try {
     const [profsRes, pagosRes] = await Promise.all([
@@ -72,11 +76,11 @@ export async function calcularLiquidacionSemanal(
     const todasProfesoras = profsRes.data.filter((p) => p.role === 'PROFESORA');
     const profe = todasProfesoras.find((p) => p.id === profesoraId);
     const profesoraNombre = profe?.full_name || 'Profesora';
-    const defaultRate = profe?.commission_rate ?? 0.40;
+    const effectiveRate = typeof overrideCommissionRate === 'number'
+      ? overrideCommissionRate
+      : (profe?.commission_rate ?? 0.40);
 
     // Filtrar cobros efectivamente ingresados en el período para esa profesora estrictamente
-    // Fallback: si pago.profesora_id no pertenece a una profesora (por ejemplo, si se guardó con el ID de un ADMIN),
-    // o está vacío, atribuirlo a la profesora de la alumna (alumna.profesora_id).
     const pagosFiltrados = pagosRes.data.filter((p) => {
       const pDate = p.payment_date || (p.created_at ? p.created_at.split('T')[0] : '');
       const matchDate = pDate >= startDate && pDate <= endDate;
@@ -92,23 +96,28 @@ export async function calcularLiquidacionSemanal(
       const isInscripcion = p.payment_type === 'INSCRIPCION' || (p.concept || '').toLowerCase().includes('inscri');
       const teacherComm = isInscripcion
         ? 0
-        : (p.commission_amount != null
-            ? p.commission_amount
-            : amountPaid * (p.commission_rate ?? defaultRate));
+        : (overrideCommissionRate !== undefined
+            ? amountPaid * effectiveRate
+            : (p.commission_amount != null
+                ? p.commission_amount
+                : amountPaid * (p.commission_rate ?? effectiveRate)));
 
       return {
         id: `det-${p.id}`,
         pago_id: p.id,
         alumna_nombre: p.alumna ? `${p.alumna.first_name} ${p.alumna.last_name || ''}`.trim() : 'Alumna',
         payment_date: p.payment_date || (p.created_at ? p.created_at.split('T')[0] : startDate),
-        plan_name: p.concept || p.plan || p.notes || 'Mensualidad',
+        plan_name: p.concept || p.plan || p.notes || (isInscripcion ? 'Inscripción inicial' : 'Mensualidad'),
+        is_inscripcion: isInscripcion,
         amount_paid: amountPaid,
         teacher_commission: teacherComm,
         sede_name: (p.alumna as any)?.sede?.name || 'Sede Principal',
       };
     });
 
-    const totalCollected = detalles.reduce((acc, d) => acc + d.amount_paid, 0);
+    const totalCuotas = detalles.filter((d) => !d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+    const totalInscripciones = detalles.filter((d) => d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+    const totalCollected = totalCuotas + totalInscripciones;
     const teacherAmount = detalles.reduce((acc, d) => acc + d.teacher_commission, 0);
     const studioAmount = totalCollected - teacherAmount;
 
@@ -119,7 +128,9 @@ export async function calcularLiquidacionSemanal(
       period_start: startDate,
       period_end: endDate,
       total_collected: totalCollected,
-      commission_rate: defaultRate,
+      total_cuotas: totalCuotas,
+      total_inscripciones: totalInscripciones,
+      commission_rate: effectiveRate,
       teacher_amount: teacherAmount,
       studio_amount: studioAmount,
       status: 'PENDING',
@@ -136,6 +147,8 @@ export interface LiquidacionGlobalResumen {
   period_start: string;
   period_end: string;
   total_recaudado: number;
+  total_cuotas: number;
+  total_inscripciones: number;
   total_estudio: number;
   total_profesoras: number;
   total_pagos: number;
@@ -172,7 +185,8 @@ const DIAS_MAPA: Record<number, string> = {
 
 export async function calcularLiquidacionGlobal(
   startDate: string,
-  endDate: string
+  endDate: string,
+  overrideRatesByProf?: Record<string, number>
 ): Promise<{ data: LiquidacionGlobalResumen | null; error: string | null }> {
   try {
     const [profsRes, pagosRes] = await Promise.all([
@@ -190,13 +204,16 @@ export async function calcularLiquidacionGlobal(
     const todos_los_detalles: LiquidacionDetalle[] = [];
 
     let totalRecaudadoGlobal = 0;
+    let totalCuotasGlobal = 0;
+    let totalInscripcionesGlobal = 0;
     let totalProfesorasGlobal = 0;
     let totalEstudioGlobal = 0;
 
     for (const profe of todasProfesoras) {
-      const defaultRate = profe.commission_rate ?? 0.40;
+      const effectiveRate = overrideRatesByProf && typeof overrideRatesByProf[profe.id] === 'number'
+        ? overrideRatesByProf[profe.id]
+        : (profe.commission_rate ?? 0.40);
       
-      // Cada pago se atribuye estrictamente a la profesora asignada (o fallback a la de la alumna si pago.profesora_id no es PROFESORA)
       const pagosDeEstaProfe = todosLosPagos.filter((p) => {
         const pProfIsProf = todasProfesoras.some((pr) => pr.id === p.profesora_id);
         const asignadaId = pProfIsProf ? p.profesora_id : ((p.alumna as any)?.profesora_id || p.profesora_id);
@@ -208,16 +225,19 @@ export async function calcularLiquidacionGlobal(
         const isInscripcion = p.payment_type === 'INSCRIPCION' || (p.concept || '').toLowerCase().includes('inscri');
         const teacherComm = isInscripcion
           ? 0
-          : (p.commission_amount != null
-              ? p.commission_amount
-              : amountPaid * (p.commission_rate ?? defaultRate));
+          : (overrideRatesByProf && overrideRatesByProf[profe.id] !== undefined
+              ? amountPaid * effectiveRate
+              : (p.commission_amount != null
+                  ? p.commission_amount
+                  : amountPaid * (p.commission_rate ?? effectiveRate)));
 
         const item: LiquidacionDetalle = {
           id: `det-${p.id}`,
           pago_id: p.id,
           alumna_nombre: p.alumna ? `${p.alumna.first_name} ${p.alumna.last_name || ''}`.trim() : 'Alumna',
           payment_date: p.payment_date || (p.created_at ? p.created_at.split('T')[0] : startDate),
-          plan_name: p.concept || p.plan || p.notes || 'Mensualidad',
+          plan_name: p.concept || p.plan || p.notes || (isInscripcion ? 'Inscripción inicial' : 'Mensualidad'),
+          is_inscripcion: isInscripcion,
           amount_paid: amountPaid,
           teacher_commission: teacherComm,
           sede_name: (p.alumna as any)?.sede?.name || 'Sede Principal',
@@ -226,11 +246,15 @@ export async function calcularLiquidacionGlobal(
         return item;
       });
 
-      const totalCollected = detalles.reduce((acc, d) => acc + d.amount_paid, 0);
+      const totalCuotas = detalles.filter((d) => !d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+      const totalInscripciones = detalles.filter((d) => d.is_inscripcion).reduce((acc, d) => acc + d.amount_paid, 0);
+      const totalCollected = totalCuotas + totalInscripciones;
       const teacherAmount = detalles.reduce((acc, d) => acc + d.teacher_commission, 0);
       const studioAmount = totalCollected - teacherAmount;
 
       totalRecaudadoGlobal += totalCollected;
+      totalCuotasGlobal += totalCuotas;
+      totalInscripcionesGlobal += totalInscripciones;
       totalProfesorasGlobal += teacherAmount;
       totalEstudioGlobal += studioAmount;
 
@@ -241,7 +265,9 @@ export async function calcularLiquidacionGlobal(
         period_start: startDate,
         period_end: endDate,
         total_collected: totalCollected,
-        commission_rate: defaultRate,
+        total_cuotas: totalCuotas,
+        total_inscripciones: totalInscripciones,
+        commission_rate: effectiveRate,
         teacher_amount: teacherAmount,
         studio_amount: studioAmount,
         status: 'PENDING',
@@ -258,7 +284,10 @@ export async function calcularLiquidacionGlobal(
 
     for (const p of pagosSinProfe) {
       const amountPaid = p.amount || 0;
+      const isInscripcion = p.payment_type === 'INSCRIPCION' || (p.concept || '').toLowerCase().includes('inscri');
       totalRecaudadoGlobal += amountPaid;
+      if (isInscripcion) totalInscripcionesGlobal += amountPaid;
+      else totalCuotasGlobal += amountPaid;
       totalEstudioGlobal += amountPaid;
 
       todos_los_detalles.push({
@@ -266,7 +295,8 @@ export async function calcularLiquidacionGlobal(
         pago_id: p.id,
         alumna_nombre: p.alumna ? `${p.alumna.first_name} ${p.alumna.last_name || ''}`.trim() : 'Cobro Directo Estudio',
         payment_date: p.payment_date || (p.created_at ? p.created_at.split('T')[0] : startDate),
-        plan_name: p.concept || p.plan || 'Cobro directo',
+        plan_name: p.concept || p.plan || (isInscripcion ? 'Inscripción directa' : 'Cobro directo'),
+        is_inscripcion: isInscripcion,
         amount_paid: amountPaid,
         teacher_commission: 0,
         sede_name: 'Estudio General',
@@ -277,6 +307,8 @@ export async function calcularLiquidacionGlobal(
       period_start: startDate,
       period_end: endDate,
       total_recaudado: totalRecaudadoGlobal,
+      total_cuotas: totalCuotasGlobal,
+      total_inscripciones: totalInscripcionesGlobal,
       total_estudio: totalEstudioGlobal,
       total_profesoras: totalProfesorasGlobal,
       total_pagos: todosLosPagos.length,

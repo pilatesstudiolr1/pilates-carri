@@ -10,12 +10,14 @@ import { AlumnaFormModal } from '@/components/alumnas/AlumnaFormModal';
 import { AlumnaDetailModal } from '@/components/alumnas/AlumnaDetailModal';
 import { AsignarTurnoFijoModal } from '@/components/alumnas/AsignarTurnoFijoModal';
 import { NuevaAlumnaForm } from '@/components/alumnas/NuevaAlumnaForm';
+import { CumpleanosView } from '@/components/alumnas/CumpleanosView';
 import { Alumna, AlumnaInsert, AlumnaStatus, MetodoPago } from '@/types/database';
 import { getAlumnas, updateAlumna, createAlumna, deleteAlumna, darDeBajaAlumna, reactivarAlumna } from '@/lib/services/alumnas';
 import { addAlumnaToClase } from '@/lib/services/agenda';
 import { registrarPago } from '@/lib/services/pagos';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { useUser } from '@/hooks/useUser';
+import { buildMensajeBajaAlumna, openWhatsAppMessage } from '@/lib/utils';
 import {
   Users,
   Plus,
@@ -32,6 +34,8 @@ import {
   UserPlus,
   UserX,
   RotateCcw,
+  Cake,
+  MessageCircle,
 } from 'lucide-react';
 
 const ITEMS_PER_PAGE = 30;
@@ -76,8 +80,10 @@ function AlumnasPageContent() {
   const { profile } = useUser();
   const isProfesora = profile?.role === 'PROFESORA';
 
-  const [activeTab, setActiveTab] = useState<'LIST' | 'NEW'>(() => {
-    return tabParam === 'new' ? 'NEW' : 'LIST';
+  const [activeTab, setActiveTab] = useState<'LIST' | 'NEW' | 'CUMPLEANOS'>(() => {
+    if (tabParam === 'new') return 'NEW';
+    if (tabParam === 'cumpleanos') return 'CUMPLEANOS';
+    return 'LIST';
   });
 
   const [alumnas, setAlumnas] = useState<Alumna[]>([]);
@@ -99,6 +105,8 @@ function AlumnasPageContent() {
   useEffect(() => {
     if (tabParam === 'new') {
       setActiveTab('NEW');
+    } else if (tabParam === 'cumpleanos') {
+      setActiveTab('CUMPLEANOS');
     } else {
       setActiveTab('LIST');
     }
@@ -206,12 +214,29 @@ Al darla de baja, pasará a estado Inactiva y SE LIBERARÁN AUTOMÁTICAMENTE SUS
     if (error) {
       await alertDialog({ title: 'Error al dar de baja', message: error, variant: 'danger' });
     } else {
-      await alertDialog({
-        title: 'Alumna dada de baja',
-        message: `${alumna.first_name} ${alumna.last_name || ''} ahora está inactiva y sus turnos fueron liberados. Podrás reactivarla con un clic cuando vuelva.`,
-        variant: 'success',
-      });
       fetchAlumnas();
+
+      const hasPhone = Boolean(alumna.phone && alumna.phone.replace(/\D/g, '').length >= 6);
+      if (hasPhone) {
+        const wantWhatsApp = await confirm({
+          title: 'Alumna dada de baja con éxito',
+          message: `${alumna.first_name} ${alumna.last_name || ''} ahora está inactiva y sus turnos fueron liberados.\n\n¿Deseas abrir WhatsApp para enviarle el mensaje de aviso de baja y despedida?`,
+          confirmText: '📱 Enviar mensaje por WhatsApp',
+          cancelText: 'Cerrar sin enviar',
+          variant: 'info',
+        });
+
+        if (wantWhatsApp) {
+          const msg = buildMensajeBajaAlumna(alumna.first_name);
+          openWhatsAppMessage(alumna.phone, msg);
+        }
+      } else {
+        await alertDialog({
+          title: 'Alumna dada de baja',
+          message: `${alumna.first_name} ${alumna.last_name || ''} ahora está inactiva y sus turnos fueron liberados. Podrás reactivarla con un clic cuando vuelva.`,
+          variant: 'success',
+        });
+      }
     }
   };
 
@@ -318,6 +343,19 @@ Al darla de baja, pasará a estado Inactiva y SE LIBERARÁN AUTOMÁTICAMENTE SUS
             <button
               onClick={() => {
                 setSelectedAlumna(null);
+                setActiveTab('CUMPLEANOS');
+              }}
+              className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'CUMPLEANOS'
+                  ? 'bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] shadow-xs'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              <Cake className="h-3.5 w-3.5 text-amber-500" /> Cumpleaños
+            </button>
+            <button
+              onClick={() => {
+                setSelectedAlumna(null);
                 setActiveTab('NEW');
               }}
               className={`px-3.5 py-1.5 rounded-[29px] text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
@@ -347,6 +385,11 @@ Al darla de baja, pasará a estado Inactiva y SE LIBERARÁN AUTOMÁTICAMENTE SUS
               fetchAlumnas();
             }}
           />
+        </div>
+      ) : activeTab === 'CUMPLEANOS' ? (
+        /* Pestaña: Calendario de Cumpleaños y Saludos WhatsApp */
+        <div className="w-full max-w-6xl mx-auto">
+          <CumpleanosView />
         </div>
       ) : (
         /* Pestaña: Listado de Alumnas con Filtros Interactivos */
